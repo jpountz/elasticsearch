@@ -22,7 +22,6 @@ package org.elasticsearch.common;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import gnu.trove.set.hash.THashSet;
-
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.UnicodeUtil;
 import org.elasticsearch.common.io.FastStringReader;
@@ -1503,5 +1502,49 @@ public class Strings {
         final byte[] bytes = new byte[spare.length];
         System.arraycopy(spare.bytes, spare.offset, bytes, 0, bytes.length);
         return bytes;
+    }
+
+    /**
+     * Compares if two {@link String}s are equal regardless of whether they are written in underscore or camel case.
+     */
+    public static boolean equalsIgnoreCamelCase(String expected, String actual) {
+        int i = 0, j = 0;
+        while (true) {
+            if (i == actual.length()) {
+                return j == expected.length();
+            } else if (j == expected.length()) {
+                return false;
+            }
+
+            // For both Strings, compute the next character if they were written in camel-case.
+            // It could be a little nicer using iterators and so on but one advantage of this impl is that it doesn't allocate
+            // objects.
+            int c1 = actual.codePointAt(i);
+            int nextI = i + Character.charCount(c1);
+            if (c1 == '_' && nextI < actual.length()) {
+                final int next = actual.codePointAt(nextI);
+                if (Character.isLowerCase(next)) {
+                    nextI += Character.charCount(next);
+                    c1 = Character.toUpperCase(next);
+                }
+            }
+
+            int c2 = expected.codePointAt(j);
+            int nextJ = j + Character.charCount(c2);
+            if (c2 == '_' && nextJ < expected.length()) {
+                final int next = expected.codePointAt(nextJ);
+                if (Character.isLowerCase(next)) {
+                    nextJ += Character.charCount(next);
+                    c2 = Character.toUpperCase(next);
+                }
+            }
+
+            if (c1 != c2) {
+                return false;
+            }
+
+            i = nextI;
+            j = nextJ;
+        }
     }
 }

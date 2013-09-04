@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.google.common.collect.Lists.newArrayList;
+import static org.elasticsearch.common.Strings.equalsIgnoreCamelCase;
 
 /**
  * <pre>
@@ -85,13 +86,13 @@ public class HighlighterParseElement implements SearchParseElement {
             if (token == XContentParser.Token.FIELD_NAME) {
                 topLevelFieldName = parser.currentName();
             } else if (token == XContentParser.Token.START_ARRAY) {
-                if ("pre_tags".equals(topLevelFieldName) || "preTags".equals(topLevelFieldName)) {
+                if (equalsIgnoreCamelCase("pre_tags", topLevelFieldName)) {
                     List<String> preTagsList = Lists.newArrayList();
                     while ((token = parser.nextToken()) != XContentParser.Token.END_ARRAY) {
                         preTagsList.add(parser.text());
                     }
                     globalPreTags = preTagsList.toArray(new String[preTagsList.size()]);
-                } else if ("post_tags".equals(topLevelFieldName) || "postTags".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("post_tags", topLevelFieldName)) {
                     List<String> postTagsList = Lists.newArrayList();
                     while ((token = parser.nextToken()) != XContentParser.Token.END_ARRAY) {
                         postTagsList.add(parser.text());
@@ -99,41 +100,41 @@ public class HighlighterParseElement implements SearchParseElement {
                     globalPostTags = postTagsList.toArray(new String[postTagsList.size()]);
                 }
             } else if (token.isValue()) {
-                if ("order".equals(topLevelFieldName)) {
+                if (equalsIgnoreCamelCase("order", topLevelFieldName)) {
                     globalScoreOrdered = "score".equals(parser.text());
-                } else if ("tags_schema".equals(topLevelFieldName) || "tagsSchema".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("tags_schema", topLevelFieldName)) {
                     String schema = parser.text();
                     if ("styled".equals(schema)) {
                         globalPreTags = STYLED_PRE_TAG;
                         globalPostTags = STYLED_POST_TAGS;
                     }
-                } else if ("highlight_filter".equals(topLevelFieldName) || "highlightFilter".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("highlight_filter", topLevelFieldName)) {
                     globalHighlightFilter = parser.booleanValue();
-                } else if ("fragment_size".equals(topLevelFieldName) || "fragmentSize".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("fragment_size", topLevelFieldName)) {
                     globalFragmentSize = parser.intValue();
-                } else if ("number_of_fragments".equals(topLevelFieldName) || "numberOfFragments".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("number_of_fragments", topLevelFieldName)) {
                     globalNumOfFragments = parser.intValue();
-                } else if ("encoder".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("encoder", topLevelFieldName)) {
                     globalEncoder = parser.text();
-                } else if ("require_field_match".equals(topLevelFieldName) || "requireFieldMatch".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("require_field_match", topLevelFieldName)) {
                     globalRequireFieldMatch = parser.booleanValue();
-                } else if ("boundary_max_scan".equals(topLevelFieldName) || "boundaryMaxScan".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("boundary_max_scan", topLevelFieldName)) {
                     globalBoundaryMaxScan = parser.intValue();
-                } else if ("boundary_chars".equals(topLevelFieldName) || "boundaryChars".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("boundary_chars", topLevelFieldName)) {
                     char[] charsArr = parser.text().toCharArray();
                     globalBoundaryChars = new Character[charsArr.length];
                     for (int i = 0; i < charsArr.length; i++) {
                         globalBoundaryChars[i] = charsArr[i];
                     }
-                } else if ("type".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("type", topLevelFieldName)) {
                     globalHighlighterType = parser.text();
-                } else if ("fragmenter".equals(topLevelFieldName)) {
+                } else if (equalsIgnoreCamelCase("fragmenter", topLevelFieldName)) {
                     globalFragmenter = parser.text();
                 }
-            } else if (token == XContentParser.Token.START_OBJECT && "options".equals(topLevelFieldName)) {
+            } else if (token == XContentParser.Token.START_OBJECT && equalsIgnoreCamelCase("options", topLevelFieldName)) {
                 globalOptions = parser.map();
             } else if (token == XContentParser.Token.START_OBJECT) {
-                if ("fields".equals(topLevelFieldName)) {
+                if (equalsIgnoreCamelCase("fields", topLevelFieldName)) {
                     String highlightFieldName = null;
                     while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
                         if (token == XContentParser.Token.FIELD_NAME) {
@@ -145,13 +146,13 @@ public class HighlighterParseElement implements SearchParseElement {
                                 if (token == XContentParser.Token.FIELD_NAME) {
                                     fieldName = parser.currentName();
                                 } else if (token == XContentParser.Token.START_ARRAY) {
-                                    if ("pre_tags".equals(fieldName) || "preTags".equals(fieldName)) {
+                                    if (equalsIgnoreCamelCase("pre_tags", fieldName)) {
                                         List<String> preTagsList = Lists.newArrayList();
                                         while ((token = parser.nextToken()) != XContentParser.Token.END_ARRAY) {
                                             preTagsList.add(parser.text());
                                         }
                                         field.preTags(preTagsList.toArray(new String[preTagsList.size()]));
-                                    } else if ("post_tags".equals(fieldName) || "postTags".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("post_tags", fieldName)) {
                                         List<String> postTagsList = Lists.newArrayList();
                                         while ((token = parser.nextToken()) != XContentParser.Token.END_ARRAY) {
                                             postTagsList.add(parser.text());
@@ -159,33 +160,33 @@ public class HighlighterParseElement implements SearchParseElement {
                                         field.postTags(postTagsList.toArray(new String[postTagsList.size()]));
                                     }
                                 } else if (token.isValue()) {
-                                    if ("fragment_size".equals(fieldName) || "fragmentSize".equals(fieldName)) {
+                                    if (equalsIgnoreCamelCase("fragment_size", fieldName)) {
                                         field.fragmentCharSize(parser.intValue());
-                                    } else if ("number_of_fragments".equals(fieldName) || "numberOfFragments".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("number_of_fragments", fieldName)) {
                                         field.numberOfFragments(parser.intValue());
-                                    } else if ("fragment_offset".equals(fieldName) || "fragmentOffset".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("fragment_offset", fieldName)) {
                                         field.fragmentOffset(parser.intValue());
-                                    } else if ("highlight_filter".equals(fieldName) || "highlightFilter".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("highlight_filter", fieldName)) {
                                         field.highlightFilter(parser.booleanValue());
-                                    } else if ("order".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("order", fieldName)) {
                                         field.scoreOrdered("score".equals(parser.text()));
-                                    } else if ("require_field_match".equals(fieldName) || "requireFieldMatch".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("require_field_match", fieldName)) {
                                         field.requireFieldMatch(parser.booleanValue());
-                                    } else if ("boundary_max_scan".equals(topLevelFieldName) || "boundaryMaxScan".equals(topLevelFieldName)) {
+                                    } else if (equalsIgnoreCamelCase("boundary_max_scan", topLevelFieldName)) {
                                         field.boundaryMaxScan(parser.intValue());
-                                    } else if ("boundary_chars".equals(topLevelFieldName) || "boundaryChars".equals(topLevelFieldName)) {
+                                    } else if (equalsIgnoreCamelCase("boundary_chars", topLevelFieldName)) {
                                         char[] charsArr = parser.text().toCharArray();
                                         Character[] boundaryChars = new Character[charsArr.length];
                                         for (int i = 0; i < charsArr.length; i++) {
                                             boundaryChars[i] = charsArr[i];
                                         }
                                         field.boundaryChars(boundaryChars);
-                                    } else if ("type".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("type", fieldName)) {
                                         field.highlighterType(parser.text());
-                                    } else if ("fragmenter".equals(fieldName)) {
+                                    } else if (equalsIgnoreCamelCase("fragmenter", fieldName)) {
                                         field.fragmenter(parser.text());
                                     }
-                                } else if (fieldName.equals("options")) {
+                                } else if (equalsIgnoreCamelCase(fieldName, "options")) {
                                     field.options(parser.map());
                                 }
                             }
