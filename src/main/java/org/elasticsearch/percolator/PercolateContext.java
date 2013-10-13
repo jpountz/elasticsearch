@@ -55,6 +55,7 @@ import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.search.Scroll;
 import org.elasticsearch.search.SearchHitField;
 import org.elasticsearch.search.SearchShardTarget;
+import org.elasticsearch.search.aggregations.SearchContextAggregations;
 import org.elasticsearch.search.dfs.DfsSearchResult;
 import org.elasticsearch.search.facet.SearchContextFacets;
 import org.elasticsearch.search.fetch.FetchSearchResult;
@@ -284,14 +285,8 @@ public class PercolateContext extends SearchContext {
     }
 
     @Override
-    public SearchContextFacets facets() {
-        return facets;
-    }
-
-    @Override
-    public SearchContext facets(SearchContextFacets facets) {
-        this.facets = facets;
-        return this;
+    public int hashCode() {
+        return super.hashCode();    //To change body of overridden methods use File | Settings | File Templates.
     }
 
     // Unused:
@@ -367,6 +362,25 @@ public class PercolateContext extends SearchContext {
 
     @Override
     public SearchContext scroll(Scroll scroll) {
+        throw new UnsupportedOperationException();
+    }
+
+    public SearchContextAggregations aggregations() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SearchContext aggregations(SearchContextAggregations aggregations) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SearchContextFacets facets() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SearchContext facets(SearchContextFacets facets) {
         throw new UnsupportedOperationException();
     }
 
