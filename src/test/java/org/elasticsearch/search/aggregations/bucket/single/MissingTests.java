@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.test.integration.search.aggregations.bucket.single;
+package org.elasticsearch.search.aggregations.bucket.single;
 
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
