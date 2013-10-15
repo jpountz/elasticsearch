@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
@@ -41,41 +42,37 @@ public class DoubleTermsTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     @Before
     public void init() throws Exception {
         createIndex("idx");
-
-        for (int i = 0; i < 5; i++) {
-            client().prepareIndex("idx", "type").setSource(jsonBuilder()
+        
+        IndexRequestBuilder[] lowcardBuilders = new IndexRequestBuilder[5]; // nocommit randomize the size
+        for (int i = 0; i < lowcardBuilders.length; i++) {
+            lowcardBuilders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
                     .field("value", (double) i)
                     .startArray("values").value((double)i).value(i + 1d).endArray()
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject());
+                    
         }
-
-        for (int i = 0; i < 100; i++) {
-            client().prepareIndex("idx", "high_card_type").setSource(jsonBuilder()
+        indexRandom(randomBoolean(), lowcardBuilders);
+        IndexRequestBuilder[] highCardBuilders = new IndexRequestBuilder[100]; // nocommit randomize the size
+        for (int i = 0; i < highCardBuilders.length; i++) {
+            highCardBuilders[i] = client().prepareIndex("idx", "high_card_type").setSource(jsonBuilder()
                     .startObject()
                     .field("value", (double) i)
                     .startArray("values").value((double)i).value(i + 1d).endArray()
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject());
         }
+        indexRandom(true, highCardBuilders);
 
         createIndex("idx_unmapped");
 
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
     }
 
     @Test

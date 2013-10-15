@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.single;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.single.missing.Missing;
@@ -26,6 +27,9 @@ import org.elasticsearch.search.aggregations.calc.numeric.avg.Avg;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.junit.Before;
 import org.junit.Test;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.avg;
@@ -39,47 +43,42 @@ import static org.hamcrest.core.IsNull.notNullValue;
  */
 public class MissingTests extends AbstractIntegrationTest {
 
+
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     @Before
     public void init() throws Exception {
         createIndex("idx");
-        for (int i = 0; i < 5; i++) {
-            client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
+            builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
                     .field("tag", "tag1")
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject()));
         }
-        for (int i = 0; i < 5; i++) {
-            client().prepareIndex("idx", "type", ""+i+6).setSource(jsonBuilder()
+        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
+            builders.add(client().prepareIndex("idx", "type", ""+i+6).setSource(jsonBuilder()
                     .startObject()
                     .field("value", i)
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject()));
         }
 
         createIndex("unmapped_idx");
-        for (int i = 0; i < 3; i++) {
-            client().prepareIndex("unmapped_idx", "type", ""+i).setSource(jsonBuilder()
+        for (int i = 0; i < 3; i++) { // NOCOMMIT randomize the size
+            builders.add(client().prepareIndex("unmapped_idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
                     .field("value", i+5)
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject()));
         }
 
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
+        indexRandom(true, builders);
+
     }
 
     @Test

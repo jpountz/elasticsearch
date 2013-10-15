@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
@@ -44,35 +45,29 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
     }
-
-    protected int numberOfShards() {
-        return 5;
-    }
-
+    
     @Before
     public void init() throws Exception {
         client().admin().indices().prepareCreate("idx")
                 .addMapping("type", "ip", "type=ip", "ips", "type=ip")
                 .execute().actionGet();
-
-        for (int i = 0; i < 255; i++) {
-            client().prepareIndex("idx", "type").setSource(jsonBuilder()
+        IndexRequestBuilder[] builders = new IndexRequestBuilder[255]; // NOCOMMIT randomize the number of docs
+        //NOCOMMIT randomize the values in the docs?
+        for (int i = 0; i < builders.length; i++) {
+            builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
                     .field("ip", "10.0.0." + (i))
                     .startArray("ips").value("10.0.0." + i).value("10.0.0." + (i + 1)).endArray()
                     .field("value", (i < 100 ? 1 : i < 200 ? 2 : 3))        // 100 1's, 100 2's, and 55 3's
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject());
         }
-
+        indexRandom(true, builders);
         createIndex("idx_unmapped");
 
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
     }
 
     @Test

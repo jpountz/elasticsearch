@@ -494,6 +494,10 @@ public abstract class AbstractIntegrationTest extends ElasticsearchTestCase {
         assertNoFailures(actionGet);
         return actionGet;
     }
+    
+    public void indexRandom(boolean forceRefresh, List<IndexRequestBuilder> builders) throws InterruptedException, ExecutionException {
+        indexRandom(forceRefresh, builders.toArray(new IndexRequestBuilder[builders.size()]));
+    }
 
     // TODO move this into a base class for integration tests
     public void indexRandom(boolean forceRefresh, IndexRequestBuilder... builders) throws InterruptedException, ExecutionException {

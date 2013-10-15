@@ -45,13 +45,9 @@ public class DateRangeTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     private DateTime date(int month, int day) {
@@ -71,7 +67,9 @@ public class DateRangeTests extends AbstractIntegrationTest {
     @Before
     public void init() throws Exception {
         createIndex("idx");
-
+        // NOCOMMIT: we must randomize the docs here the risk is too high that we are depending on the order
+        // we should also index way more docs that those (maybe just with dummy fields to get more variation or
+        // use a filter and an alias to filter those that are relevant out)
         indexDoc(1, 2, 1);  // Jan 2
         indexDoc(2, 2, 2);  // Feb 2
         indexDoc(2, 15, 3); // Feb 15
