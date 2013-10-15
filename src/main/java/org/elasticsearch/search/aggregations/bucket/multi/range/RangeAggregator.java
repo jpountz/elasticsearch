@@ -42,6 +42,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.cre
 /**
  *
  */
+// nocommit range aggregations should use binary search to find the matching ranges
 public class RangeAggregator extends DoubleBucketsAggregator {
 
     public static class Range {
