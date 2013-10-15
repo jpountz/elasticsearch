@@ -139,6 +139,8 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
         }
         InternalTerms reduced = null;
 
+        //nocommit we should use HPPC here instead of a HashMap (that will enable us to also sort the backing array buffer instead of using priority queue/treeset)
+
         Map<Text, List<InternalTerms.Bucket>> buckets = new HashMap<Text, List<InternalTerms.Bucket>>(requiredSize);
         for (InternalAggregation aggregation : aggregations) {
             InternalTerms terms = (InternalTerms) aggregation;

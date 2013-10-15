@@ -41,7 +41,7 @@ import java.util.List;
 import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
 
 /**
- *
+ * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
  */
 public class StringTermsAggregator extends BytesBucketsAggregator {
 
