@@ -50,6 +50,9 @@ public class TermsParser implements AggregatorParser {
         return StringTerms.TYPE.name();
     }
 
+    //nocommit add support for shard_size (vs. size) a la terms facets
+    //nocommit add support for term filtering (regexp/include/exclude) a lat terms facets
+
     @Override
     public Aggregator.Factory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 

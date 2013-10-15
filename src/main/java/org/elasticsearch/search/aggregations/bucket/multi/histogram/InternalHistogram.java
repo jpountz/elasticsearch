@@ -30,7 +30,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- *
+ * nocommit I'd love to rename this to InternalNumericHistogram (see comment on {@link Histogram})
  */
 public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> implements Histogram {
 

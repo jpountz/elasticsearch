@@ -110,7 +110,7 @@ public interface Rounding extends Streamable {
             Rounding rounding = null;
             byte id = in.readByte();
             switch (id) {
-                case Interval.ID: rounding = new Interval();
+                case Interval.ID: rounding = new Interval(); break;
                 case TimeZoneRounding.TimeTimeZoneRoundingFloor.ID: rounding = new TimeZoneRounding.TimeTimeZoneRoundingFloor(); break;
                 case TimeZoneRounding.UTCTimeZoneRoundingFloor.ID: rounding = new TimeZoneRounding.UTCTimeZoneRoundingFloor(); break;
                 case TimeZoneRounding.DayTimeZoneRoundingFloor.ID: rounding = new TimeZoneRounding.DayTimeZoneRoundingFloor(); break;

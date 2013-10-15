@@ -146,6 +146,8 @@ public class DoubleTerms extends InternalTerms {
             return (UnmappedTerms) aggregations.get(0);
         }
 
+        //nocommit we can just sort the backing array buffer of LongObjectOpenHashMap and use arraycopy instead of using prio-queue/treeset
+
         if (requiredSize < BucketPriorityQueue.LIMIT) {
             BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
             boolean[] states = buckets.v().allocated;

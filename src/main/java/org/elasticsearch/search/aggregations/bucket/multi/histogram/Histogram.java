@@ -20,7 +20,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 /**
- *
+ * nocommit I'd love to rename this to NumericHistogram - this will also clean up the code and make it less confusing
  */
 public interface Histogram extends HistogramBase<Histogram.Bucket> {
 

@@ -46,6 +46,8 @@ import java.util.ListIterator;
 
 /**
  * An internal implementation of {@link HistogramBase}
+ *
+ * nocommit I'd love to rename it to AbstractHistogram (see the comment on {@link Histogram}
  */
 abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends InternalAggregation implements HistogramBase<B>, ToXContent, Streamable {
 
@@ -142,6 +144,8 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         }
         return (B) bucketsMap.get(key);
     }
+
+    //nocommit extract the reduce logic to a strategy class and have it configurable at request time (two possible strategies - total & delta)
 
     @Override
     public InternalAggregation reduce(ReduceContext reduceContext) {
