@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.range.Range;
@@ -38,35 +39,29 @@ import static org.hamcrest.core.IsNull.notNullValue;
  */
 public class RangeTests extends AbstractIntegrationTest {
 
+
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     @Before
     public void init() throws Exception {
         createIndex("idx");
-
-        for (int i = 0; i < 10; i++) {
-            client().prepareIndex("idx", "type").setSource(jsonBuilder()
+        IndexRequestBuilder[] builders = new IndexRequestBuilder[10]; // NOCOMMIT randomize the size?
+        for (int i = 0; i < builders.length; i++) {
+            builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
                     .field("value", i+1)
                     .startArray("values").value(i+1).value(i+2).endArray()
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject());
         }
-
+        indexRandom(true, builders);
         createIndex("idx_unmapped");
 
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
     }
 
     @Test

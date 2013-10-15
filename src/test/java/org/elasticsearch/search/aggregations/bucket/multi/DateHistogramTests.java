@@ -43,13 +43,9 @@ public class DateHistogramTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     private DateTime date(int month, int day) {
@@ -69,7 +65,9 @@ public class DateHistogramTests extends AbstractIntegrationTest {
     @Before
     public void init() throws Exception {
         createIndex("idx");
-
+        // NOCOMMIT: we must randomize the docs here the risk is too high that we are depending on the order
+        // we should also index way more docs that those (maybe just with dummy fields to get more variation or
+        // use a filter and an alias to filter those that are relevant out)
         indexDoc(1, 2, 1);  // date: Jan 2, dates: Jan 2, Feb 3
         indexDoc(2, 2, 2);  // date: Feb 2, dates: Feb 2, Mar 3
         indexDoc(2, 15, 3); // date: Feb 15, dates: Feb 15, Mar 16
@@ -702,7 +700,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
-        assertThat(bucket.getDocCount(), equalTo(1l));
+        assertThat(bucket.getDocCount(), equalTo(1l)); //NOCOMMIT - this fails if replicas > 0
 
         key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);

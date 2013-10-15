@@ -19,9 +19,13 @@
 
 package org.elasticsearch.search.aggregations.calc;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.junit.Before;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
@@ -33,29 +37,25 @@ public abstract class AbstractNumericTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     @Before
     public void init() throws Exception {
         createIndex("idx");
         createIndex("idx2");
-        for (int i = 0; i < 10; i++) {
-            client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+
+        for (int i = 0; i < 10; i++) { // NOCOMMIT randomize the size and the params in here?
+            builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
                     .field("value", i+1)
                     .startArray("values").value(i+2).value(i+3).endArray()
-                    .endObject())
-                    .execute().actionGet();
+                    .endObject()));
         }
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
+        indexRandom(true, builders);
     }
 
     public abstract void testUnmapped() throws Exception;

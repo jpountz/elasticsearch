@@ -47,13 +47,9 @@ public class GeoDistanceTests extends AbstractIntegrationTest {
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
-                .put("index.number_of_shards", numberOfShards())
-                .put("index.number_of_replicas", 0)
+                .put("index.number_of_shards", between(1, 5))
+                .put("index.number_of_replicas", between(0, 1))
                 .build();
-    }
-
-    protected int numberOfShards() {
-        return 5;
     }
 
     private void indexCity(String name, String latLon) throws Exception {
@@ -70,7 +66,9 @@ public class GeoDistanceTests extends AbstractIntegrationTest {
         client().admin().indices().prepareCreate("idx")
                 .addMapping("type", "location", "type=geo_point", "city", "type=string,index=not_analyzed")
                 .execute().actionGet();
-
+        
+        //NOCOMMIT index these things randomized and inject dummy docs 
+        
         // below 500km
         indexCity("utrecht", "52.0945, 5.116");
         indexCity("haarlem", "52.3890, 4.637");
