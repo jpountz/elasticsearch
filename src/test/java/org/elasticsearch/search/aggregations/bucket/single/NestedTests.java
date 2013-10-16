@@ -23,6 +23,8 @@ import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.search.aggregations.bucket.multi.terms.LongTerms;
+import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.single.nested.Nested;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.Stats;
 import org.elasticsearch.test.AbstractIntegrationTest;
@@ -35,6 +37,7 @@ import java.util.List;
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.nested;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.stats;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
@@ -51,6 +54,22 @@ public class NestedTests extends AbstractIntegrationTest {
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
     }
+
+    /*
+
+    1
+        1, 2,3,4,5
+    2
+        2, 3,4,5,6
+    3
+        3,4,5,6,7
+    4
+        4,5,6,7,8
+    5
+        5,6,7,8,9
+
+
+     */
 
     @Before
     public void init() throws Exception {
@@ -102,7 +121,7 @@ public class NestedTests extends AbstractIntegrationTest {
     }
 
     @Test
-    public void OnNonNestedField() throws Exception {
+    public void onNonNestedField() throws Exception {
 
         try {
             client().prepareSearch("idx")
@@ -114,5 +133,60 @@ public class NestedTests extends AbstractIntegrationTest {
 
         } catch (ElasticSearchException ese) {
         }
+    }
+
+    /*
+
+    1 - 1
+    2 - 2
+    3 - 3
+    4 - 4
+    5 - 5
+    6 - 4
+    7 - 3
+    8 - 2
+    9 - 1
+
+     */
+    @Test
+    public void nestedWithSubTermsAgg() throws Exception {
+
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(nested("nested").path("nested")
+                        .subAggregation(terms("values").field("nested.value")))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        Nested nested = response.getAggregations().get("nested");
+        assertThat(nested, notNullValue());
+        assertThat(nested.getName(), equalTo("nested"));
+        assertThat(nested.getDocCount(), equalTo(25l));
+        assertThat(nested.getAggregations().asList().isEmpty(), is(false));
+
+        LongTerms values = nested.getAggregations().get("values");
+        assertThat(values, notNullValue());
+        assertThat(values.getName(), equalTo("values"));
+        assertThat(values.buckets(), notNullValue());
+        assertThat(values.buckets().size(), equalTo(9));
+        assertThat(values.getByTerm("1"), notNullValue());
+        assertThat(values.getByTerm("1").getDocCount(), equalTo(1l));
+        assertThat(values.getByTerm("2"), notNullValue());
+        assertThat(values.getByTerm("2").getDocCount(), equalTo(2l));
+        assertThat(values.getByTerm("3"), notNullValue());
+        assertThat(values.getByTerm("3").getDocCount(), equalTo(3l));
+        assertThat(values.getByTerm("4"), notNullValue());
+        assertThat(values.getByTerm("4").getDocCount(), equalTo(4l));
+        assertThat(values.getByTerm("5"), notNullValue());
+        assertThat(values.getByTerm("5").getDocCount(), equalTo(5l));
+        assertThat(values.getByTerm("6"), notNullValue());
+        assertThat(values.getByTerm("6").getDocCount(), equalTo(4l));
+        assertThat(values.getByTerm("7"), notNullValue());
+        assertThat(values.getByTerm("7").getDocCount(), equalTo(3l));
+        assertThat(values.getByTerm("8"), notNullValue());
+        assertThat(values.getByTerm("8").getDocCount(), equalTo(2l));
+        assertThat(values.getByTerm("9"), notNullValue());
+        assertThat(values.getByTerm("9").getDocCount(), equalTo(1l));
+
     }
 }

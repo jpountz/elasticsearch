@@ -52,7 +52,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     private FixedBitSet parentDocs;
 
     private long docCount;
-    private InternalAggregations aggregations;
 
     public NestedAggregator(String name, List<Aggregator.Factory> factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
         super(name, factories, aggregationContext, parent);
@@ -122,7 +121,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
                 }
             }
             NestedAggregator.this.docCount = docCount;
-            NestedAggregator.this.aggregations = buildAggregations(subAggregators);
         }
 
         @Override
