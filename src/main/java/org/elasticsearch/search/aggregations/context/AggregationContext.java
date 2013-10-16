@@ -181,10 +181,12 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
 
     public void registerReaderContextAware(ReaderContextAware readerContextAware) {
         readerAwares.add(readerContextAware);
+        setReaderIfNeeded(readerContextAware);
     }
 
     public void registerScorerAware(ScorerAware scorerAware) {
         scorerAwares.add(scorerAware);
+        setScorerIfNeeded(scorerAware);
     }
 
     private void setReaderIfNeeded(ReaderContextAware readerContextAware) {
