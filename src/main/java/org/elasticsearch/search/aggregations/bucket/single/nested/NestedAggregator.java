@@ -100,13 +100,11 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
     class Collector implements Aggregator.Collector {
 
-        private final Aggregator[] subAggregators;
         private final Aggregator.Collector[] collectors;
 
         private long docCount;
 
         public Collector(Aggregator[] subAggregators) {
-            this.subAggregators = subAggregators;
             this.collectors = new Aggregator.Collector[subAggregators.length];
             for (int i = 0; i < subAggregators.length; i++) {
                 collectors[i] = subAggregators[i].collector();

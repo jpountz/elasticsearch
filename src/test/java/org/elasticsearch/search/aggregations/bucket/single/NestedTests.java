@@ -24,8 +24,10 @@ import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.LongTerms;
+import org.elasticsearch.search.aggregations.bucket.multi.terms.StringTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.single.nested.Nested;
+import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.Stats;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.junit.Before;
@@ -35,9 +37,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.nested;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.stats;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
@@ -187,6 +187,32 @@ public class NestedTests extends AbstractIntegrationTest {
         assertThat(values.getByTerm("8").getDocCount(), equalTo(2l));
         assertThat(values.getByTerm("9"), notNullValue());
         assertThat(values.getByTerm("9").getDocCount(), equalTo(1l));
+    }
 
+    @Test
+    public void nestedAsSubAggregation() throws Exception {
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(terms("top_values").field("value")
+                        .subAggregation(nested("nested").path("nested")
+                                .subAggregation(max("max_value").field("nested.value"))))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        LongTerms values = response.getAggregations().get("top_values");
+        assertThat(values, notNullValue());
+        assertThat(values.getName(), equalTo("top_values"));
+        assertThat(values.buckets(), notNullValue());
+        assertThat(values.buckets().size(), equalTo(5));
+
+        for (int i = 0; i < 5; i++) {
+            String topValue = "" + (i + 1);
+            assertThat(values.getByTerm(topValue), notNullValue());
+            Nested nested = values.getByTerm(topValue).getAggregations().get("nested");
+            assertThat(nested, notNullValue());
+            Max max = nested.getAggregations().get("max_value");
+            assertThat(max, notNullValue());
+            assertThat(max.getValue(), equalTo(i + 5.0));
+        }
     }
 }
