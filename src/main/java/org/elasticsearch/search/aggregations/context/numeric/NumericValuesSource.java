@@ -82,21 +82,22 @@ public interface NumericValuesSource extends ValuesSource {
 
     public static class Script extends ValuesSource.Script implements NumericValuesSource {
 
-        private final boolean multiValue;
         private final ValueFormatter formatter;
         private final ValueParser parser;
         private final ScriptValueType scriptValueType;
 
-        private ScriptDoubleValues doubleValues;
-        private ScriptLongValues longValues;
-        private ScriptBytesValues bytesValues;
+        private final ScriptDoubleValues doubleValues;
+        private final ScriptLongValues longValues;
+        private final ScriptBytesValues bytesValues;
 
         public Script(SearchScript script, boolean multiValue, ScriptValueType scriptValueType, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
             super(script);
-            this.multiValue = multiValue;
             this.formatter = formatter;
             this.parser = parser;
             this.scriptValueType = scriptValueType;
+            longValues = new ScriptLongValues(script, multiValue);
+            doubleValues = new ScriptDoubleValues(script, multiValue);
+            bytesValues = new ScriptBytesValues(script, multiValue);
         }
 
         @Override
@@ -106,25 +107,16 @@ public interface NumericValuesSource extends ValuesSource {
 
         @Override
         public LongValues longValues() {
-            if (longValues == null) {
-                longValues = new ScriptLongValues(script, multiValue);
-            }
             return longValues;
         }
 
         @Override
         public DoubleValues doubleValues() {
-            if (doubleValues == null) {
-                doubleValues = new ScriptDoubleValues(script, multiValue);
-            }
             return doubleValues;
         }
 
         @Override
         public BytesValues bytesValues() {
-            if (bytesValues == null) {
-                bytesValues = new ScriptBytesValues(script, multiValue);
-            }
             return bytesValues;
         }
 

@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
  */
 public interface ValueParser {
 
-    static final ValueParser IPv4 = new IPV4();
+    static final ValueParser IPv4 = new ValueParser.IPv4();
 
     long parseLong(String value, SearchContext searchContext);
 
@@ -97,9 +97,9 @@ public interface ValueParser {
     /**
      * Knows how to parse IPv4 formats
      */
-    static class IPV4 implements ValueParser {
+    static class IPv4 implements ValueParser {
 
-        private IPV4() {
+        private IPv4() {
         }
 
         @Override

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.bucket.multi.range.ip4v;
+package org.elasticsearch.search.aggregations.bucket.multi.range.ipv4;
 
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.search.aggregations.AggregationStreams;

@@ -39,7 +39,7 @@ import java.util.Locale;
 public interface ValueFormatter extends Streamable {
 
     public final static ValueFormatter RAW = new Raw();
-    public final static ValueFormatter IPv4 = new IP4();
+    public final static ValueFormatter IPv4 = new IPv4Formatter();
 
     /**
      * Uniquely identifies this formatter (used for efficient serialization)
@@ -191,7 +191,7 @@ public interface ValueFormatter extends Streamable {
         }
     }
 
-    public static class IP4 implements ValueFormatter {
+    static class IPv4Formatter implements ValueFormatter {
 
         static final byte ID = 6;
 

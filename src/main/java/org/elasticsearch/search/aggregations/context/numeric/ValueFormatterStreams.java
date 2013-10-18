@@ -35,7 +35,7 @@ public class ValueFormatterStreams {
         ValueFormatter formatter = null;
         switch (id) {
             case ValueFormatter.Raw.ID: return ValueFormatter.RAW;
-            case ValueFormatter.IP4.ID: return ValueFormatter.IPv4;
+            case ValueFormatter.IPv4Formatter.ID: return ValueFormatter.IPv4;
             case ValueFormatter.DateTime.ID: formatter = new ValueFormatter.DateTime(); break;
             case ValueFormatter.Number.Pattern.ID: formatter = new ValueFormatter.Number.Pattern(); break;
             default: throw new ElasticSearchIllegalArgumentException("Unknown value formatter with id [" + id + "]");

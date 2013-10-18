@@ -25,7 +25,7 @@ import org.elasticsearch.search.aggregations.bucket.multi.histogram.InternalDate
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.InternalHistogram;
 import org.elasticsearch.search.aggregations.bucket.multi.range.InternalRange;
 import org.elasticsearch.search.aggregations.bucket.multi.range.date.InternalDateRange;
-import org.elasticsearch.search.aggregations.bucket.multi.range.ip4v.InternalIPv4Range;
+import org.elasticsearch.search.aggregations.bucket.multi.range.ipv4.InternalIPv4Range;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.DoubleTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.LongTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.StringTerms;
