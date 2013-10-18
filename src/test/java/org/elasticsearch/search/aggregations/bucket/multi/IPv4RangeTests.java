@@ -23,7 +23,7 @@ import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
-import org.elasticsearch.search.aggregations.bucket.multi.range.ip4v.IPv4Range;
+import org.elasticsearch.search.aggregations.bucket.multi.range.ipv4.IPv4Range;
 import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.elasticsearch.test.AbstractIntegrationTest;
