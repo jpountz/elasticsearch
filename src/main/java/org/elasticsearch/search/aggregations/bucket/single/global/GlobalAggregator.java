@@ -24,7 +24,6 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 
 import java.io.IOException;
 import java.util.List;
@@ -59,9 +58,9 @@ public class GlobalAggregator extends SingleBucketAggregator {
         }
 
         @Override
-        protected ValueSpace onDoc(int doc, ValueSpace context) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             docCount++;
-            return context;
+            return true;
         }
 
         @Override

@@ -23,7 +23,6 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.calc.ValuesSourceCalcAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 
@@ -74,7 +73,7 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
         }
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
 
             DoubleValues values = valuesSource.doubleValues();
             if (values == null) {
@@ -86,18 +85,12 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
             }
 
             if (!values.isMultiValued()) {
-                double value = values.getValue(doc);
-                if (valueSpace.accept(valuesSource.key(), value)) {
-                    stats.collect(doc, value);
-                }
+                stats.collect(doc, values.getValue(doc));
                 return;
             }
 
             for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                double value = iter.next();
-                if (valueSpace.accept(valuesSource.key(), value)) {
-                    stats.collect(doc, value);
-                }
+                stats.collect(doc, iter.next());
             }
         }
 

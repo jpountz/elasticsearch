@@ -30,7 +30,6 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 
 import java.io.IOException;
 import java.util.List;
@@ -85,12 +84,12 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
 
         @Override
-        protected ValueSpace onDoc(int doc, ValueSpace context) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             if (bits.get(doc)) {
                 docCount++;
-                return context;
+                return true;
             }
-            return null;
+            return false;
         }
 
         @Override

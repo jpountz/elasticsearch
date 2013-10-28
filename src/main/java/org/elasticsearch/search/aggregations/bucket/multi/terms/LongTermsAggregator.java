@@ -28,7 +28,6 @@ import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.bucket.LongBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
@@ -101,7 +100,7 @@ public class LongTermsAggregator extends LongBucketsAggregator {
         private ReusableGrowableArray<BucketCollector> matchedBuckets;
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
 
             LongValues values = valuesSource.longValues();
 
@@ -109,38 +108,31 @@ public class LongTermsAggregator extends LongBucketsAggregator {
                 return;
             }
 
-            Object valuesSourceKey = valuesSource.key();
             if (!values.isMultiValued()) {
                 long term = values.getValue(doc);
-                if (!valueSpace.accept(valuesSourceKey, term)) {
-                    return;
-                }
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
                     bucketCollectors.v().put(term, bucket);
                 }
-                bucket.collect(doc, valueSpace);
+                bucket.collect(doc);
                 return;
             }
 
             if (matchedBuckets == null) {
                 matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
             }
-            populateMatchingBuckets(doc, valuesSourceKey, values, valueSpace);
+            populateMatchingBuckets(doc, values);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
-                mBuckets[i].collect(doc, valueSpace);
+                mBuckets[i].collect(doc);
             }
         }
 
-        private void populateMatchingBuckets(int doc, Object valuesSourceKey, LongValues values, ValueSpace valueSpace) {
+        private void populateMatchingBuckets(int doc, LongValues values) {
             matchedBuckets.reset();
             for (LongValues.Iter iter = values.getIter(doc); iter.hasNext();) {
                 long term = iter.next();
-                if (!valueSpace.accept(valuesSourceKey, term)) {
-                    continue;
-                }
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
@@ -174,14 +166,9 @@ public class LongTermsAggregator extends LongBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, LongValues values, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc, LongValues values) throws IOException {
             docCount++;
             return true;
-        }
-
-        @Override
-        public boolean accept(long value) {
-            return term == value;
         }
 
         LongTerms.Bucket buildBucket() {

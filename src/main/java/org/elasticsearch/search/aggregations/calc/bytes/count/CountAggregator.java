@@ -25,7 +25,6 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
 import org.elasticsearch.search.aggregations.calc.bytes.BytesCalcAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
@@ -62,20 +61,16 @@ public class CountAggregator extends BytesCalcAggregator {
         }
 
         @Override
-        protected void collect(int doc, BytesValues values, ValueSpace valueSpace) throws IOException {
+        protected void collect(int doc, BytesValues values) throws IOException {
             if (!values.hasValue(doc)) {
                 return;
             }
             if (!values.isMultiValued()) {
-                if (valueSpace.accept(valuesSource.key(), values.getValue(doc))) {
-                    count++;
-                }
+                count++;
                 return;
             }
-            for (BytesValues.Iter iter  = values.getIter(doc); iter.hasNext();) {
-                if (valueSpace.accept(valuesSource.key(), iter.next())) {
-                    count++;
-                }
+            for (BytesValues.Iter iter  = values.getIter(doc); iter.hasNext(); iter.next()) {
+                count++;
             }
         }
 

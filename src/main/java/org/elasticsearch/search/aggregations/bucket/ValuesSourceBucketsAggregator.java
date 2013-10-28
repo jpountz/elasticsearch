@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 
 import java.io.IOException;
@@ -50,8 +49,7 @@ public abstract class ValuesSourceBucketsAggregator<VS extends ValuesSource> ext
 
     /**
      * A base class for a collector that collects/aggregates the document in each bucket (you have a bucket collector per bucket). One can see
-     * A bucket collector as a runtime representation of the bucket. A bucket collector defines and works within a {@link ValueSpace value space}.
-     * The value space determines what values belong to the bucket and what values don't (see {@link #onDoc(int, ValueSpace)}).
+     * A bucket collector as a runtime representation of the bucket.
      *
      * @param <VS>
      */
@@ -116,12 +114,11 @@ public abstract class ValuesSourceBucketsAggregator<VS extends ValuesSource> ext
         }
 
         @Override
-        public final void collect(int doc, ValueSpace valueSpace) throws IOException {
-            valueSpace = onDoc(doc, valueSpace);
-            if (valueSpace != null) {
+        public final void collect(int doc) throws IOException {
+            if (onDoc(doc)) {
                 for (int i = 0; i < collectors.length; i++) {
                     if (collectors[i] != null) {
-                        collectors[i].collect(doc, valueSpace);
+                        collectors[i].collect(doc);
                     }
                 }
             }
@@ -132,12 +129,10 @@ public abstract class ValuesSourceBucketsAggregator<VS extends ValuesSource> ext
          * that should be used for all sub-aggregations in the bucket this collector represents.
          *
          * @param doc           The document id
-         * @param valueSpace    The current value space
-         * @return              The value space for all sub-aggregations of this bucket, {@code null} if the may return to indicate that the
-         *                      given document doesn't match/fit this bucket (in which case, the document will not be aggregated in it)
+         * @return              {@code true} if the give doc falls in the bucket, {@code false} otherwise.
          * @throws IOException
          */
-        protected abstract ValueSpace onDoc(int doc, ValueSpace valueSpace) throws IOException;
+        protected abstract boolean onDoc(int doc) throws IOException;
 
         /**
          * Called after all documents in the context where collected.

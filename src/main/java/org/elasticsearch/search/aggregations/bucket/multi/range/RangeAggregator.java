@@ -26,7 +26,6 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.DoubleBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
@@ -125,9 +124,9 @@ public class RangeAggregator extends DoubleBucketsAggregator {
     class Collector implements Aggregator.Collector {
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
             for (int i = 0; i < bucketCollectors.length; i++) {
-                bucketCollectors[i].collect(doc, valueSpace);
+                bucketCollectors[i].collect(doc);
             }
         }
 
@@ -151,37 +150,27 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, DoubleValues values, ValueSpace valueSpace) throws IOException {
-            if (matches(doc, values, valueSpace)) {
-                docCount++;
-                return true;
-            }
-            return false;
-        }
-
-        private boolean matches(int doc, DoubleValues values, ValueSpace context) {
+        protected boolean onDoc(int doc, DoubleValues values) throws IOException {
             if (!values.hasValue(doc)) {
                 return false;
             }
 
-            Object valueSourceKey = valuesSource.key();
             if (!values.isMultiValued()) {
                 double value = values.getValue(doc);
-                return context.accept(valueSourceKey, value) && range.matches(value);
+                if (range.matches(value)) {
+                    docCount++;
+                    return true;
+                }
+                return false;
             }
 
             for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
                 double value = iter.next();
-                if (context.accept(valueSourceKey, value) && range.matches(value)) {
+                if (range.matches(value)) {
                     return true;
                 }
             }
             return false;
-        }
-
-        @Override
-        public boolean accept(double value) {
-            return range.matches(value);
         }
 
         RangeBase.Bucket buildBucket(AbstractRangeBase.Factory factory) {

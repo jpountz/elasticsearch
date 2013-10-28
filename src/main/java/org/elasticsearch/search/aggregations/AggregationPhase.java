@@ -34,7 +34,6 @@ import org.elasticsearch.search.SearchParseElement;
 import org.elasticsearch.search.SearchPhase;
 import org.elasticsearch.search.aggregations.bucket.single.global.GlobalAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.search.query.QueryPhaseExecutionException;
 
@@ -155,7 +154,7 @@ public class AggregationPhase implements SearchPhase {
         @Override
         public void collect(int doc) throws IOException {
             for (int i = 0; i < collectors.size(); i++) {
-                collectors.get(i).collect(doc, ValueSpace.DEFAULT);
+                collectors.get(i).collect(doc);
             }
         }
 

@@ -24,7 +24,6 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 
 import java.io.IOException;
 import java.util.List;
@@ -106,12 +105,11 @@ public abstract class BucketsAggregator extends Aggregator {
         }
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
-            valueSpace = onDoc(doc, valueSpace);
-            if (valueSpace != null) {
+        public void collect(int doc) throws IOException {
+            if (onDoc(doc)) {
                 for (int i = 0; i < collectors.length; i++) {
                     if (collectors[i] != null) {
-                        collectors[i].collect(doc, valueSpace);
+                        collectors[i].collect(doc);
                     }
                 }
             }
@@ -122,12 +120,10 @@ public abstract class BucketsAggregator extends Aggregator {
          * of this bucket.
          *
          * @param doc   The doc to aggregate
-         * @return      The value space for all the sub-aggregator of this bucket. If the doc doesn't "fall" within this bucket, this
-         *              method <strong>must</strong> return {@code null} (in which case, the sub-aggregators will not be asked to collect
-         *              the doc)
+         * @return      {@code true} if the give doc falls in the bucket, {@code false} otherwise.
          * @throws IOException
          */
-        protected abstract ValueSpace onDoc(int doc, ValueSpace valueSpace) throws IOException;
+        protected abstract boolean onDoc(int doc) throws IOException;
 
         /**
          * Called when collection is finished
