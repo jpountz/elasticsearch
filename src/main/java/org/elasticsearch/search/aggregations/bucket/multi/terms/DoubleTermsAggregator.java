@@ -28,7 +28,6 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.bucket.DoubleBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
@@ -104,7 +103,7 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
         private ReusableGrowableArray<BucketCollector> matchedBuckets;
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
 
             DoubleValues values = valuesSource.doubleValues();
 
@@ -112,39 +111,32 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
                 return;
             }
 
-            Object valuesSourceKey = valuesSource.key();
             if (!values.isMultiValued()) {
                 double term = values.getValue(doc);
-                if (!valueSpace.accept(valuesSourceKey, term)) {
-                    return;
-                }
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, DoubleTermsAggregator.this);
                     bucketCollectors.v().put(term, bucket);
                 }
-                bucket.collect(doc, valueSpace);
+                bucket.collect(doc);
                 return;
             }
 
             if (matchedBuckets == null) {
                 matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
             }
-            populateMatchedBuckets(doc, valuesSourceKey, values, valueSpace);
+            populateMatchedBuckets(doc, values);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
-                mBuckets[i].collect(doc, valueSpace);
+                mBuckets[i].collect(doc);
             }
 
         }
 
-        private void populateMatchedBuckets(int doc, Object valuesSourceKey, DoubleValues values, ValueSpace context) {
+        private void populateMatchedBuckets(int doc, DoubleValues values) {
             matchedBuckets.reset();
             for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
                 double term = iter.next();
-                if (!context.accept(valuesSourceKey, term)) {
-                    continue;
-                }
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, DoubleTermsAggregator.this);
@@ -178,14 +170,9 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, DoubleValues values, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc, DoubleValues values) throws IOException {
             docCount++;
             return true;
-        }
-
-        @Override
-        public boolean accept(double value) {
-            return term == value;
         }
 
         DoubleTerms.Bucket buildBucket() {

@@ -25,7 +25,6 @@ import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.bucket.LongBucketsAggregator;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 
 import java.io.IOException;
@@ -78,7 +77,7 @@ class HistogramCollector implements Aggregator.Collector {
     }
 
     @Override
-    public void collect(int doc, ValueSpace valueSpace) throws IOException {
+    public void collect(int doc) throws IOException {
 
         LongValues values = valuesSource.longValues();
 
@@ -93,16 +92,13 @@ class HistogramCollector implements Aggregator.Collector {
             // so we can just collect it
 
             long value = values.getValue(doc);
-            if (!valueSpace.accept(valuesSource.key(), value)) {
-                return;
-            }
             long key = rounding.round(value);
             BucketCollector bucketCollector = bucketCollectors.get(key);
             if (bucketCollector == null) {
                 bucketCollector = new BucketCollector(key, rounding, valuesSource, factories, aggregator);
                 bucketCollectors.put(key, bucketCollector);
             }
-            bucketCollector.collect(doc, valueSpace);
+            bucketCollector.collect(doc);
             return;
 
         }
@@ -113,11 +109,11 @@ class HistogramCollector implements Aggregator.Collector {
         // and aggregate only those that are marked (and while at it, clear the mark, making it ready for
         // the next aggregation).
 
-        populateMatchedBuckets(doc, valuesSource.key(), values, valueSpace);
+        populateMatchedBuckets(doc, valuesSource.key(), values);
         BucketCollector[] mBukcets = matchedBuckets.innerValues();
         for (int i = 0; i < matchedBuckets.size(); i++) {
             mBukcets[i].matched = false;
-            mBukcets[i].collect(doc, valueSpace);
+            mBukcets[i].collect(doc);
         }
     }
 
@@ -126,13 +122,10 @@ class HistogramCollector implements Aggregator.Collector {
     // collect the matched ones. We need to do this to avoid situations where multiple values in a single field
     // or multiple values across the aggregated fields match the bucket and then the bucket will collect the same
     // document multiple times.
-    private void populateMatchedBuckets(int doc, Object valuesSourceKey, LongValues values, ValueSpace valueSpace) {
+    private void populateMatchedBuckets(int doc, Object valuesSourceKey, LongValues values) {
         matchedBuckets.reset();
         for (LongValues.Iter iter = values.getIter(doc); iter.hasNext();) {
             long value = iter.next();
-            if (!valueSpace.accept(valuesSourceKey, value)) {
-                continue;
-            }
             long key = rounding.round(value);
             BucketCollector bucket = bucketCollectors.get(key);
             if (bucket == null) {
@@ -172,14 +165,9 @@ class HistogramCollector implements Aggregator.Collector {
         }
 
         @Override
-        protected boolean onDoc(int doc, LongValues values, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc, LongValues values) throws IOException {
             docCount++;
             return true;
-        }
-
-        @Override
-        public boolean accept(long value) {
-            return this.key == rounding.round(value);
         }
 
     }

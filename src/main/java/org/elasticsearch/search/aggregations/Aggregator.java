@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations;
 
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -80,7 +79,7 @@ public abstract class Aggregator<A extends InternalAggregation> {
      */
     public static interface Collector {
 
-        void collect(int doc, ValueSpace valueSpace) throws IOException;
+        void collect(int doc) throws IOException;
 
         void postCollection();
 

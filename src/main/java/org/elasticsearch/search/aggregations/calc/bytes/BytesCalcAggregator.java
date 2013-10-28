@@ -23,7 +23,6 @@ import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.calc.ValuesSourceCalcAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
 
@@ -45,11 +44,11 @@ public abstract class BytesCalcAggregator extends ValuesSourceCalcAggregator<Byt
         }
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
-            collect(doc, valuesSource.bytesValues(), valueSpace);
+        public void collect(int doc) throws IOException {
+            collect(doc, valuesSource.bytesValues());
         }
 
-        protected abstract void collect(int doc, BytesValues values, ValueSpace context) throws IOException;
+        protected abstract void collect(int doc, BytesValues values) throws IOException;
     }
 
 }

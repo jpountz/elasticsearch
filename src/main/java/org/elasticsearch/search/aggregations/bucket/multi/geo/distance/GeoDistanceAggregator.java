@@ -28,7 +28,6 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.bucket.GeoPointBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
 
@@ -103,9 +102,9 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
     class Collector implements Aggregator.Collector {
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
             for (BucketCollector collector : collectors) {
-                collector.collect(doc, valueSpace);
+                collector.collect(doc);
             }
         }
 
@@ -129,33 +128,27 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, GeoPointValues values, ValueSpace valueSpace) throws IOException {
-            if (matches(doc, valuesSource.key(), values, valueSpace)) {
+        protected boolean onDoc(int doc, GeoPointValues values) throws IOException {
+            if (matches(doc, valuesSource.key(), values)) {
                 docCount++;
                 return true;
             }
             return false;
         }
 
-        private boolean matches(int doc, Object valuesSourceKey, GeoPointValues values, ValueSpace context) {
+        private boolean matches(int doc, Object valuesSourceKey, GeoPointValues values) {
             if (!values.hasValue(doc)) {
                 return false;
             }
             if (!values.isMultiValued()) {
-                return range.matches(values.getValue(doc)) && context.accept(valuesSourceKey, values.getValue(doc));
+                return range.matches(values.getValue(doc));
             }
             for (GeoPointValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                GeoPoint point = iter.next();
-                if (range.matches(point) && context.accept(valuesSourceKey, point)) {
+                if (range.matches(iter.next())) {
                     return true;
                 }
             }
             return false;
-        }
-
-        @Override
-        public boolean accept(GeoPoint value) {
-            return range.matches(value);
         }
 
         InternalGeoDistance.Bucket buildBucket() {

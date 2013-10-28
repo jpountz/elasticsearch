@@ -30,7 +30,6 @@ import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.bucket.BytesBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
@@ -108,26 +107,22 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
         private HashedBytesRef scratch = new HashedBytesRef(new BytesRef());
 
         @Override
-        public void collect(int doc, ValueSpace valueSpace) throws IOException {
+        public void collect(int doc) throws IOException {
             BytesValues values = valuesSource.bytesValues();
 
             if (!values.hasValue(doc)) {
                 return;
             }
 
-            Object valuesSourceKey = valuesSource.key();
             if (!values.isMultiValued()) {
                 scratch.hash = values.getValueHashed(doc, scratch.bytes);
-                if (!valueSpace.accept(valuesSourceKey, scratch.bytes)) {
-                    return;
-                }
                 BucketCollector bucket = buckets.v().get(scratch);
                 if (bucket == null) {
                     HashedBytesRef put = new HashedBytesRef(values.makeSafe(scratch.bytes), scratch.hash);
                     bucket = new BucketCollector(valuesSource, put.bytes, factories, StringTermsAggregator.this);
                     buckets.v().put(put, bucket);
                 }
-                bucket.collect(doc, valueSpace);
+                bucket.collect(doc);
                 return;
             }
 
@@ -137,21 +132,18 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
 
             // we'll first find all the buckets that match the values, and then propagate the document through them
             // we need to do that to avoid counting the same document more than once.
-            populateMatchingBuckets(doc, valuesSourceKey, values, valueSpace);
+            populateMatchingBuckets(doc, values);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
-                mBuckets[i].collect(doc, valueSpace);
+                mBuckets[i].collect(doc);
             }
         }
 
-        private void populateMatchingBuckets(int doc, Object valuesSourceKey, BytesValues values, ValueSpace context) throws IOException {
+        private void populateMatchingBuckets(int doc, BytesValues values) throws IOException {
             matchedBuckets.reset();
             for (BytesValues.Iter iter = values.getIter(doc); iter.hasNext();) {
                 scratch.bytes = iter.next();
                 scratch.hash = iter.hash();
-                if (!context.accept(valuesSourceKey, scratch.bytes)) {
-                    continue;
-                }
                 BucketCollector bucket = buckets.v().get(scratch);
                 if (bucket == null) {
                     HashedBytesRef put = new HashedBytesRef(values.makeSafe(scratch.bytes), scratch.hash);
@@ -188,19 +180,9 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, BytesValues values, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc, BytesValues values) throws IOException {
             docCount++;
             return true;
-        }
-
-        @Override
-        public boolean accept(BytesRef value) {
-            // we can optimize here and instead of checking the value space, just return 'true'. The reason for this is that the bucket only
-            // represents a single field value anyway, and currently checking the value space will only be required if we put a cout calc
-            // agg under the bucket or another term agg on the same field (which makes no sense). The problem is, once we do return 'true'
-            // we "break" the contract of the aggs as putting "count" agg under the bucket (as insensible it may be) will return wrong counts.
-            // so for now we keep the contract and still check the value space.
-            return value.equals(term);
         }
 
         StringTerms.Bucket buildBucket() {

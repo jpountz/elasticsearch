@@ -35,7 +35,6 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 
 import java.io.IOException;
 import java.util.List;
@@ -122,7 +121,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public void collect(int parentDoc, ValueSpace valueSpace) throws IOException {
+        public void collect(int parentDoc) throws IOException {
             if (parentDoc == 0 || parentDocs == null) {
                 return;
             }
@@ -132,7 +131,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
                     docCount++;
                     for (int j = 0; j < collectors.length; j++) {
                         if (collectors[j] != null) {
-                            collectors[j].collect(i, valueSpace);
+                            collectors[j].collect(i);
                         }
                     }
                 }

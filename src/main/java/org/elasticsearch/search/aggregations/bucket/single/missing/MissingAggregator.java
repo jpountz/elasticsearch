@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.bucket.single.missing;
 
-import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -27,7 +26,6 @@ import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.bucket.BytesBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValueSpace;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 
@@ -51,7 +49,7 @@ public class MissingAggregator extends BytesBucketsAggregator {
 
     @Override
     public Aggregator.Collector collector() {
-        return valuesSource != null ? new Collector(valuesSource, subAggregators) : new MissingCollector(subAggregators, this);
+        return valuesSource != null ? new Collector(valuesSource, subAggregators) : new AllMissingCollector(subAggregators, this);
     }
 
     @Override
@@ -68,7 +66,7 @@ public class MissingAggregator extends BytesBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, BytesValues values, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc, BytesValues values) throws IOException {
             if (!values.hasValue(doc)) {
                 docCount++;
                 return true;
@@ -80,28 +78,20 @@ public class MissingAggregator extends BytesBucketsAggregator {
         protected void doPostCollection() {
             MissingAggregator.this.docCount = docCount;
         }
-
-        @Override
-        public boolean accept(BytesRef value) {
-            // doesn't matter what we return here... this method will never be called anyway
-            // if a doc made it down the hierarchy, by definition the doc has no values for the field
-            // so there's no way this method will be called with a value for this field
-            return false;
-        }
     }
 
-    public class MissingCollector extends BucketsAggregator.BucketCollector {
+    public class AllMissingCollector extends BucketsAggregator.BucketCollector {
 
         private long docCount;
 
-        public MissingCollector(Aggregator[] subAggregators, Aggregator aggregator) {
+        public AllMissingCollector(Aggregator[] subAggregators, Aggregator aggregator) {
             super(subAggregators, aggregator);
         }
 
         @Override
-        protected ValueSpace onDoc(int doc, ValueSpace valueSpace) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             docCount++;
-            return valueSpace;
+            return true;
         }
 
         @Override
