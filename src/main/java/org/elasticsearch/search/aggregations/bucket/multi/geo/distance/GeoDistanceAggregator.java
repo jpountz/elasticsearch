@@ -129,22 +129,23 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
 
         @Override
         protected boolean onDoc(int doc, GeoPointValues values) throws IOException {
-            if (matches(doc, valuesSource.key(), values)) {
+            if (matches(doc, values)) {
                 docCount++;
                 return true;
             }
             return false;
         }
 
-        private boolean matches(int doc, Object valuesSourceKey, GeoPointValues values) {
-            if (!values.hasValue(doc)) {
+        private boolean matches(int doc, GeoPointValues values) {
+            int valuesCount = values.setDocument(doc);
+            if (valuesCount == 0) {
                 return false;
             }
-            if (!values.isMultiValued()) {
-                return range.matches(values.getValue(doc));
+            if (valuesCount == 1) {
+                return range.matches(values.nextValue());
             }
-            for (GeoPointValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                if (range.matches(iter.next())) {
+            for (int i = 0; i < valuesCount; i++) {
+                if (range.matches(values.nextValue())) {
                     return true;
                 }
             }

@@ -80,17 +80,18 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
                 return;
             }
 
-            if (!values.hasValue(doc)) {
+            int valuesCount = values.setDocument(doc);
+            if (valuesCount == 0) {
                 return;
             }
 
-            if (!values.isMultiValued()) {
-                stats.collect(doc, values.getValue(doc));
+            if (valuesCount == 1) {
+                stats.collect(doc, values.nextValue());
                 return;
             }
 
-            for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                stats.collect(doc, iter.next());
+            for (int i = 0; i < valuesCount; i++) {
+                stats.collect(doc, values.nextValue());
             }
         }
 

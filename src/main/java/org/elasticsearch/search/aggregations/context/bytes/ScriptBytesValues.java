@@ -22,9 +22,11 @@ package org.elasticsearch.search.aggregations.context.bytes;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.script.SearchScript;
+import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.context.ScriptValues;
 
 import java.lang.reflect.Array;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -34,27 +36,14 @@ import java.util.List;
 public class ScriptBytesValues extends BytesValues implements ScriptValues {
 
     final SearchScript script;
-    final InternalIter iter;
-    final Iter.Single singleIter = new Iter.Single();
 
-    private int docId = -1;
+    final Iter iter = new Iter();
     private Object value;
     private BytesRef scratch = new BytesRef();
-
-    public ScriptBytesValues(SearchScript script) {
-        this(script, true);
-    }
 
     public ScriptBytesValues(SearchScript script, boolean multiValue) {
         super(multiValue);
         this.script = script;
-        this.iter = new InternalIter();
-    }
-
-    @Override
-    public void clearCache() {
-        docId = -1;
-        value = null;
     }
 
     @Override
@@ -63,12 +52,15 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
     }
 
     @Override
+    public void clearCache() {
+        value = null;
+    }
+
+    @Override
     public boolean hasValue(int docId) {
-        if (this.docId != docId) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
+        script.setNextDocId(docId);
+        Object value = script.run();
+
         if (value == null) {
             return false;
         }
@@ -79,24 +71,20 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
         }
 
         if (value.getClass().isArray()) {
-            return Array.getLength(value) > 0;
+            return Array.getLength(value) != 0;
         }
-        if (value instanceof List) {
-            return !((List) value).isEmpty();
+
+        if (value instanceof Collection) {
+            return !((Collection) value).isEmpty();
         }
-        if (value instanceof Iterator) {
-            return ((Iterator) value).hasNext();
-        }
-        return true;
+
+        return false;
     }
 
-    @Override
     public BytesRef getValueScratch(int docId, BytesRef ret) {
-        if (this.docId != docId) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
+        script.setNextDocId(docId);
+        Object value = script.run();
+        assert value != null : "expected value to exists. call ScriptDoubleValues#hasValue(int) must be called before ScriptDoubleValues#getValue(int)";
 
         // shortcutting single valued
         if (!isMultiValued()) {
@@ -112,8 +100,8 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
             ret.copyChars(((List) value).get(0).toString());
             return ret;
         }
-        if (value instanceof Iterator) {
-            ret.copyChars(((Iterator) value).next().toString());
+        if (value instanceof Collection) {
+            ret.copyChars(((Collection) value).iterator().next().toString());
             return ret;
         }
         ret.copyChars(value.toString());
@@ -126,39 +114,43 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
     }
 
     @Override
-    public Iter getIter(int docId) {
+    public int setDocument(int docId) {
         if (this.docId != docId) {
             this.docId = docId;
             script.setNextDocId(docId);
             value = script.run();
         }
 
-        // shortcutting single valued
+        if (value == null) {
+            return 0;
+        }
+
         if (!isMultiValued()) {
-            scratch.copyChars(value.toString());
-            singleIter.reset(scratch, 0);
-            return singleIter;
+            return 1;
         }
 
         if (value.getClass().isArray()) {
             iter.reset(value);
-            return iter;
+            return Array.getLength(value);
         }
-        if (value instanceof List) {
-            iter.reset(((List<Long>) value).iterator());
-            return iter;
-        }
-        if (value instanceof Iterator) {
-            iter.reset((Iterator<Long>) value);
-            return iter;
+        if (value instanceof Collection) {
+            iter.reset(((Collection) value).iterator());
+            return ((Collection) value).size();
         }
 
-        scratch.copyChars(value.toString());
-        singleIter.reset(scratch, 0);
-        return singleIter;
+        throw new AggregationExecutionException("Unsupported script value [" + value + "]");
     }
 
-    static class InternalIter implements Iter {
+    @Override
+    public BytesRef nextValue() {
+        if (!isMultiValued()) {
+            scratch.copyChars(value.toString());
+            return scratch;
+        }
+        return iter.next();
+    }
+
+    static class Iter {
 
         Object array;
         int arrayLength;
@@ -179,7 +171,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
             this.array = null;
         }
 
-        @Override
         public boolean hasNext() {
             if (iterator != null) {
                 return iterator.hasNext();
@@ -187,7 +178,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
             return i + 1 < arrayLength;
         }
 
-        @Override
         public BytesRef next() {
             if (iterator != null) {
                 scratch.copyChars(iterator.next().toString());
@@ -197,7 +187,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
             return scratch;
         }
 
-        @Override
         public int hash() {
             return scratch.hashCode();
         }

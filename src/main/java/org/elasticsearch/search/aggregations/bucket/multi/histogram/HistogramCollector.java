@@ -81,17 +81,19 @@ class HistogramCollector implements Aggregator.Collector {
 
         LongValues values = valuesSource.longValues();
 
-        if (!values.hasValue(doc)) {
+        int valuesCount = values.setDocument(doc);
+
+        if (valuesCount == 0) {
             return;
         }
 
-        if (!values.isMultiValued()) {
+        if (valuesCount == 1) {
 
             // optimization for a single valued field when aggregating a single field. In this case,
             // there's no need to mark buckets as a match on a bucket will always be a single match per doc
             // so we can just collect it
 
-            long value = values.getValue(doc);
+            long value = values.nextValue();
             long key = rounding.round(value);
             BucketCollector bucketCollector = bucketCollectors.get(key);
             if (bucketCollector == null) {
@@ -109,7 +111,7 @@ class HistogramCollector implements Aggregator.Collector {
         // and aggregate only those that are marked (and while at it, clear the mark, making it ready for
         // the next aggregation).
 
-        populateMatchedBuckets(doc, valuesSource.key(), values);
+        populateMatchedBuckets(values, valuesCount);
         BucketCollector[] mBukcets = matchedBuckets.innerValues();
         for (int i = 0; i < matchedBuckets.size(); i++) {
             mBukcets[i].matched = false;
@@ -122,10 +124,11 @@ class HistogramCollector implements Aggregator.Collector {
     // collect the matched ones. We need to do this to avoid situations where multiple values in a single field
     // or multiple values across the aggregated fields match the bucket and then the bucket will collect the same
     // document multiple times.
-    private void populateMatchedBuckets(int doc, Object valuesSourceKey, LongValues values) {
+    private void populateMatchedBuckets(LongValues values, int valuesCount) {
         matchedBuckets.reset();
-        for (LongValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-            long value = iter.next();
+
+        for (int i = 0; i < valuesCount; i++) {
+            long value = values.nextValue();
             long key = rounding.round(value);
             BucketCollector bucket = bucketCollectors.get(key);
             if (bucket == null) {

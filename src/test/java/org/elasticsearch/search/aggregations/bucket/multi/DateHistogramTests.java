@@ -27,6 +27,8 @@ import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -553,6 +555,17 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l));
     }
 
+    /**
+     * The script will change to document date values to the following:
+     *
+     * doc 1: [ Feb 2, Mar 3]
+     * doc 2: [ Mar 2, Apr 3]
+     * doc 3: [ Mar 15, Apr 16]
+     * doc 4: [ Apr 2, May 3]
+     * doc 5: [ Apr 15, May 16]
+     * doc 6: [ Apr 23, May 24]
+     *
+     */
     @Test
     public void multiValuedField_WithValueScript_WithInheritedSubAggregator() throws Exception {
         SearchResponse response = client().prepareSearch("idx")
@@ -686,7 +699,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
     @Test
     public void script_MultiValued() throws Exception {
         SearchResponse response = client().prepareSearch("idx")
-                .addAggregation(dateHistogram("histo").script("doc['dates'].values").interval(DateHistogram.Interval.MONTH))
+                .addAggregation(dateHistogram("histo").script("doc['dates'].values").multiValued(true).interval(DateHistogram.Interval.MONTH))
                 .execute().actionGet();
 
         assertThat(response.getFailedShards(), equalTo(0));

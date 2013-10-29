@@ -21,9 +21,11 @@ package org.elasticsearch.search.aggregations.context.numeric;
 
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.script.SearchScript;
+import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.context.ScriptValues;
 
 import java.lang.reflect.Array;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
@@ -33,24 +35,18 @@ import java.util.List;
 public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
 
     final SearchScript script;
-    final InternalIter iter;
 
-    private int docId = -1;
     private Object value;
+    private final Iter iter = new Iter();
 
-    public ScriptDoubleValues(SearchScript script) {
-        this(script, true);
-    }
 
     public ScriptDoubleValues(SearchScript script, boolean multiValue) {
         super(multiValue);
         this.script = script;
-        this.iter = new InternalIter();
     }
 
     @Override
     public void clearCache() {
-        docId = -1;
         value = null;
     }
 
@@ -60,12 +56,39 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
     }
 
     @Override
-    public boolean hasValue(int docId) {
-        if (this.docId != docId) {
+    public int setDocument(int docId) {
+        if (this.docId != docId || value == null) {
             this.docId = docId;
             script.setNextDocId(docId);
             value = script.run();
         }
+
+        if (value == null) {
+            return 0;
+        }
+
+        // shortcutting on single valued
+        if (!isMultiValued()) {
+            return 1;
+        }
+
+        if (value.getClass().isArray()) {
+            iter.reset(value);
+            return Array.getLength(value);
+        }
+        if (value instanceof Collection) {
+            iter.reset(((Collection) value).iterator());
+            return ((Collection) value).size();
+        }
+
+        throw new AggregationExecutionException("Unsupported script value [" + value + "]");
+    }
+
+    @Override
+    public boolean hasValue(int docId) {
+        script.setNextDocId(docId);
+        Object value = script.run();
+
         if (value == null) {
             return false;
         }
@@ -78,23 +101,19 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
         if (value.getClass().isArray()) {
             return Array.getLength(value) != 0;
         }
-        if (value instanceof List) {
-            return !((List) value).isEmpty();
-        }
-        if (value instanceof Iterator) {
-            return ((Iterator<Number>) value).hasNext();
+
+        if (value instanceof Collection) {
+            return !((Collection) value).isEmpty();
         }
 
-        return true;
+        return false;
     }
 
     @Override
     public double getValue(int docId) {
-        if (this.docId != docId) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
+        script.setNextDocId(docId);
+        Object value = script.run();
+        assert value != null : "expected value to exists. call ScriptDoubleValues#hasValue(int) must be called before ScriptDoubleValues#getValue(int)";
 
         // shortcutting on single valued
         if (!isMultiValued()) {
@@ -105,45 +124,23 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
             return ((Number) Array.get(value, 0)).doubleValue();
         }
         if (value instanceof List) {
-            return ((Number) ((List) value).get(0)).doubleValue();
+            return (((List<Number>) value).get(0)).doubleValue();
         }
-        if (value instanceof Iterator) {
-            return ((Iterator<Number>) value).next().doubleValue();
+        if (value instanceof Collection) {
+            return (((Collection<Number>) value).iterator().next()).doubleValue();
         }
         return ((Number) value).doubleValue();
     }
 
     @Override
-    public Iter getIter(int docId) {
-        if (this.docId != docId) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
-
-        // shortcutting on single valued
+    public double nextValue() {
         if (!isMultiValued()) {
-            return super.getIter(docId);
+            return ((Number) value).doubleValue();
         }
-
-        if (value.getClass().isArray()) {
-            iter.reset(value);
-            return iter;
-        }
-        if (value instanceof List) {
-            iter.reset(((List<Number>) value).iterator());
-            return iter;
-        }
-        if (value instanceof Iterator) {
-            iter.reset((Iterator<Number>) value);
-            return iter;
-        }
-
-        // falling back to single value iterator
-        return super.getIter(docId);
+        return iter.next();
     }
 
-    static class InternalIter implements Iter {
+    static class Iter {
 
         Object array;
         int arrayLength;
@@ -163,7 +160,6 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
             this.array = null;
         }
 
-        @Override
         public boolean hasNext() {
             if (iterator != null) {
                 return iterator.hasNext();
@@ -171,7 +167,6 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
             return i < arrayLength;
         }
 
-        @Override
         public double next() {
             if (iterator != null) {
                 return iterator.next().doubleValue();

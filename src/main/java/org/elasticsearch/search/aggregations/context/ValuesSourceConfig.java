@@ -34,7 +34,7 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
     ValueFormatter formatter;
     ValueParser parser;
     ScriptValueType scriptValueType;
-    boolean multiValued = true;
+    boolean multiValued = false;
     boolean unmapped = false;
 
     public ValuesSourceConfig(Class<VS> valueSourceType) {
