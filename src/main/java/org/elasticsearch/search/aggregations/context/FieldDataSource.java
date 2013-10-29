@@ -89,13 +89,11 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
             private final FieldDataSource source;
             private final SearchScript script;
-            private final InternalIter iter;
 
             public BytesValues(FieldDataSource source, SearchScript script) {
                 super(true);
                 this.source = source;
                 this.script = script;
-                this.iter = new InternalIter(script);
             }
 
             @Override
@@ -104,46 +102,24 @@ public abstract class FieldDataSource implements ReaderContextAware {
             }
 
             @Override
-            public BytesRef getValueScratch(int docId, BytesRef ret) {
-                source.bytesValues().getValueScratch(docId, ret);
-                script.setNextVar("_value", ret.utf8ToString());
-                ret.copyChars(script.run().toString());
-                return ret;
+            public BytesRef getValue(int docId) {
+                BytesRef value = source.bytesValues.getValue(docId);
+                script.setNextVar("_value", value.utf8ToString());
+                value.copyChars(script.run().toString());
+                return value;
             }
 
             @Override
-            public Iter getIter(int docId) {
-                this.iter.iter = source.bytesValues().getIter(docId);
-                return this.iter;
+            public int setDocument(int docId) {
+                return source.bytesValues.setDocument(docId);
             }
 
-            static class InternalIter implements Iter {
-
-                private final SearchScript script;
-                private Iter iter;
-                private final BytesRef scratch = new BytesRef();
-
-                InternalIter(SearchScript script) {
-                    this.script = script;
-                }
-
-                @Override
-                public boolean hasNext() {
-                    return iter.hasNext();
-                }
-
-                @Override
-                public int hash() {
-                    return iter.hashCode();
-                }
-
-                @Override
-                public BytesRef next() {
-                    BytesRef scratch = iter.next();
-                    script.setNextVar("_value", scratch.utf8ToString());
-                    this.scratch.copyChars(script.run().toString());
-                    return this.scratch;
-                }
+            @Override
+            public BytesRef nextValue() {
+                BytesRef value = source.bytesValues.nextValue();
+                script.setNextVar("_value", value.utf8ToString());
+                value.copyChars(script.run().toString());
+                return value;
             }
         }
     }
@@ -236,13 +212,11 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
                 private final Numeric source;
                 private final SearchScript script;
-                private final InternalIter iter;
 
                 public LongValues(Numeric source, SearchScript script) {
                     super(true);
                     this.source = source;
                     this.script = script;
-                    this.iter = new InternalIter(script);
                 }
 
                 @Override
@@ -257,30 +231,14 @@ public abstract class FieldDataSource implements ReaderContextAware {
                 }
 
                 @Override
-                public Iter getIter(int docId) {
-                    this.iter.iter = source.longValues().getIter(docId);
-                    return this.iter;
+                public int setDocument(int docId) {
+                    return source.longValues().setDocument(docId);
                 }
 
-                static class InternalIter implements Iter {
-
-                    private final SearchScript script;
-                    private Iter iter;
-
-                    InternalIter(SearchScript script) {
-                        this.script = script;
-                    }
-
-                    @Override
-                    public boolean hasNext() {
-                        return iter.hasNext();
-                    }
-
-                    @Override
-                    public long next() {
-                        script.setNextVar("_value", iter.next());
-                        return script.runAsLong();
-                    }
+                @Override
+                public long nextValue() {
+                    script.setNextVar("_value", source.longValues().nextValue());
+                    return script.runAsLong();
                 }
             }
 
@@ -288,13 +246,11 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
                 private final Numeric source;
                 private final SearchScript script;
-                private final InternalIter iter;
 
                 public DoubleValues(Numeric source, SearchScript script) {
                     super(true);
                     this.source = source;
                     this.script = script;
-                    this.iter = new InternalIter(script);
                 }
 
                 @Override
@@ -309,30 +265,14 @@ public abstract class FieldDataSource implements ReaderContextAware {
                 }
 
                 @Override
-                public Iter getIter(int docId) {
-                    this.iter.iter = source.doubleValues().getIter(docId);
-                    return this.iter;
+                public int setDocument(int docId) {
+                    return source.doubleValues().setDocument(docId);
                 }
 
-                static class InternalIter implements Iter {
-
-                    private final SearchScript script;
-                    private Iter iter;
-
-                    InternalIter(SearchScript script) {
-                        this.script = script;
-                    }
-
-                    @Override
-                    public boolean hasNext() {
-                        return iter.hasNext();
-                    }
-
-                    @Override
-                    public double next() {
-                        script.setNextVar("_value", iter.next());
-                        return script.runAsDouble();
-                    }
+                @Override
+                public double nextValue() {
+                    script.setNextVar("_value", source.doubleValues().nextValue());
+                    return script.runAsDouble();
                 }
             }
         }

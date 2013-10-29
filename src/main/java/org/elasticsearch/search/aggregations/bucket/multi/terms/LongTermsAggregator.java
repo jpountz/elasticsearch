@@ -103,13 +103,14 @@ public class LongTermsAggregator extends LongBucketsAggregator {
         public void collect(int doc) throws IOException {
 
             LongValues values = valuesSource.longValues();
+            int valuesCount = values.setDocument(doc);
 
-            if (!values.hasValue(doc)) {
+            if (valuesCount == 0) {
                 return;
             }
 
-            if (!values.isMultiValued()) {
-                long term = values.getValue(doc);
+            if (valuesCount == 1) {
+                long term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
@@ -122,17 +123,17 @@ public class LongTermsAggregator extends LongBucketsAggregator {
             if (matchedBuckets == null) {
                 matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
             }
-            populateMatchingBuckets(doc, values);
+            populateMatchingBuckets(values, valuesCount);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
                 mBuckets[i].collect(doc);
             }
         }
 
-        private void populateMatchingBuckets(int doc, LongValues values) {
+        private void populateMatchingBuckets(LongValues values, int valuesCount) {
             matchedBuckets.reset();
-            for (LongValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                long term = iter.next();
+            for (int i = 0; i < valuesCount; i++) {
+                long term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
@@ -140,6 +141,7 @@ public class LongTermsAggregator extends LongBucketsAggregator {
                 }
                 matchedBuckets.add(bucket);
             }
+
         }
 
         @Override

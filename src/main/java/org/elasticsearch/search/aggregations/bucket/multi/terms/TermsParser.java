@@ -65,7 +65,7 @@ public class TermsParser implements AggregatorParser {
         String orderKey = "_count";
         boolean orderAsc = false;
         String format = null;
-        boolean multiValued = true;
+        boolean multiValued = false;
 
 
         XContentParser.Token token;

@@ -106,13 +106,14 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
         public void collect(int doc) throws IOException {
 
             DoubleValues values = valuesSource.doubleValues();
+            int valuesCount = values.setDocument(doc);
 
-            if (!values.hasValue(doc)) {
+            if (valuesCount == 0) {
                 return;
             }
 
-            if (!values.isMultiValued()) {
-                double term = values.getValue(doc);
+            if (valuesCount == 1) {
+                double term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, DoubleTermsAggregator.this);
@@ -125,7 +126,7 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
             if (matchedBuckets == null) {
                 matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
             }
-            populateMatchedBuckets(doc, values);
+            populateMatchedBuckets(values, valuesCount);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
                 mBuckets[i].collect(doc);
@@ -133,10 +134,10 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
 
         }
 
-        private void populateMatchedBuckets(int doc, DoubleValues values) {
+        private void populateMatchedBuckets(DoubleValues values, int valuesCount) {
             matchedBuckets.reset();
-            for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                double term = iter.next();
+            for (int i = 0; i < valuesCount; i++) {
+                double term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
                     bucket = new BucketCollector(valuesSource, term, DoubleTermsAggregator.this);

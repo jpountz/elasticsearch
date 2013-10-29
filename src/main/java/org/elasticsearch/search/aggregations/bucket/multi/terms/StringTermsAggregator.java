@@ -109,16 +109,19 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
         @Override
         public void collect(int doc) throws IOException {
             BytesValues values = valuesSource.bytesValues();
+            int valuesCount = values.setDocument(doc);
 
-            if (!values.hasValue(doc)) {
+            if (valuesCount == 0) {
                 return;
             }
 
-            if (!values.isMultiValued()) {
-                scratch.hash = values.getValueHashed(doc, scratch.bytes);
+            if (valuesCount == 1) {
+
+                scratch.bytes = values.nextValue();
+                scratch.hash = values.currentValueHash();
                 BucketCollector bucket = buckets.v().get(scratch);
                 if (bucket == null) {
-                    HashedBytesRef put = new HashedBytesRef(values.makeSafe(scratch.bytes), scratch.hash);
+                    HashedBytesRef put = scratch.deepCopy();
                     bucket = new BucketCollector(valuesSource, put.bytes, factories, StringTermsAggregator.this);
                     buckets.v().put(put, bucket);
                 }
@@ -132,21 +135,21 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
 
             // we'll first find all the buckets that match the values, and then propagate the document through them
             // we need to do that to avoid counting the same document more than once.
-            populateMatchingBuckets(doc, values);
+            populateMatchingBuckets(values, valuesCount);
             BucketCollector[] mBuckets = matchedBuckets.innerValues();
             for (int i = 0; i < matchedBuckets.size(); i++) {
                 mBuckets[i].collect(doc);
             }
         }
 
-        private void populateMatchingBuckets(int doc, BytesValues values) throws IOException {
+        private void populateMatchingBuckets(BytesValues values, int valuesCount) throws IOException {
             matchedBuckets.reset();
-            for (BytesValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                scratch.bytes = iter.next();
-                scratch.hash = iter.hash();
+            for (int i = 0; i < valuesCount; i++) {
+                scratch.bytes = values.nextValue();
+                scratch.hash = values.currentValueHash();
                 BucketCollector bucket = buckets.v().get(scratch);
                 if (bucket == null) {
-                    HashedBytesRef put = new HashedBytesRef(values.makeSafe(scratch.bytes), scratch.hash);
+                    HashedBytesRef put = scratch.deepCopy();
                     bucket = new BucketCollector(valuesSource, put.bytes, factories, StringTermsAggregator.this);
                     buckets.v().put(put, bucket);
                 }

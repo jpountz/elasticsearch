@@ -67,7 +67,7 @@ public class MissingAggregator extends BytesBucketsAggregator {
 
         @Override
         protected boolean onDoc(int doc, BytesValues values) throws IOException {
-            if (!values.hasValue(doc)) {
+            if (values.setDocument(doc) == 0) {
                 docCount++;
                 return true;
             }

@@ -151,12 +151,14 @@ public class RangeAggregator extends DoubleBucketsAggregator {
 
         @Override
         protected boolean onDoc(int doc, DoubleValues values) throws IOException {
-            if (!values.hasValue(doc)) {
+            int valuesCount = values.setDocument(doc);
+
+            if (valuesCount == 0) {
                 return false;
             }
 
-            if (!values.isMultiValued()) {
-                double value = values.getValue(doc);
+            if (valuesCount == 1) {
+                double value = values.nextValue();
                 if (range.matches(value)) {
                     docCount++;
                     return true;
@@ -164,8 +166,8 @@ public class RangeAggregator extends DoubleBucketsAggregator {
                 return false;
             }
 
-            for (DoubleValues.Iter iter = values.getIter(doc); iter.hasNext();) {
-                double value = iter.next();
+            for (int i = 0; i < valuesCount; i++) {
+                double value = values.nextValue();
                 if (range.matches(value)) {
                     return true;
                 }

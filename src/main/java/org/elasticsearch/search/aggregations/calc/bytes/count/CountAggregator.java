@@ -62,16 +62,11 @@ public class CountAggregator extends BytesCalcAggregator {
 
         @Override
         protected void collect(int doc, BytesValues values) throws IOException {
-            if (!values.hasValue(doc)) {
+            int valuesCount = values.setDocument(doc);
+            if (valuesCount == 0) {
                 return;
             }
-            if (!values.isMultiValued()) {
-                count++;
-                return;
-            }
-            for (BytesValues.Iter iter  = values.getIter(doc); iter.hasNext(); iter.next()) {
-                count++;
-            }
+            count += valuesCount;
         }
 
         @Override
