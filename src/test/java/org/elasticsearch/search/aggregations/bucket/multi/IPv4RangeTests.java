@@ -488,7 +488,7 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(100l));
         Max max = bucket.getAggregations().get("max");
         assertThat(max, Matchers.notNullValue());
-        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.99")));
+        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.100")));
 
         bucket = range.getByKey("10.0.0.100-10.0.0.200");
         assertThat(bucket, notNullValue());
@@ -500,7 +500,7 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(101l));
         max = bucket.getAggregations().get("max");
         assertThat(max, Matchers.notNullValue());
-        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.199")));
+        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.200")));
 
         bucket = range.getByKey("10.0.0.200-*");
         assertThat(bucket, notNullValue());
@@ -688,7 +688,7 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(100l));
         Max max = bucket.getAggregations().get("max");
         assertThat(max, Matchers.notNullValue());
-        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.99")));
+        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.100")));
 
         bucket = range.getByKey("10.0.0.100-10.0.0.200");
         assertThat(bucket, notNullValue());
@@ -700,7 +700,7 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(101l));
         max = bucket.getAggregations().get("max");
         assertThat(max, Matchers.notNullValue());
-        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.199")));
+        assertThat((long) max.getValue(), equalTo(IpFieldMapper.ipToLong("10.0.0.200")));
 
         bucket = range.getByKey("10.0.0.200-*");
         assertThat(bucket, notNullValue());
