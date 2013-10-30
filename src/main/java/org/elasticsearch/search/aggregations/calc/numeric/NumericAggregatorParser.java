@@ -73,10 +73,6 @@ public class NumericAggregatorParser<S extends NumericAggregation> implements Ag
                 } else if ("script_lang".equals(currentFieldName) || "scriptLang".equals(currentFieldName)) {
                     scriptLang = parser.text();
                 }
-            } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
-                if ("multi_valued".equals(currentFieldName) || "multiValued".equals(currentFieldName)) {
-                    config.multiValued(parser.booleanValue());
-                }
             } else if (token == XContentParser.Token.START_OBJECT) {
                 if ("params".equals(currentFieldName)) {
                     scriptParams = parser.map();

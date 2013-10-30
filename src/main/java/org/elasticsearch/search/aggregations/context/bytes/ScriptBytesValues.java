@@ -19,16 +19,15 @@
 
 package org.elasticsearch.search.aggregations.context.bytes;
 
+import com.google.common.collect.Iterators;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.script.SearchScript;
-import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.context.ScriptValues;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  *
@@ -37,12 +36,13 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
 
     final SearchScript script;
 
-    final Iter iter = new Iter();
+    private Iterator<?> iter;
+    private boolean started;
     private Object value;
     private BytesRef scratch = new BytesRef();
 
-    public ScriptBytesValues(SearchScript script, boolean multiValue) {
-        super(multiValue);
+    public ScriptBytesValues(SearchScript script) {
+        super(true); // assume multi-valued
         this.script = script;
     }
 
@@ -58,137 +58,75 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
 
     @Override
     public boolean hasValue(int docId) {
-        script.setNextDocId(docId);
-        Object value = script.run();
-
-        if (value == null) {
-            return false;
-        }
-
-        // shortcutting on single valued
-        if (!isMultiValued()) {
-            return true;
-        }
-
-        if (value.getClass().isArray()) {
-            return Array.getLength(value) != 0;
-        }
-
-        if (value instanceof Collection) {
-            return !((Collection) value).isEmpty();
-        }
-
-        return false;
+        throw new UnsupportedOperationException("Use setDocument(doc) == 0");
     }
 
     public BytesRef getValueScratch(int docId, BytesRef ret) {
-        script.setNextDocId(docId);
-        Object value = script.run();
-        assert value != null : "expected value to exists. call ScriptDoubleValues#hasValue(int) must be called before ScriptDoubleValues#getValue(int)";
-
-        // shortcutting single valued
-        if (!isMultiValued()) {
-            ret.copyChars(value.toString());
-            return ret;
-        }
-
-        if (value.getClass().isArray()) {
-            ret.copyChars(Array.get(value, 0).toString());
-            return ret;
-        }
-        if (value instanceof List) {
-            ret.copyChars(((List) value).get(0).toString());
-            return ret;
-        }
-        if (value instanceof Collection) {
-            ret.copyChars(((Collection) value).iterator().next().toString());
-            return ret;
-        }
-        ret.copyChars(value.toString());
-        return ret;
+        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
     }
 
     @Override
     public BytesRef getValue(int docId) {
-        return getValueScratch(docId, scratch);
+        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
     }
 
     @Override
     public int setDocument(int docId) {
-        if (this.docId != docId) {
+        if (this.docId != docId || started) {
             this.docId = docId;
             script.setNextDocId(docId);
             value = script.run();
         }
 
+        started = false;
+
         if (value == null) {
+            iter = Iterators.emptyIterator();
             return 0;
         }
 
-        if (!isMultiValued()) {
-            return 1;
-        }
-
         if (value.getClass().isArray()) {
-            iter.reset(value);
-            return Array.getLength(value);
-        }
-        if (value instanceof Collection) {
-            iter.reset(((Collection) value).iterator());
-            return ((Collection) value).size();
+            final int length = Array.getLength(value);
+            // don't use Arrays.asList because the array may be an array of primitives?
+            iter = new Iterator<Object>() {
+
+                int i = 0;
+
+                @Override
+                public boolean hasNext() {
+                    return i < length;
+                }
+
+                @Override
+                public Object next() {
+                    return Array.get(value, i++);
+                }
+
+                @Override
+                public void remove() {
+                    throw new UnsupportedOperationException();
+                }
+
+            };
+            return length;
         }
 
-        throw new AggregationExecutionException("Unsupported script value [" + value + "]");
+        if (value instanceof Collection) {
+            final Collection<?> coll = (Collection<?>) value;
+            iter = coll.iterator();
+            return coll.size();
+        }
+
+        iter = Iterators.singletonIterator(value);
+        return 1;
     }
 
     @Override
     public BytesRef nextValue() {
-        if (!isMultiValued()) {
-            scratch.copyChars(value.toString());
-            return scratch;
-        }
-        return iter.next();
+        started = true;
+        final String next = iter.next().toString();
+        scratch.copyChars(next);
+        return scratch;
     }
 
-    static class Iter {
-
-        Object array;
-        int arrayLength;
-        int i = 0;
-
-        Iterator iterator;
-
-        final BytesRef scratch = new BytesRef();
-
-        void reset(Object array) {
-            this.array = array;
-            this.arrayLength = Array.getLength(array);
-            this.iterator = null;
-        }
-
-        void reset(Iterator iterator) {
-            this.iterator = iterator;
-            this.array = null;
-        }
-
-        public boolean hasNext() {
-            if (iterator != null) {
-                return iterator.hasNext();
-            }
-            return i + 1 < arrayLength;
-        }
-
-        public BytesRef next() {
-            if (iterator != null) {
-                scratch.copyChars(iterator.next().toString());
-                return scratch;
-            }
-            scratch.copyChars(Array.get(array, ++i).toString());
-            return scratch;
-        }
-
-        public int hash() {
-            return scratch.hashCode();
-        }
-    }
 }

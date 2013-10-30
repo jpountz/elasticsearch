@@ -34,7 +34,6 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
     ValueFormatter formatter;
     ValueParser parser;
     ScriptValueType scriptValueType;
-    boolean multiValued = false;
     boolean unmapped = false;
 
     public ValuesSourceConfig(Class<VS> valueSourceType) {
@@ -92,11 +91,6 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
 
     public ScriptValueType scriptValueType() {
         return scriptValueType;
-    }
-
-    public ValuesSourceConfig<VS> multiValued(boolean multiValued) {
-        this.multiValued = multiValued;
-        return this;
     }
 
     public ValuesSourceConfig<VS> unmapped(boolean unmapped) {

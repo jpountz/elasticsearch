@@ -16,7 +16,6 @@ public abstract class NumericAggregationBuilder<B extends NumericAggregationBuil
     private String script;
     private String scriptLang;
     private Map<String, Object> params;
-    private Boolean multiValued;
 
     protected NumericAggregationBuilder(String name, String type) {
         super(name, type);
@@ -54,11 +53,6 @@ public abstract class NumericAggregationBuilder<B extends NumericAggregationBuil
         return (B) this;
     }
 
-    public B multiValued(boolean multiValued) {
-        this.multiValued = multiValued;
-        return (B) this;
-    }
-
     @Override
     protected void internalXContent(XContentBuilder builder, Params params) throws IOException {
         if (field != null) {
@@ -75,10 +69,6 @@ public abstract class NumericAggregationBuilder<B extends NumericAggregationBuil
 
         if (this.params != null && !this.params.isEmpty()) {
             builder.field("params").map(this.params);
-        }
-
-        if (multiValued != null) {
-            builder.field("multi_valued", multiValued);
         }
     }
 }

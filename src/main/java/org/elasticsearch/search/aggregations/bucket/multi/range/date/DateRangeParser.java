@@ -117,8 +117,6 @@ public class DateRangeParser implements AggregatorParser {
             } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
                 if ("keyed".equals(currentFieldName)) {
                     keyed = parser.booleanValue();
-                } else if ("multi_valued".equals(currentFieldName) || "multiValued".equals(currentFieldName)) {
-                    config.multiValued(parser.booleanValue());
                 }
             }
         }

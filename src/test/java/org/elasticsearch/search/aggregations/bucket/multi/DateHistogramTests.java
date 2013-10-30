@@ -27,8 +27,6 @@ import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -699,7 +697,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
     @Test
     public void script_MultiValued() throws Exception {
         SearchResponse response = client().prepareSearch("idx")
-                .addAggregation(dateHistogram("histo").script("doc['dates'].values").multiValued(true).interval(DateHistogram.Interval.MONTH))
+                .addAggregation(dateHistogram("histo").script("doc['dates'].values").interval(DateHistogram.Interval.MONTH))
                 .execute().actionGet();
 
         assertThat(response.getFailedShards(), equalTo(0));
