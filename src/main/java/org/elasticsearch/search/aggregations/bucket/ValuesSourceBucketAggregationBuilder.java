@@ -15,7 +15,6 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
     private String script;
     private String scriptLang;
     private Map<String, Object> params;
-    private Boolean multiValued;
 
     /**
      * Constructs a new builder.
@@ -66,23 +65,6 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
     }
 
     /**
-     * When configuring a script to generate the aggregated values, elasticsearch will assume that the script can potentially generate/return
-     * multiple values. This assumption may have a performance hit, so if you know that the script will always generate a single value, you
-     * can set this to {@code false}.
-     * <p/>
-     * NOTE: <i>value script</i>s only support single value generation (that is, it accepts a single value and returns a single value).
-     *<p/>
-     * For more information about <i>value scripts</i>, see {@link #script(String)}.
-     *
-     * @param multiValued   The language of the script.
-     * @return              This builder (fluent interface support)
-     */
-    public B multiValued(boolean multiValued) {
-        this.multiValued = multiValued;
-        return (B) this;
-    }
-
-    /**
      * Sets the value of a parameter that is used in the script (if one is configured).
      *
      * @param name      The name of the parameter.
@@ -122,9 +104,6 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
         }
         if (scriptLang != null) {
             builder.field("script_lang", scriptLang);
-        }
-        if (multiValued != null) {
-            builder.field("multi_valued", multiValued);
         }
         if (this.params != null) {
             builder.field("params").map(this.params);

@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.context.numeric;
 
+import org.apache.lucene.util.ArrayUtil;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.script.SearchScript;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
@@ -27,7 +28,6 @@ import org.elasticsearch.search.aggregations.context.ScriptValues;
 import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
 
 /**
  * {@link LongValues} implementation which is based on a script
@@ -37,10 +37,12 @@ public class ScriptLongValues extends LongValues implements ScriptValues {
     final SearchScript script;
 
     private Object value;
-    final Iter iter = new Iter();
+    private long[] values = new long[4];
+    private int valueCount;
+    private int valueOffset;
 
-    public ScriptLongValues(SearchScript script, boolean multiValue) {
-        super(multiValue);
+    public ScriptLongValues(SearchScript script) {
+        super(true); // assume multi-valued
         this.script = script;
     }
 
@@ -57,122 +59,60 @@ public class ScriptLongValues extends LongValues implements ScriptValues {
 
     @Override
     public int setDocument(int docId) {
-        if (this.docId != docId || value == null) {
+        if (this.docId != docId || valueOffset != 0) {
             this.docId = docId;
             script.setNextDocId(docId);
             value = script.run();
         }
 
         if (value == null) {
-            return 0;
+            valueCount = 0;
         }
 
-        // shortcutting on single valued
-        if (!isMultiValued()) {
-            return 1;
+        else if (value instanceof Number) {
+            valueCount = 1;
+            values[0] = ((Number) value).longValue();
         }
 
-        if (value.getClass().isArray()) {
-            iter.reset(value);
-            return Array.getLength(value);
-        }
-        if (value instanceof Collection) {
-            iter.reset(((Collection) value).iterator());
-            return ((Collection) value).size();
+        else if (value.getClass().isArray()) {
+            valueCount = Array.getLength(value);
+            values = ArrayUtil.grow(values, valueCount);
+            for (int i = 0; i < valueCount; ++i) {
+                values[i] = ((Number) Array.get(value, i++)).longValue();
+            }
         }
 
-        throw new AggregationExecutionException("Unsupported script value [" + value + "]");
+        else if (value instanceof Collection) {
+            valueCount = ((Collection<?>) value).size();
+            int i = 0;
+            for (Iterator<?> it = ((Collection<?>) value).iterator(); it.hasNext(); ++i) {
+                values[i] = ((Number) it.next()).longValue();
+            }
+            assert i == valueCount;
+        }
+
+        else {
+            throw new AggregationExecutionException("Unsupported script value [" + value + "]");
+        }
+
+        valueOffset = 0;
+        return valueCount;
     }
 
     @Override
     public boolean hasValue(int docId) {
-        script.setNextDocId(docId);
-        Object value = script.run();
-
-        if (value == null) {
-            return false;
-        }
-
-        // shortcutting on single valued
-        if (!isMultiValued()) {
-            return true;
-        }
-
-        if (value.getClass().isArray()) {
-            return Array.getLength(value) != 0;
-        }
-
-        if (value instanceof Collection) {
-            return !((Collection) value).isEmpty();
-        }
-
-        return false;
+        throw new UnsupportedOperationException("Use setDocument(doc) == 0");
     }
 
     @Override
     public long getValue(int docId) {
-        script.setNextDocId(docId);
-        Object value = script.run();
-        assert value != null : "expected value to exists. call ScriptDoubleValues#hasValue(int) must be called before ScriptDoubleValues#getValue(int)";
-
-        // shortcutting on single valued
-        if (!isMultiValued()) {
-            return ((Number) value).longValue();
-        }
-
-        if (value.getClass().isArray()) {
-            return ((Number) Array.get(value, 0)).longValue();
-        }
-        if (value instanceof List) {
-            return (((List<Number>) value).get(0)).longValue();
-        }
-        if (value instanceof Collection) {
-            return (((Collection<Number>) value).iterator().next()).longValue();
-        }
-
-        throw new AggregationExecutionException("Unsupported script value [" + value + "]. Expecting one of the following types: long, Number, Collection<Number>, <? extends Number>[]");
+        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
     }
 
     @Override
     public long nextValue() {
-        if (!isMultiValued()) {
-            return ((Number) value).longValue();
-        }
-        return iter.next();
+        assert valueOffset < valueCount;
+        return values[valueOffset++];
     }
 
-    static class Iter {
-
-        Object array;
-        int arrayLength;
-        int i = 0;
-
-        Iterator<Number> iterator;
-
-        void reset(Object array) {
-            this.array = array;
-            this.i = 0;
-            this.arrayLength = Array.getLength(array);
-            this.iterator = null;
-        }
-
-        void reset(Iterator<Number> iterator) {
-            this.iterator = iterator;
-            this.array = null;
-        }
-
-        public boolean hasNext() {
-            if (iterator != null) {
-                return iterator.hasNext();
-            }
-            return i < arrayLength;
-        }
-
-        public long next() {
-            if (iterator != null) {
-                return iterator.next().longValue();
-            }
-            return ((Number) Array.get(array, i++)).longValue();
-        }
-    }
 }

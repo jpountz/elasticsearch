@@ -90,14 +90,14 @@ public interface NumericValuesSource extends ValuesSource {
         private final ScriptLongValues longValues;
         private final ScriptBytesValues bytesValues;
 
-        public Script(SearchScript script, boolean multiValue, ScriptValueType scriptValueType, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
+        public Script(SearchScript script, ScriptValueType scriptValueType, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
             super(script);
             this.formatter = formatter;
             this.parser = parser;
             this.scriptValueType = scriptValueType;
-            longValues = new ScriptLongValues(script, multiValue);
-            doubleValues = new ScriptDoubleValues(script, multiValue);
-            bytesValues = new ScriptBytesValues(script, multiValue);
+            longValues = new ScriptLongValues(script);
+            doubleValues = new ScriptDoubleValues(script);
+            bytesValues = new ScriptBytesValues(script);
         }
 
         @Override

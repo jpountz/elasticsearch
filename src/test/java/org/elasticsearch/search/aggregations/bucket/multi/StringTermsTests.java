@@ -375,8 +375,7 @@ public class StringTermsTests extends AbstractIntegrationTest {
     public void script_SingleValue_ExplicitSingleValue() throws Exception {
         SearchResponse response = client().prepareSearch("idx").setTypes("type")
                 .addAggregation(terms("terms")
-                        .script("doc['value'].value")
-                        .multiValued(false))
+                        .script("doc['value'].value"))
                 .execute().actionGet();
 
         assertThat(response.getFailedShards(), equalTo(0));

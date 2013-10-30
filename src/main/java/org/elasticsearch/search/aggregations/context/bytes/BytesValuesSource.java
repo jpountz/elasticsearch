@@ -41,9 +41,9 @@ public interface BytesValuesSource extends ValuesSource {
 
         private final ScriptBytesValues values;
 
-        public Script(SearchScript script, boolean multiValue) {
+        public Script(SearchScript script) {
             super(script);
-            this.values = new ScriptBytesValues(script, multiValue);
+            this.values = new ScriptBytesValues(script);
         }
 
         @Override

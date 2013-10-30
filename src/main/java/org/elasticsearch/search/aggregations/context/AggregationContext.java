@@ -98,10 +98,10 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
 
         if (config.fieldContext == null) {
             if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-                return (VS) numericScript(config.script, config.multiValued, config.scriptValueType, config.formatter, config.parser);
+                return (VS) numericScript(config.script, config.scriptValueType, config.formatter, config.parser);
             }
             if (BytesValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-                return (VS) bytesScript(config.script, config.multiValued);
+                return (VS) bytesScript(config.script);
             }
             throw new AggregationExecutionException("value source of type [" + config.valueSourceType.getSimpleName() + "] is not supported by scripts");
         }
@@ -119,12 +119,12 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         throw new AggregationExecutionException("value source of type [" + config.valueSourceType.getSimpleName() + "] is not supported");
     }
 
-    private NumericValuesSource.Script numericScript(SearchScript script, boolean multiValued, ScriptValueType scriptValueType, ValueFormatter formatter, ValueParser parser) {
+    private NumericValuesSource.Script numericScript(SearchScript script, ScriptValueType scriptValueType, ValueFormatter formatter, ValueParser parser) {
         setScorerIfNeeded(script);
         setReaderIfNeeded(script);
         scorerAwares.add(script);
         readerAwares.add(script);
-        return new NumericValuesSource.Script(script, multiValued, scriptValueType, formatter, parser);
+        return new NumericValuesSource.Script(script, scriptValueType, formatter, parser);
     }
 
     private NumericValuesSource numericField(FieldContext fieldContext, SearchScript script, ValueFormatter formatter, ValueParser parser) {
@@ -161,12 +161,12 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         return new BytesValuesSource.FieldData(dataSource);
     }
 
-    private BytesValuesSource bytesScript(SearchScript script, boolean multiValued) {
+    private BytesValuesSource bytesScript(SearchScript script) {
         setScorerIfNeeded(script);
         setReaderIfNeeded(script);
         scorerAwares.add(script);
         readerAwares.add(script);
-        return new BytesValuesSource.Script(script, multiValued);
+        return new BytesValuesSource.Script(script);
     }
 
     private GeoPointValuesSource geoPointField(FieldContext fieldContext) {

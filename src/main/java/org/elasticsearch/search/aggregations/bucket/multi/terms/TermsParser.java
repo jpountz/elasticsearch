@@ -65,7 +65,6 @@ public class TermsParser implements AggregatorParser {
         String orderKey = "_count";
         boolean orderAsc = false;
         String format = null;
-        boolean multiValued = false;
 
 
         XContentParser.Token token;
@@ -88,10 +87,6 @@ public class TermsParser implements AggregatorParser {
             } else if (token == XContentParser.Token.VALUE_NUMBER) {
                 if ("size".equals(currentFieldName)) {
                     requiredSize = parser.intValue();
-                }
-            } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
-                if ("multi_valued".equals(currentFieldName) || "multiValued".equals(currentFieldName)) {
-                    multiValued = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.START_OBJECT) {
                 if ("params".equals(currentFieldName)) {
@@ -128,7 +123,6 @@ public class TermsParser implements AggregatorParser {
                 config.scriptValueType(valueType.scriptValueType);
             }
             config.script(searchScript);
-            config.multiValued(multiValued);
             return new TermsAggregatorFactory(aggregationName, config, order, requiredSize);
         }
 
@@ -164,7 +158,6 @@ public class TermsParser implements AggregatorParser {
         }
 
         config.script(searchScript);
-        config.multiValued(multiValued);
 
         config.fieldContext(new FieldContext(field, indexFieldData));
 
