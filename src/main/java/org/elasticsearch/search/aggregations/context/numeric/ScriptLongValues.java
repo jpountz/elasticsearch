@@ -47,23 +47,15 @@ public class ScriptLongValues extends LongValues implements ScriptValues {
     }
 
     @Override
-    public void clearCache() {
-        docId = -1;
-        value = null;
-    }
-
-    @Override
     public SearchScript script() {
         return script;
     }
 
     @Override
     public int setDocument(int docId) {
-        if (this.docId != docId || valueOffset != 0) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
+        this.docId = docId;
+        script.setNextDocId(docId);
+        value = script.run();
 
         if (value == null) {
             valueCount = 0;

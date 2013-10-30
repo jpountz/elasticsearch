@@ -37,7 +37,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
     final SearchScript script;
 
     private Iterator<?> iter;
-    private boolean started;
     private Object value;
     private BytesRef scratch = new BytesRef();
 
@@ -49,11 +48,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
     @Override
     public SearchScript script() {
         return script;
-    }
-
-    @Override
-    public void clearCache() {
-        value = null;
     }
 
     @Override
@@ -72,13 +66,9 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
 
     @Override
     public int setDocument(int docId) {
-        if (this.docId != docId || started) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
-
-        started = false;
+        this.docId = docId;
+        script.setNextDocId(docId);
+        value = script.run();
 
         if (value == null) {
             iter = Iterators.emptyIterator();
@@ -123,7 +113,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
 
     @Override
     public BytesRef nextValue() {
-        started = true;
         final String next = iter.next().toString();
         scratch.copyChars(next);
         return scratch;

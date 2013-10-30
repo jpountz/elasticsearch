@@ -26,8 +26,6 @@ import org.elasticsearch.script.SearchScript;
  */
 public interface ScriptValues {
 
-    void clearCache();
-
     SearchScript script();
 
 }
