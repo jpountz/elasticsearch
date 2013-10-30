@@ -430,7 +430,7 @@ public class RangeTests extends AbstractIntegrationTest {
         Sum sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 2));
+        assertThat(sum.getValue(), equalTo(2d+3d));
 
         bucket = range.getByKey("3.0-6.0");
         assertThat(bucket, notNullValue());
@@ -441,7 +441,7 @@ public class RangeTests extends AbstractIntegrationTest {
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 3+3+4+4+5+5));
+        assertThat(sum.getValue(), equalTo((double) 2+3+3+4+4+5+5+6));
 
         bucket = range.getByKey("6.0-*");
         assertThat(bucket, notNullValue());
@@ -452,7 +452,7 @@ public class RangeTests extends AbstractIntegrationTest {
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 6+6+7+7+8+8+9+9+10+10+11+11+12));
+        assertThat(sum.getValue(), equalTo((double) 5+6+6+7+7+8+8+9+9+10+10+11+11+12));
     }
 
     @Test
@@ -626,7 +626,7 @@ public class RangeTests extends AbstractIntegrationTest {
         Sum sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 1+2+2));
+        assertThat(sum.getValue(), equalTo((double) 1+2+2+3));
 
         bucket = range.getByKey("r2");
         assertThat(bucket, notNullValue());
@@ -637,7 +637,7 @@ public class RangeTests extends AbstractIntegrationTest {
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 3+3+4+4+5+5));
+        assertThat(sum.getValue(), equalTo((double) 2+3+3+4+4+5+5+6));
 
         bucket = range.getByKey("r3");
         assertThat(bucket, notNullValue());
@@ -648,7 +648,7 @@ public class RangeTests extends AbstractIntegrationTest {
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 6+6+7+7+8+8+9+9+10+10+11));
+        assertThat(sum.getValue(), equalTo((double) 5+6+6+7+7+8+8+9+9+10+10+11));
     }
 
     @Test

@@ -153,22 +153,10 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         protected boolean onDoc(int doc, DoubleValues values) throws IOException {
             int valuesCount = values.setDocument(doc);
 
-            if (valuesCount == 0) {
-                return false;
-            }
-
-            if (valuesCount == 1) {
-                double value = values.nextValue();
-                if (range.matches(value)) {
-                    docCount++;
-                    return true;
-                }
-                return false;
-            }
-
             for (int i = 0; i < valuesCount; i++) {
                 double value = values.nextValue();
                 if (range.matches(value)) {
+                    ++docCount;
                     return true;
                 }
             }
