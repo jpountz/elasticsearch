@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi;
 
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthStatus;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
@@ -499,6 +500,8 @@ public class DoubleTermsTests extends AbstractIntegrationTest {
 
     @Test
     public void unmapped() throws Exception {
+        client().admin().cluster().prepareHealth("idx_unmapped").setWaitForYellowStatus().execute().actionGet();
+
         SearchResponse response = client().prepareSearch("idx_unmapped").setTypes("type")
                 .addAggregation(terms("terms")
                         .field("value"))

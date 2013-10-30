@@ -814,6 +814,8 @@ public class DateRangeTests extends AbstractIntegrationTest {
 
     @Test
     public void unmapped() throws Exception {
+        client().admin().cluster().prepareHealth("idx_unmapped").setWaitForYellowStatus().execute().actionGet();
+
         SearchResponse response = client().prepareSearch("idx_unmapped")
                 .addAggregation(dateRange("range")
                         .field("date")
