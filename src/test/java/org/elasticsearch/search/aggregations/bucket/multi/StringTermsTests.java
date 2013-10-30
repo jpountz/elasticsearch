@@ -339,12 +339,12 @@ public class StringTermsTests extends AbstractIntegrationTest {
                 assertThat(bucket.getDocCount(), equalTo(1l));
                 Count count = bucket.getAggregations().get("count");
                 assertThat(count, notNullValue());
-                assertThat(count.getValue(), equalTo(1l));
+                assertThat(count.getValue(), equalTo(2l));
             } else {
                 assertThat(bucket.getDocCount(), equalTo(2l));
                 Count count = bucket.getAggregations().get("count");
                 assertThat(count, notNullValue());
-                assertThat(count.getValue(), equalTo(2l));
+                assertThat(count.getValue(), equalTo(4l));
             }
         }
     }
@@ -468,12 +468,12 @@ public class StringTermsTests extends AbstractIntegrationTest {
                 assertThat(bucket.getDocCount(), equalTo(1l));
                 Count count = bucket.getAggregations().get("count");
                 assertThat(count, notNullValue());
-                assertThat(count.getValue(), equalTo(1l));
+                assertThat(count.getValue(), equalTo(2l));
             } else {
                 assertThat(bucket.getDocCount(), equalTo(2l));
                 Count count = bucket.getAggregations().get("count");
                 assertThat(count, notNullValue());
-                assertThat(count.getValue(), equalTo(2l));
+                assertThat(count.getValue(), equalTo(4l));
             }
         }
     }
