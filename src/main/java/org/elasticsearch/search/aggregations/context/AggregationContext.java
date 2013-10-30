@@ -22,6 +22,8 @@ package org.elasticsearch.search.aggregations.context;
 import com.carrotsearch.hppc.ObjectObjectOpenHashMap;
 import org.apache.lucene.index.AtomicReaderContext;
 import org.apache.lucene.search.Scorer;
+import org.apache.lucene.util.ArrayUtil;
+import org.apache.lucene.util.RamUsageEstimator;
 import org.elasticsearch.cache.recycler.CacheRecycler;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.ScorerAware;
@@ -35,6 +37,7 @@ import org.elasticsearch.search.aggregations.context.numeric.ValueParser;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -45,7 +48,7 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
 
     private final SearchContext searchContext;
 
-    private ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources = new ObjectObjectOpenHashMap<String, FieldDataSource>();
+    private ObjectObjectOpenHashMap<String, FieldDataSource>[] perDepthFieldDataSources = new ObjectObjectOpenHashMap[4];
     private List<ReaderContextAware> readerAwares = new ArrayList<ReaderContextAware>();
     private List<ScorerAware> scorerAwares = new ArrayList<ScorerAware>();
 
@@ -77,10 +80,16 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         for (int i = 0; i < readerAwares.size(); i++) {
             readerAwares.get(i).setNextReader(reader);
         }
-        Object[] sources = fieldDataSources.values;
-        for (int i = 0; i < fieldDataSources.allocated.length; i++) {
-            if (fieldDataSources.allocated[i]) {
-                ((FieldDataSource) sources[i]).setNextReader(reader);
+        for (int k = 0; k < perDepthFieldDataSources.length; ++k) {
+            final ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources = perDepthFieldDataSources[k];
+            if (fieldDataSources == null) {
+                continue;
+            }
+            Object[] sources = fieldDataSources.values;
+            for (int i = 0; i < fieldDataSources.allocated.length; i++) {
+                if (fieldDataSources.allocated[i]) {
+                    ((FieldDataSource) sources[i]).setNextReader(reader);
+                }
             }
         }
     }
@@ -92,9 +101,18 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         }
     }
 
-    public <VS extends ValuesSource> VS valuesSource(ValuesSourceConfig<VS> config) {
+    /** Get a value source given its configuration and the depth of the aggregator in the aggregation tree. */
+    public <VS extends ValuesSource> VS valuesSource(ValuesSourceConfig<VS> config, int depth) {
         assert config.valid() : "value source config is invalid - must have either a field context or a script or marked as unmapped";
         assert !config.unmapped : "value source should not be created for unmapped fields";
+
+        if (perDepthFieldDataSources.length <= depth) {
+            perDepthFieldDataSources = Arrays.copyOf(perDepthFieldDataSources, ArrayUtil.oversize(1 + depth, RamUsageEstimator.NUM_BYTES_OBJECT_REF));
+        }
+        if (perDepthFieldDataSources[depth] == null) {
+            perDepthFieldDataSources[depth] = new ObjectObjectOpenHashMap<String, FieldDataSource>();
+        }
+        final ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources = perDepthFieldDataSources[depth];
 
         if (config.fieldContext == null) {
             if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
@@ -107,13 +125,13 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         }
 
         if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) numericField(config.fieldContext, config.script, config.formatter, config.parser);
+            return (VS) numericField(fieldDataSources, config.fieldContext, config.script, config.formatter, config.parser);
         }
         if (BytesValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) bytesField(config.fieldContext, config.script);
+            return (VS) bytesField(fieldDataSources, config.fieldContext, config.script);
         }
         if (GeoPointValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) geoPointField(config.fieldContext);
+            return (VS) geoPointField(fieldDataSources, config.fieldContext);
         }
 
         throw new AggregationExecutionException("value source of type [" + config.valueSourceType.getSimpleName() + "] is not supported");
@@ -127,7 +145,7 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         return new NumericValuesSource.Script(script, scriptValueType, formatter, parser);
     }
 
-    private NumericValuesSource numericField(FieldContext fieldContext, SearchScript script, ValueFormatter formatter, ValueParser parser) {
+    private NumericValuesSource numericField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script, ValueFormatter formatter, ValueParser parser) {
         FieldDataSource.Numeric dataSource = (FieldDataSource.Numeric) fieldDataSources.get(fieldContext.field());
         if (dataSource == null) {
             dataSource = new FieldDataSource.Numeric(fieldContext.field(), fieldContext.indexFieldData());
@@ -144,7 +162,7 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         return new NumericValuesSource.FieldData(dataSource, formatter, parser);
     }
 
-    private BytesValuesSource bytesField(FieldContext fieldContext, SearchScript script) {
+    private BytesValuesSource bytesField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script) {
         FieldDataSource dataSource = fieldDataSources.get(fieldContext.field());
         if (dataSource == null) {
             dataSource = new FieldDataSource.Bytes(fieldContext.field(), fieldContext.indexFieldData());
@@ -169,7 +187,7 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         return new BytesValuesSource.Script(script);
     }
 
-    private GeoPointValuesSource geoPointField(FieldContext fieldContext) {
+    private GeoPointValuesSource geoPointField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext) {
         FieldDataSource.GeoPoint dataSource = (FieldDataSource.GeoPoint) fieldDataSources.get(fieldContext.field());
         if (dataSource == null) {
             dataSource = new FieldDataSource.GeoPoint(fieldContext.field(), fieldContext.indexFieldData());

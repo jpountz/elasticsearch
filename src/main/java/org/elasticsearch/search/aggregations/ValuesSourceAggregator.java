@@ -60,7 +60,7 @@ public abstract class ValuesSourceAggregator<VS extends ValuesSource> extends Ag
             if (valuesSourceConfig.unmapped()) {
                 return createUnmapped(context, parentAggregator);
             }
-            VS vs = context.valuesSource(valuesSourceConfig);
+            VS vs = context.valuesSource(valuesSourceConfig, parentAggregator == null ? 0 : 1 + parentAggregator.depth());
             return create(vs, context, parentAggregator);
         }
 
@@ -95,7 +95,7 @@ public abstract class ValuesSourceAggregator<VS extends ValuesSource> extends Ag
             if (valueSourceConfig.unmapped()) {
                 return createUnmapped(context, parentAggregator);
             }
-            VS vs = context.valuesSource(valueSourceConfig);
+            VS vs = context.valuesSource(valueSourceConfig, parentAggregator == null ? 0 : 1 + parentAggregator.depth());
             return create(vs, context, parentAggregator);
         }
 
