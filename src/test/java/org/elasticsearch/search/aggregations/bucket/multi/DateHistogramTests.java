@@ -588,7 +588,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(1l));
         Max max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 2, 2, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 3, 3, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 3, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
@@ -597,7 +597,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l));
         max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 3, 15, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 4, 16, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 4, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
@@ -606,7 +606,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(5l));
         max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 4, 23, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 5, 24, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 5, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
@@ -618,6 +618,14 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat((long) max.getValue(), equalTo(new DateTime(2012, 5, 24, 0, 0, DateTimeZone.UTC).getMillis()));
     }
 
+    /**
+     * Jan 2
+     * Feb 2
+     * Feb 15
+     * Mar 2
+     * Mar 15
+     * Mar 23
+     */
     @Test
     public void script_SingleValue() throws Exception {
         SearchResponse response = client().prepareSearch("idx")
@@ -764,7 +772,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(1l));
         Max max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 1, 2, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 2, 3, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
@@ -773,7 +781,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l));
         max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 2, 15, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 3, 16, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 3, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
@@ -782,7 +790,7 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(5l));
         max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 3, 23, 0, 0, DateTimeZone.UTC).getMillis()));
+        assertThat((long) max.getValue(), equalTo(new DateTime(2012, 4, 24, 0, 0, DateTimeZone.UTC).getMillis()));
 
         key = new DateTime(2012, 4, 1, 0, 0, DateTimeZone.UTC).getMillis();
         bucket = histo.getByKey(key);
