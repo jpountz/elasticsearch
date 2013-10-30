@@ -39,6 +39,8 @@ import static org.hamcrest.core.IsNull.notNullValue;
  */
 public class LongTermsTests extends AbstractIntegrationTest {
 
+    private static final int NUM_DOCS = 5; // NOCOMMIT randomize the size?
+
     @Override
     public Settings getSettings() {
         return randomSettingsBuilder()
@@ -50,7 +52,7 @@ public class LongTermsTests extends AbstractIntegrationTest {
     @Before
     public void init() throws Exception {
         createIndex("idx");
-        IndexRequestBuilder[] lowCardBuilders = new IndexRequestBuilder[5]; // NOCOMMIT randomize the size?
+        IndexRequestBuilder[] lowCardBuilders = new IndexRequestBuilder[NUM_DOCS];
         for (int i = 0; i < lowCardBuilders.length; i++) {
             lowCardBuilders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
@@ -341,17 +343,18 @@ public class LongTermsTests extends AbstractIntegrationTest {
             assertThat(bucket, notNullValue());
             assertThat(bucket.getTerm().string(), equalTo("" + (i+1)));
             assertThat(bucket.getTermAsNumber().intValue(), equalTo(i+1));
-            if (i == 0 | i == 5) {
-                assertThat(bucket.getDocCount(), equalTo(1l));
-                Sum sum = bucket.getAggregations().get("sum");
-                assertThat(sum, notNullValue());
-                assertThat(sum.getValue(), equalTo((double) (i+1)));
-            } else {
-                assertThat(bucket.getDocCount(), equalTo(2l));
-                Sum sum = bucket.getAggregations().get("sum");
-                assertThat(sum, notNullValue());
-                assertThat(sum.getValue(), equalTo((double) (i+1 + i+1)));
+            final long count = i == 0 || i == 5 ? 1 : 2;
+            double s = 0;
+            for (int j = 0; j < NUM_DOCS; ++j) {
+                if (i == j || i == j+1) {
+                    s += j + 1;
+                    s += j+1 + 1;
+                }
             }
+            assertThat(bucket.getDocCount(), equalTo(count));
+            Sum sum = bucket.getAggregations().get("sum");
+            assertThat(sum, notNullValue());
+            assertThat(sum.getValue(), equalTo(s));
         }
     }
 
@@ -474,17 +477,18 @@ public class LongTermsTests extends AbstractIntegrationTest {
             assertThat(bucket, notNullValue());
             assertThat(bucket.getTerm().string(), equalTo("" + i));
             assertThat(bucket.getTermAsNumber().intValue(), equalTo(i));
-            if (i == 0 | i == 5) {
-                assertThat(bucket.getDocCount(), equalTo(1l));
-                Sum sum = bucket.getAggregations().get("sum");
-                assertThat(sum, notNullValue());
-                assertThat(sum.getValue(), equalTo((double) i));
-            } else {
-                assertThat(bucket.getDocCount(), equalTo(2l));
-                Sum sum = bucket.getAggregations().get("sum");
-                assertThat(sum, notNullValue());
-                assertThat(sum.getValue(), equalTo((double) (i + i)));
+            final long count = i == 0 || i == 5 ? 1 : 2;
+            double s = 0;
+            for (int j = 0; j < NUM_DOCS; ++j) {
+                if (i == j || i == j+1) {
+                    s += j;
+                    s += j+1;
+                }
             }
+            assertThat(bucket.getDocCount(), equalTo(count));
+            Sum sum = bucket.getAggregations().get("sum");
+            assertThat(sum, notNullValue());
+            assertThat(sum.getValue(), equalTo(s));
         }
     }
 
