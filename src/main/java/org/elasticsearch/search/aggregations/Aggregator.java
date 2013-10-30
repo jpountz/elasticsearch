@@ -35,11 +35,13 @@ public abstract class Aggregator<A extends InternalAggregation> {
     protected final String name;
     protected final Aggregator parent;
     protected final AggregationContext context;
+    protected final int depth;
 
     protected Aggregator(String name, AggregationContext context, Aggregator parent) {
         this.name = name;
         this.parent = parent;
         this.context = context;
+        this.depth = parent == null ? 0 : 1 + parent.depth();
     }
 
     /**
@@ -47,6 +49,11 @@ public abstract class Aggregator<A extends InternalAggregation> {
      */
     public String name() {
         return name;
+    }
+
+    /** Return the depth of this aggregator in the aggregation tree. */
+    public final int depth() {
+        return depth;
     }
 
     /**
