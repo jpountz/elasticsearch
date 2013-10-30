@@ -23,7 +23,6 @@ import com.carrotsearch.hppc.ObjectObjectOpenHashMap;
 import com.google.common.collect.ImmutableList;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.collect.BoundedTreeSet;
-import org.elasticsearch.common.collect.ReusableGrowableArray;
 import org.elasticsearch.common.lucene.HashedBytesRef;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.BytesValues;
@@ -103,7 +102,6 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
 
     class Collector implements Aggregator.Collector {
 
-        private ReusableGrowableArray<BucketCollector> matchedBuckets;
         private HashedBytesRef scratch = new HashedBytesRef(new BytesRef());
 
         @Override
@@ -111,12 +109,7 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
             BytesValues values = valuesSource.bytesValues();
             int valuesCount = values.setDocument(doc);
 
-            if (valuesCount == 0) {
-                return;
-            }
-
-            if (valuesCount == 1) {
-
+            for (int i = 0; i < valuesCount; ++i) {
                 scratch.bytes = values.nextValue();
                 scratch.hash = values.currentValueHash();
                 BucketCollector bucket = buckets.v().get(scratch);
@@ -126,37 +119,8 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
                     buckets.v().put(put, bucket);
                 }
                 bucket.collect(doc);
-                return;
-            }
-
-            if (matchedBuckets == null) {
-                matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
-            }
-
-            // we'll first find all the buckets that match the values, and then propagate the document through them
-            // we need to do that to avoid counting the same document more than once.
-            populateMatchingBuckets(values, valuesCount);
-            BucketCollector[] mBuckets = matchedBuckets.innerValues();
-            for (int i = 0; i < matchedBuckets.size(); i++) {
-                mBuckets[i].collect(doc);
             }
         }
-
-        private void populateMatchingBuckets(BytesValues values, int valuesCount) throws IOException {
-            matchedBuckets.reset();
-            for (int i = 0; i < valuesCount; i++) {
-                scratch.bytes = values.nextValue();
-                scratch.hash = values.currentValueHash();
-                BucketCollector bucket = buckets.v().get(scratch);
-                if (bucket == null) {
-                    HashedBytesRef put = scratch.deepCopy();
-                    bucket = new BucketCollector(valuesSource, put.bytes, factories, StringTermsAggregator.this);
-                    buckets.v().put(put, bucket);
-                }
-                matchedBuckets.add(bucket);
-            }
-        }
-
 
         @Override
         public void postCollection() {

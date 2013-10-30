@@ -83,66 +83,26 @@ class HistogramCollector implements Aggregator.Collector {
 
         int valuesCount = values.setDocument(doc);
 
-        if (valuesCount == 0) {
-            return;
-        }
-
-        if (valuesCount == 1) {
-
-            // optimization for a single valued field when aggregating a single field. In this case,
-            // there's no need to mark buckets as a match on a bucket will always be a single match per doc
-            // so we can just collect it
-
+        // nocommit the matched logic could be more efficient if we knew the values are in order
+        matchedBuckets.reset();
+        for (int i = 0; i < valuesCount; ++i) {
             long value = values.nextValue();
             long key = rounding.round(value);
             BucketCollector bucketCollector = bucketCollectors.get(key);
             if (bucketCollector == null) {
                 bucketCollector = new BucketCollector(key, rounding, valuesSource, factories, aggregator);
                 bucketCollectors.put(key, bucketCollector);
+            } else if (bucketCollector.matched) {
+                continue;
             }
             bucketCollector.collect(doc);
-            return;
-
+            bucketCollector.matched = true;
+            matchedBuckets.add(bucketCollector);
         }
-
-        // it's a multi-valued field, meaning, some values of the field may fit the bucket, while other
-        // won't. thus, we need to iterate on all values and mark the bucket that they fall in (or
-        // create new buckets if needed). Only after this "mark" phase ends, we can iterate over all the buckets
-        // and aggregate only those that are marked (and while at it, clear the mark, making it ready for
-        // the next aggregation).
-
-        populateMatchedBuckets(values, valuesCount);
-        BucketCollector[] mBukcets = matchedBuckets.innerValues();
-        for (int i = 0; i < matchedBuckets.size(); i++) {
-            mBukcets[i].matched = false;
-            mBukcets[i].collect(doc);
+        for (int i = 0; i < matchedBuckets.size(); ++i) {
+            matchedBuckets.innerValues()[i].matched = false;
         }
     }
-
-    // collecting all the buckets (and creating new buckets if needed) that match the given doc
-    // based on the values of the given field. after this method is called we'll go over the buckets and only
-    // collect the matched ones. We need to do this to avoid situations where multiple values in a single field
-    // or multiple values across the aggregated fields match the bucket and then the bucket will collect the same
-    // document multiple times.
-    private void populateMatchedBuckets(LongValues values, int valuesCount) {
-        matchedBuckets.reset();
-
-        for (int i = 0; i < valuesCount; i++) {
-            long value = values.nextValue();
-            long key = rounding.round(value);
-            BucketCollector bucket = bucketCollectors.get(key);
-            if (bucket == null) {
-                bucket = new BucketCollector(key, rounding, valuesSource, factories, aggregator);
-                bucketCollectors.put(key, bucket);
-            }
-            if (!bucket.matched) {
-                matchedBuckets.add(bucket);
-                bucket.matched = true;
-            }
-        }
-    }
-
-
 
     /**
      * A collector for a histogram bucket. This collector counts the number of documents that fall into it,

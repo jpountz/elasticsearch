@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import com.google.common.collect.ImmutableList;
 import org.elasticsearch.common.collect.BoundedTreeSet;
-import org.elasticsearch.common.collect.ReusableGrowableArray;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
@@ -97,19 +96,13 @@ public class LongTermsAggregator extends LongBucketsAggregator {
 
     class Collector implements Aggregator.Collector {
 
-        private ReusableGrowableArray<BucketCollector> matchedBuckets;
-
         @Override
         public void collect(int doc) throws IOException {
 
             LongValues values = valuesSource.longValues();
             int valuesCount = values.setDocument(doc);
 
-            if (valuesCount == 0) {
-                return;
-            }
-
-            if (valuesCount == 1) {
+            for (int i = 0; i < valuesCount; ++i) {
                 long term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.v().get(term);
                 if (bucket == null) {
@@ -117,31 +110,7 @@ public class LongTermsAggregator extends LongBucketsAggregator {
                     bucketCollectors.v().put(term, bucket);
                 }
                 bucket.collect(doc);
-                return;
             }
-
-            if (matchedBuckets == null) {
-                matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
-            }
-            populateMatchingBuckets(values, valuesCount);
-            BucketCollector[] mBuckets = matchedBuckets.innerValues();
-            for (int i = 0; i < matchedBuckets.size(); i++) {
-                mBuckets[i].collect(doc);
-            }
-        }
-
-        private void populateMatchingBuckets(LongValues values, int valuesCount) {
-            matchedBuckets.reset();
-            for (int i = 0; i < valuesCount; i++) {
-                long term = values.nextValue();
-                BucketCollector bucket = bucketCollectors.v().get(term);
-                if (bucket == null) {
-                    bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
-                    bucketCollectors.v().put(term, bucket);
-                }
-                matchedBuckets.add(bucket);
-            }
-
         }
 
         @Override

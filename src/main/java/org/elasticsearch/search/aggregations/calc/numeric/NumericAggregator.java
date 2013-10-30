@@ -81,14 +81,6 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
             }
 
             int valuesCount = values.setDocument(doc);
-            if (valuesCount == 0) {
-                return;
-            }
-
-            if (valuesCount == 1) {
-                stats.collect(doc, values.nextValue());
-                return;
-            }
 
             for (int i = 0; i < valuesCount; i++) {
                 stats.collect(doc, values.nextValue());
