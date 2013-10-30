@@ -576,7 +576,7 @@ public class DateRangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(1l));
         Max max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat(max.getValue(), equalTo((double) date(2, 2).getMillis()));
+        assertThat(max.getValue(), equalTo((double) date(3, 3).getMillis()));
 
         bucket = range.getByKey("2012-02-15T00:00:00.000Z-2012-03-15T00:00:00.000Z");
         assertThat(bucket, notNullValue());
@@ -588,7 +588,7 @@ public class DateRangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(2l));
         max = bucket.getAggregations().get("max");
         assertThat(max, notNullValue());
-        assertThat(max.getValue(), equalTo((double) date(3, 3).getMillis()));
+        assertThat(max.getValue(), equalTo((double) date(4, 3).getMillis()));
 
         bucket = range.getByKey("2012-03-15T00:00:00.000Z-*");
         assertThat(bucket, notNullValue());
@@ -797,7 +797,7 @@ public class DateRangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l));
         min = bucket.getAggregations().get("min");
         assertThat(min, notNullValue());
-        assertThat(min.getValue(), equalTo((double) date(2, 15).getMillis()));
+        assertThat(min.getValue(), equalTo((double) date(2, 2).getMillis()));
 
         bucket = range.getByKey("2012-03-15T00:00:00.000Z-*");
         assertThat(bucket, notNullValue());
@@ -809,7 +809,7 @@ public class DateRangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(4l));
         min = bucket.getAggregations().get("min");
         assertThat(min, notNullValue());
-        assertThat(min.getValue(), equalTo((double) date(3, 15).getMillis()));
+        assertThat(min.getValue(), equalTo((double) date(2, 15).getMillis()));
     }
 
     @Test

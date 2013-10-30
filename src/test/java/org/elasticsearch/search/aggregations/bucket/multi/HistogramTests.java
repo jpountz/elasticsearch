@@ -618,10 +618,11 @@ public class HistogramTests extends AbstractIntegrationTest {
         Terms terms = bucket.getAggregations().get("values");
         assertThat(terms, notNullValue());
         assertThat(terms.getName(), equalTo("values"));
-        assertThat(terms.buckets().size(), equalTo(2)); // values that match the bucket: 2, 3
+        assertThat(terms.buckets().size(), equalTo(3)); // values that match the bucket: 2, 3, 4
         Iterator<Terms.Bucket> iter = terms.iterator();
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(2l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(3l));
+        assertThat(iter.next().getTermAsNumber().longValue(), equalTo(4l));
 
         bucket = histo.getByKey(4);
         assertThat(bucket, notNullValue());
@@ -630,12 +631,14 @@ public class HistogramTests extends AbstractIntegrationTest {
         terms = bucket.getAggregations().get("values");
         assertThat(terms, notNullValue());
         assertThat(terms.getName(), equalTo("values"));
-        assertThat(terms.buckets().size(), equalTo(4)); // values that match the bucket: 4, 5, 6, 7
+        assertThat(terms.buckets().size(), equalTo(6)); // values that match the bucket: 3, 4, 5, 6, 7, 8
         iter = terms.iterator();
+        assertThat(iter.next().getTermAsNumber().longValue(), equalTo(3l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(4l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(5l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(6l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(7l));
+        assertThat(iter.next().getTermAsNumber().longValue(), equalTo(8l));
 
         bucket = histo.getByKey(8);
         assertThat(bucket, notNullValue());
@@ -644,8 +647,9 @@ public class HistogramTests extends AbstractIntegrationTest {
         terms = bucket.getAggregations().get("values");
         assertThat(terms, notNullValue());
         assertThat(terms.getName(), equalTo("values"));
-        assertThat(terms.buckets().size(), equalTo(4)); // values that match the bucket: 8, 9, 10, 11
+        assertThat(terms.buckets().size(), equalTo(5)); // values that match the bucket: 7, 8, 9, 10, 11
         iter = terms.iterator();
+        assertThat(iter.next().getTermAsNumber().longValue(), equalTo(7l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(8l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(9l));
         assertThat(iter.next().getTermAsNumber().longValue(), equalTo(10l));
@@ -769,7 +773,7 @@ public class HistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l)); // docs: [1, 2], [2, 3], [3, 4]
         Sum sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
-        assertThat(sum.getValue(), equalTo((double) 1+2+2+3+3));
+        assertThat(sum.getValue(), equalTo((double) 1+2+2+3+3+4));
 
         bucket = histo.getByKey(4);
         assertThat(bucket, notNullValue());
@@ -777,7 +781,7 @@ public class HistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(5l)); // docs: [3, 4], [4, 5], [5, 6], [6, 7], [7, 8]
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
-        assertThat(sum.getValue(), equalTo((double) 4+4+5+5+6+6+7+7));
+        assertThat(sum.getValue(), equalTo((double) 3+4+4+5+5+6+6+7+7+8));
 
         bucket = histo.getByKey(8);
         assertThat(bucket, notNullValue());
@@ -785,7 +789,7 @@ public class HistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l)); // docs: [7, 8], [8. 9], [9, 10]
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
-        assertThat(sum.getValue(), equalTo((double) 8+8+9+9+10));
+        assertThat(sum.getValue(), equalTo((double) 7+8+8+9+9+10));
     }
 
     @Test
