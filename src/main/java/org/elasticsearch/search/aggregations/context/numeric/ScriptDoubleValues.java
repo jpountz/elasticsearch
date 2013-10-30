@@ -71,7 +71,7 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
             valueCount = Array.getLength(value);
             values = ArrayUtil.grow(values, valueCount);
             for (int i = 0; i < valueCount; ++i) {
-                values[i] = ((Number) Array.get(value, i++)).doubleValue();
+                values[i] = ((Number) Array.get(value, i)).doubleValue();
             }
         }
 
