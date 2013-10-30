@@ -89,11 +89,13 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
             private final FieldDataSource source;
             private final SearchScript script;
+            private final BytesRef scratch;
 
             public BytesValues(FieldDataSource source, SearchScript script) {
                 super(true);
                 this.source = source;
                 this.script = script;
+                scratch = new BytesRef();
             }
 
             @Override
@@ -103,7 +105,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
             @Override
             public BytesRef getValue(int docId) {
-                BytesRef value = source.bytesValues.getValue(docId);
+                BytesRef value = source.bytesValues().getValue(docId);
                 script.setNextVar("_value", value.utf8ToString());
                 value.copyChars(script.run().toString());
                 return value;
@@ -111,15 +113,15 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
             @Override
             public int setDocument(int docId) {
-                return source.bytesValues.setDocument(docId);
+                return source.bytesValues().setDocument(docId);
             }
 
             @Override
             public BytesRef nextValue() {
-                BytesRef value = source.bytesValues.nextValue();
+                BytesRef value = source.bytesValues().nextValue();
                 script.setNextVar("_value", value.utf8ToString());
-                value.copyChars(script.run().toString());
-                return value;
+                scratch.copyChars(script.run().toString());
+                return scratch;
             }
         }
     }
