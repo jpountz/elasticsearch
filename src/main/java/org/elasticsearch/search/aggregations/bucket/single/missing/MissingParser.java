@@ -63,7 +63,7 @@ public class MissingParser implements AggregatorParser {
             return new MissingAggregator.Factory(aggregationName, config);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new MissingAggregator.Factory(aggregationName, config);

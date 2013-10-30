@@ -37,7 +37,7 @@ public class InternalSum extends NumericAggregation.SingleValue implements Sum {
 
     public final static Type TYPE = new Type("sum");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalSum>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalSum readResult(StreamInput in) throws IOException {
             InternalSum result = new InternalSum();

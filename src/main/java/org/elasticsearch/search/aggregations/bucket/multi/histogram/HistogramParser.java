@@ -112,13 +112,13 @@ public class HistogramParser implements AggregatorParser {
             return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalHistogram.FACTORY);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalHistogram.FACTORY);
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalHistogram.FACTORY);
 

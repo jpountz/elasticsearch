@@ -140,7 +140,7 @@ public class IpRangeParser implements AggregatorParser {
             return new RangeAggregator.Factory(aggregationName, config, InternalIPv4Range.FACTORY, ranges, keyed);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new RangeAggregator.Factory(aggregationName, config, InternalIPv4Range.FACTORY, ranges, keyed);
@@ -150,7 +150,7 @@ public class IpRangeParser implements AggregatorParser {
             throw new AggregationExecutionException("ip_range aggregation can only be applied to ip fields which is not the case with field [" + field + "]");
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new RangeAggregator.Factory(aggregationName, config, InternalIPv4Range.FACTORY, ranges, keyed);
     }

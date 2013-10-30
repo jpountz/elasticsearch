@@ -43,7 +43,7 @@ public class InternalGeoDistance extends InternalAggregation implements GeoDista
 
     public static final Type TYPE = new Type("geo_distance", "gdist");
 
-    public static final AggregationStreams.Stream<InternalGeoDistance> STREAM = new AggregationStreams.Stream<InternalGeoDistance>() {
+    public static final AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalGeoDistance readResult(StreamInput in) throws IOException {
             InternalGeoDistance geoDistance = new InternalGeoDistance();

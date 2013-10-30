@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * A base class for all bucket aggregation builders.
  */
-public abstract class BucketAggregationBuilder<B extends BucketAggregationBuilder> extends AggregationBuilder {
+public abstract class BucketAggregationBuilder<B extends BucketAggregationBuilder<B>> extends AggregationBuilder {
 
     private List<AggregationBuilder> aggregations;
     private BytesReference aggregationsBinary;
@@ -28,6 +28,7 @@ public abstract class BucketAggregationBuilder<B extends BucketAggregationBuilde
     /**
      * Add a sub get to this bucket get.
      */
+    @SuppressWarnings("unchecked")
     public B subAggregation(AggregationBuilder aggregation) {
         if (aggregations == null) {
             aggregations = Lists.newArrayList();
@@ -53,6 +54,7 @@ public abstract class BucketAggregationBuilder<B extends BucketAggregationBuilde
     /**
      * Sets a raw (xcontent / json) sub addAggregation.
      */
+    @SuppressWarnings("unchecked")
     public B subAggregation(BytesReference aggregationsBinary) {
         this.aggregationsBinary = aggregationsBinary;
         return (B) this;
@@ -68,7 +70,7 @@ public abstract class BucketAggregationBuilder<B extends BucketAggregationBuilde
     /**
      * Sets a raw (xcontent / json) sub addAggregation.
      */
-    public B subAggregation(Map facets) {
+    public B subAggregation(Map<String, Object> facets) {
         try {
             XContentBuilder builder = XContentFactory.contentBuilder(Requests.CONTENT_TYPE);
             builder.map(facets);

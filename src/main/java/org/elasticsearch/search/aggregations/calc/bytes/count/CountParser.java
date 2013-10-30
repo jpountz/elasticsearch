@@ -64,13 +64,13 @@ public class CountParser implements AggregatorParser {
             return new CountAggregator.Factory(aggregationName, config);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new CountAggregator.Factory(aggregationName, config);
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new CountAggregator.Factory(aggregationName, config);
     }

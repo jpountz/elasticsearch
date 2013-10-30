@@ -35,7 +35,7 @@ public class InternalCount extends InternalAggregation implements Count {
 
     public static final Type TYPE = new Type("count");
 
-    private static final AggregationStreams.Stream<InternalCount> STREAM = new AggregationStreams.Stream<InternalCount>() {
+    private static final AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalCount readResult(StreamInput in) throws IOException {
             InternalCount count = new InternalCount();

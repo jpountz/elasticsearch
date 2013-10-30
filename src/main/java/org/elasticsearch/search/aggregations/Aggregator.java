@@ -30,7 +30,7 @@ import java.util.List;
  * handles the aggregation by providing the appropriate collector (see {@link #collector()}), and when the aggregation finishes, it is also used
  * for generating the result aggregation (see {@link #buildAggregation()}).
  */
-public abstract class Aggregator<A extends InternalAggregation> {
+public abstract class Aggregator {
 
     protected final String name;
     protected final Aggregator parent;
@@ -78,7 +78,7 @@ public abstract class Aggregator<A extends InternalAggregation> {
     /**
      * @return  The aggregated & built get.
      */
-    public abstract A buildAggregation();
+    public abstract InternalAggregation buildAggregation();
 
 
     /**
@@ -122,7 +122,6 @@ public abstract class Aggregator<A extends InternalAggregation> {
             super(name);
         }
 
-        @SuppressWarnings("unchecked")
         public Factory set(List<Factory> factories) {
             this.factories = factories;
             for (Factory factory : factories) {

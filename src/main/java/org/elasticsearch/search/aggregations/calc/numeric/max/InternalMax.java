@@ -37,7 +37,7 @@ public class InternalMax extends NumericAggregation.SingleValue implements Max {
 
     public final static Type TYPE = new Type("max");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalMax>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalMax readResult(StreamInput in) throws IOException {
             InternalMax result = new InternalMax();

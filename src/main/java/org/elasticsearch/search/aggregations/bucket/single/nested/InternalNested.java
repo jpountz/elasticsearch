@@ -33,7 +33,7 @@ public class InternalNested extends SingleBucketAggregation<InternalNested> impl
 
     public static final Type TYPE = new Type("nested");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalNested>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalNested readResult(StreamInput in) throws IOException {
             InternalNested result = new InternalNested();

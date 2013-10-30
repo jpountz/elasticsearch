@@ -36,7 +36,7 @@ public class InternalExtendedStats extends InternalStats implements ExtendedStat
 
     public final static Type TYPE = new Type("extended_stats", "estats");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalExtendedStats>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalExtendedStats readResult(StreamInput in) throws IOException {
             InternalExtendedStats result = new InternalExtendedStats();

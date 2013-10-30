@@ -32,6 +32,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param field     The name of the field
      * @return          This builder (fluent interface support)
      */
+    @SuppressWarnings("unchecked")
     public B field(String field) {
         this.field = field;
         return (B) this;
@@ -46,6 +47,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param script    The configured script.
      * @return          This builder (fluent interface support)
      */
+    @SuppressWarnings("unchecked")
     public B script(String script) {
         this.script = script;
         return (B) this;
@@ -59,6 +61,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param scriptLang    The language of the script.
      * @return              This builder (fluent interface support)
      */
+    @SuppressWarnings("unchecked")
     public B scriptLang(String scriptLang) {
         this.scriptLang = scriptLang;
         return (B) this;
@@ -71,6 +74,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param value     The value of the parameter.
      * @return          This builder (fluent interface support)
      */
+    @SuppressWarnings("unchecked")
     public B param(String name, Object value) {
         if (params == null) {
             params = Maps.newHashMap();
@@ -85,6 +89,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param params    The the parameters.
      * @return          This builder (fluent interface support)
      */
+    @SuppressWarnings("unchecked")
     public B params(Map<String, Object> params) {
         if (this.params == null) {
             this.params = Maps.newHashMap();

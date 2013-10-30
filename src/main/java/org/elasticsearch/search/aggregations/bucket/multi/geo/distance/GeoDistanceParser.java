@@ -154,13 +154,13 @@ public class GeoDistanceParser implements AggregatorParser {
             return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
     }

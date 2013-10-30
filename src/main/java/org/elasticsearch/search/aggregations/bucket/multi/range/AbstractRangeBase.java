@@ -220,7 +220,7 @@ public abstract class AbstractRangeBase<B extends RangeBase.Bucket> extends Inte
 
         if (rangesList == null) {
             // unmapped, we can just take the first one
-            return (AbstractRangeBase) aggregations.get(0);
+            return (AbstractRangeBase<?>) aggregations.get(0);
         }
 
         AbstractRangeBase reduced = (AbstractRangeBase) aggregations.get(0);

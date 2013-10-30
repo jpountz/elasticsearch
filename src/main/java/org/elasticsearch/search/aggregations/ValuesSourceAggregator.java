@@ -78,15 +78,15 @@ public abstract class ValuesSourceAggregator<VS extends ValuesSource> extends Ag
 
     public static abstract class CompoundFactory<VS extends ValuesSource> extends Aggregator.CompoundFactory implements ValuesSourceConfigurable {
 
-        protected ValuesSourceConfig<VS> valueSourceConfig;
+        protected ValuesSourceConfig<? extends VS> valueSourceConfig;
 
-        protected CompoundFactory(String name, ValuesSourceConfig<VS> valueSourceConfig) {
+        protected CompoundFactory(String name, ValuesSourceConfig<? extends VS> valueSourceConfig) {
             super(name);
             this.valueSourceConfig = valueSourceConfig;
         }
 
         @Override
-        public ValuesSourceConfig valuesSourceConfig() {
+        public ValuesSourceConfig<?> valuesSourceConfig() {
             return valueSourceConfig;
         }
 

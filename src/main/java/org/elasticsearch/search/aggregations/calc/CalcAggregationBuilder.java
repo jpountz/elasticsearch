@@ -8,7 +8,7 @@ import java.io.IOException;
 /**
  *
  */
-public abstract class CalcAggregationBuilder<B extends CalcAggregationBuilder> extends AggregationBuilder {
+public abstract class CalcAggregationBuilder<B extends CalcAggregationBuilder<B>> extends AggregationBuilder {
 
     public CalcAggregationBuilder(String name, String type) {
         super(name, type);

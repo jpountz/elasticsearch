@@ -126,13 +126,13 @@ public class RangeParser implements AggregatorParser {
         }
 
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new RangeAggregator.Factory(aggregationName, config, InternalRange.FACTORY, ranges, keyed);
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new RangeAggregator.Factory(aggregationName, config, InternalRange.FACTORY, ranges, keyed);
     }

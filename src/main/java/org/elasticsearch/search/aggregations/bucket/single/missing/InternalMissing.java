@@ -33,7 +33,7 @@ public class InternalMissing extends SingleBucketAggregation<InternalMissing> im
 
     public final static Type TYPE = new Type("missing");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalMissing>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalMissing readResult(StreamInput in) throws IOException {
             InternalMissing missing = new InternalMissing();

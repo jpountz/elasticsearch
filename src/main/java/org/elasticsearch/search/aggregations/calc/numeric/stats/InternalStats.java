@@ -38,7 +38,7 @@ public class InternalStats extends NumericAggregation.MultiValue implements Stat
 
     public final static Type TYPE = new Type("stats");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalStats>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalStats readResult(StreamInput in) throws IOException {
             InternalStats result = new InternalStats();

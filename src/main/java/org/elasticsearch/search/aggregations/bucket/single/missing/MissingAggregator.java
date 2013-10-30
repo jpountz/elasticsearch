@@ -103,7 +103,7 @@ public class MissingAggregator extends BytesBucketsAggregator {
 
     public static class Factory extends ValuesSourceAggregator.CompoundFactory<ValuesSource> {
 
-        public Factory(String name, ValuesSourceConfig valueSourceConfig) {
+        public Factory(String name, ValuesSourceConfig<? extends ValuesSource> valueSourceConfig) {
             super(name, valueSourceConfig);
         }
 

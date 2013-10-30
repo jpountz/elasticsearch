@@ -38,7 +38,7 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
     public final static Type TYPE = new Type("date_histogram", "dhisto");
     public final static Factory FACTORY = new Factory();
 
-    private final static AggregationStreams.Stream<InternalDateHistogram> STREAM = new AggregationStreams.Stream<InternalDateHistogram>() {
+    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalDateHistogram readResult(StreamInput in) throws IOException {
             InternalDateHistogram histogram = new InternalDateHistogram();
@@ -73,7 +73,7 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
         }
 
         @Override
-        public AbstractHistogramBase create(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
+        public AbstractHistogramBase<?> create(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
             return new InternalDateHistogram(name, buckets, order, rounding, formatter, keyed);
         }
 
