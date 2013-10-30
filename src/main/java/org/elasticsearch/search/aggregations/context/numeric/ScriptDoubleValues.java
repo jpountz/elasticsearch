@@ -48,22 +48,15 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
     }
 
     @Override
-    public void clearCache() {
-        value = null;
-    }
-
-    @Override
     public SearchScript script() {
         return script;
     }
 
     @Override
     public int setDocument(int docId) {
-        if (this.docId != docId || valueOffset != 0) {
-            this.docId = docId;
-            script.setNextDocId(docId);
-            value = script.run();
-        }
+        this.docId = docId;
+        script.setNextDocId(docId);
+        value = script.run();
 
         if (value == null) {
             valueCount = 0;
