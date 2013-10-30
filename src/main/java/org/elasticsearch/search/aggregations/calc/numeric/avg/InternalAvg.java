@@ -37,7 +37,7 @@ public class InternalAvg extends NumericAggregation.SingleValue implements Avg {
 
     public final static Type TYPE = new Type("avg");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalAvg>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalAvg readResult(StreamInput in) throws IOException {
             InternalAvg result = new InternalAvg();

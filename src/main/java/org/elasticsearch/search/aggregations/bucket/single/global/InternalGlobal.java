@@ -34,7 +34,7 @@ public class InternalGlobal extends SingleBucketAggregation<InternalGlobal> impl
 
     public final static Type TYPE = new Type("global");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalGlobal>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalGlobal readResult(StreamInput in) throws IOException {
             InternalGlobal result = new InternalGlobal();

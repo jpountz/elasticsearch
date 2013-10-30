@@ -88,13 +88,13 @@ public class NumericAggregatorParser<S extends NumericAggregation> implements Ag
             return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
     }

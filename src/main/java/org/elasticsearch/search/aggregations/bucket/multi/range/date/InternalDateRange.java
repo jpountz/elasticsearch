@@ -38,9 +38,9 @@ public class InternalDateRange extends AbstractRangeBase<DateRange.Bucket> imple
 
     public final static Type TYPE = new Type("date_range", "drange");
 
-    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<AbstractRangeBase>() {
+    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
-        public AbstractRangeBase readResult(StreamInput in) throws IOException {
+        public AbstractRangeBase<?> readResult(StreamInput in) throws IOException {
             InternalDateRange ranges = new InternalDateRange();
             ranges.readFrom(in);
             return ranges;

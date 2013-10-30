@@ -43,7 +43,7 @@ public class StringTerms extends InternalTerms {
 
     public static final InternalAggregation.Type TYPE = new Type("terms", "sterms");
 
-    public static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<StringTerms>() {
+    public static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public StringTerms readResult(StreamInput in) throws IOException {
             StringTerms buckets = new StringTerms();

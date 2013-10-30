@@ -156,7 +156,8 @@ public class DateHistogramParser implements AggregatorParser {
 
         SearchScript searchScript = null;
         if (script != null) {
-            config.script(context.scriptService().search(context.lookup(), scriptLang, script, scriptParams));
+            searchScript = context.scriptService().search(context.lookup(), scriptLang, script, scriptParams);
+            config.script(searchScript);
         }
 
         TimeZoneRounding.Builder tzRoundingBuilder;
@@ -190,7 +191,7 @@ public class DateHistogramParser implements AggregatorParser {
             return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalDateHistogram.FACTORY);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalDateHistogram.FACTORY);
@@ -200,7 +201,7 @@ public class DateHistogramParser implements AggregatorParser {
             throw new SearchParseException(context, "date histogram can only be aggregated on date fields but  [" + field + "] is not a date field");
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         return new HistogramAggregator.Factory(aggregationName, config, rounding, order, keyed, computeEmptyBuckets, InternalDateHistogram.FACTORY);
     }

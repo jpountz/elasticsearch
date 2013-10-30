@@ -31,11 +31,11 @@ import org.elasticsearch.script.SearchScript;
 public abstract class FieldDataSource implements ReaderContextAware {
 
     protected final String field;
-    protected final IndexFieldData indexFieldData;
-    protected AtomicFieldData fieldData;
+    protected final IndexFieldData<?> indexFieldData;
+    protected AtomicFieldData<?> fieldData;
     protected BytesValues bytesValues;
 
-    public FieldDataSource(String field, IndexFieldData indexFieldData) {
+    public FieldDataSource(String field, IndexFieldData<?> indexFieldData) {
         this.field = field;
         this.indexFieldData = indexFieldData;
     }
@@ -131,7 +131,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
         private DoubleValues doubleValues;
         private LongValues longValues;
 
-        public Numeric(String field, IndexFieldData indexFieldData) {
+        public Numeric(String field, IndexFieldData<?> indexFieldData) {
             super(field, indexFieldData);
         }
 
@@ -161,7 +161,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
         }
 
         public boolean isFloatingPoint() {
-            return ((IndexNumericFieldData) indexFieldData).getNumericType().isFloatingPoint();
+            return ((IndexNumericFieldData<?>) indexFieldData).getNumericType().isFloatingPoint();
         }
 
         public static class WithScript extends Numeric {
@@ -283,7 +283,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
     public static class Bytes extends FieldDataSource {
 
-        public Bytes(String field, IndexFieldData indexFieldData) {
+        public Bytes(String field, IndexFieldData<?> indexFieldData) {
             super(field, indexFieldData);
         }
 
@@ -293,7 +293,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
         private GeoPointValues geoPointValues;
 
-        public GeoPoint(String field, IndexFieldData indexFieldData) {
+        public GeoPoint(String field, IndexFieldData<?> indexFieldData) {
             super(field, indexFieldData);
         }
 
@@ -301,13 +301,13 @@ public abstract class FieldDataSource implements ReaderContextAware {
         public void setNextReader(AtomicReaderContext reader) {
             super.setNextReader(reader);
             if (geoPointValues != null) {
-                geoPointValues = ((AtomicGeoPointFieldData) fieldData).getGeoPointValues();
+                geoPointValues = ((AtomicGeoPointFieldData<?>) fieldData).getGeoPointValues();
             }
         }
 
         public GeoPointValues geoPointValues() {
             if (geoPointValues == null) {
-                geoPointValues = ((AtomicGeoPointFieldData) fieldData).getGeoPointValues();
+                geoPointValues = ((AtomicGeoPointFieldData<?>) fieldData).getGeoPointValues();
             }
             return geoPointValues;
         }

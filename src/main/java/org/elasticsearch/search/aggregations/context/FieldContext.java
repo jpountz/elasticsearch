@@ -28,7 +28,7 @@ import org.elasticsearch.index.fielddata.IndexFieldData;
 public class FieldContext {
 
     private final String field;
-    private final IndexFieldData indexFieldData;
+    private final IndexFieldData<?> indexFieldData;
 
     /**
      * Constructs a field data context for the given field and its index field data
@@ -36,7 +36,7 @@ public class FieldContext {
      * @param field             The name of the field
      * @param indexFieldData    The index field data of the field
      */
-    public FieldContext(String field, IndexFieldData indexFieldData) {
+    public FieldContext(String field, IndexFieldData<?> indexFieldData) {
         this.field = field;
         this.indexFieldData = indexFieldData;
     }
@@ -48,7 +48,7 @@ public class FieldContext {
     /**
      * @return The index field datas in this context
      */
-    public IndexFieldData indexFieldData() {
+    public IndexFieldData<?> indexFieldData() {
         return indexFieldData;
     }
 

@@ -45,7 +45,7 @@ public class HistogramAggregator extends LongBucketsAggregator {
     private final InternalOrder order;
     private final boolean keyed;
     private final boolean computeEmptyBuckets;
-    private final AbstractHistogramBase.Factory histogramFactory;
+    private final AbstractHistogramBase.Factory<?> histogramFactory;
     private final Recycler.V<LongObjectOpenHashMap<HistogramCollector.BucketCollector>> collectors;
 
     public HistogramAggregator(String name,
@@ -55,7 +55,7 @@ public class HistogramAggregator extends LongBucketsAggregator {
                                boolean keyed,
                                boolean computeEmptyBuckets,
                                @Nullable NumericValuesSource valuesSource,
-                               AbstractHistogramBase.Factory histogramFactory,
+                               AbstractHistogramBase.Factory<?> histogramFactory,
                                AggregationContext aggregationContext,
                                Aggregator parent) {
 
@@ -104,10 +104,10 @@ public class HistogramAggregator extends LongBucketsAggregator {
         private final InternalOrder order;
         private final boolean keyed;
         private final boolean computeEmptyBuckets;
-        private final AbstractHistogramBase.Factory histogramFactory;
+        private final AbstractHistogramBase.Factory<?> histogramFactory;
 
         public Factory(String name, ValuesSourceConfig<NumericValuesSource> valueSourceConfig,
-                       Rounding rounding, InternalOrder order, boolean keyed, boolean computeEmptyBuckets, AbstractHistogramBase.Factory histogramFactory) {
+                       Rounding rounding, InternalOrder order, boolean keyed, boolean computeEmptyBuckets, AbstractHistogramBase.Factory<?> histogramFactory) {
             super(name, valueSourceConfig);
             this.rounding = rounding;
             this.order = order;

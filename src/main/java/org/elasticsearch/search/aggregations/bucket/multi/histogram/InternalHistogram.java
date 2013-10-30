@@ -37,7 +37,7 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
     public final static Type TYPE = new Type("histogram", "histo");
     public final static Factory FACTORY = new Factory();
 
-    private final static AggregationStreams.Stream<InternalHistogram> STREAM = new AggregationStreams.Stream<InternalHistogram>() {
+    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalHistogram readResult(StreamInput in) throws IOException {
             InternalHistogram histogram = new InternalHistogram();
@@ -63,7 +63,7 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
         private Factory() {
         }
 
-        public AbstractHistogramBase create(String name, List<Histogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
+        public AbstractHistogramBase<?> create(String name, List<Histogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
             return new InternalHistogram(name, buckets, order, rounding, formatter, keyed);
         }
 

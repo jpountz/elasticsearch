@@ -36,7 +36,7 @@ public class InternalRange extends AbstractRangeBase<Range.Bucket> implements Ra
 
     public final static Type TYPE = new Type("range");
 
-    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<AbstractRangeBase>() {
+    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public AbstractRangeBase readResult(StreamInput in) throws IOException {
             InternalRange ranges = new InternalRange();

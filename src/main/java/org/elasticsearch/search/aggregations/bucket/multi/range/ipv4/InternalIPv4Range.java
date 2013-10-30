@@ -38,9 +38,9 @@ public class InternalIPv4Range extends AbstractRangeBase<IPv4Range.Bucket> imple
 
     public final static Type TYPE = new Type("ip_range", "iprange");
 
-    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<AbstractRangeBase>() {
+    private final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
-        public AbstractRangeBase readResult(StreamInput in) throws IOException {
+        public AbstractRangeBase<?> readResult(StreamInput in) throws IOException {
             InternalIPv4Range range = new InternalIPv4Range();
             range.readFrom(in);
             return range;

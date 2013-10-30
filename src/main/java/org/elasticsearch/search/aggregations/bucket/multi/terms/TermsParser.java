@@ -118,7 +118,7 @@ public class TermsParser implements AggregatorParser {
                     valueType != null ? valueType.scriptValueType.getValuesSourceType() : // the user explicitly defined a value type
                     BytesValuesSource.class; // defaulting to bytes
 
-            ValuesSourceConfig config = new ValuesSourceConfig(valueSourceType);
+            ValuesSourceConfig<?> config = new ValuesSourceConfig(valueSourceType);
             if (valueType != null) {
                 config.scriptValueType(valueType.scriptValueType);
             }
@@ -126,15 +126,15 @@ public class TermsParser implements AggregatorParser {
             return new TermsAggregatorFactory(aggregationName, config, order, requiredSize);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
-            ValuesSourceConfig config = new ValuesSourceConfig(BytesValuesSource.class);
+            ValuesSourceConfig<?> config = new ValuesSourceConfig<BytesValuesSource>(BytesValuesSource.class);
             config.unmapped(true);
             return new TermsAggregatorFactory(aggregationName, config, order, requiredSize);
         }
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
 
-        ValuesSourceConfig config;
+        ValuesSourceConfig<?> config;
 
         if (mapper instanceof DateFieldMapper) {
             DateFieldMapper dateMapper = (DateFieldMapper) mapper;

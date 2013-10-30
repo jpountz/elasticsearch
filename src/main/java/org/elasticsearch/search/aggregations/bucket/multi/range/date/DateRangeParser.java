@@ -141,7 +141,7 @@ public class DateRangeParser implements AggregatorParser {
             return new RangeAggregator.Factory(aggregationName, config, InternalDateRange.FACTORY, ranges, keyed);
         }
 
-        FieldMapper mapper = context.smartNameFieldMapper(field);
+        FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
             return new RangeAggregator.Factory(aggregationName, config, InternalDateRange.FACTORY, ranges, keyed);
@@ -151,7 +151,7 @@ public class DateRangeParser implements AggregatorParser {
             throw new AggregationExecutionException("date_range aggregation can only be applied to date fields which is not the case with field [" + field + "]");
         }
 
-        IndexFieldData indexFieldData = context.fieldData().getForField(mapper);
+        IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
         if (format == null) {
             config.formatter(new ValueFormatter.DateTime(((DateFieldMapper) mapper).dateTimeFormatter()));

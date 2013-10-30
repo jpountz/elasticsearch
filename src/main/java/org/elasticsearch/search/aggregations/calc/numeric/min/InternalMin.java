@@ -37,7 +37,7 @@ public class InternalMin extends NumericAggregation.SingleValue implements Min {
 
     public final static Type TYPE = new Type("min");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalMin>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalMin readResult(StreamInput in) throws IOException {
             InternalMin result = new InternalMin();

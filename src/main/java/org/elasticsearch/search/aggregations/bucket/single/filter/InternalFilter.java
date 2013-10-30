@@ -33,7 +33,7 @@ public class InternalFilter extends SingleBucketAggregation<InternalFilter> impl
 
     public final static Type TYPE = new Type("filter");
 
-    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<InternalFilter>() {
+    public final static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public InternalFilter readResult(StreamInput in) throws IOException {
             InternalFilter result = new InternalFilter();

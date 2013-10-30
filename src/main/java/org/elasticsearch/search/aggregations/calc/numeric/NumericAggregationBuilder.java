@@ -10,7 +10,7 @@ import java.util.Map;
 /**
  *
  */
-public abstract class NumericAggregationBuilder<B extends NumericAggregationBuilder> extends CalcAggregationBuilder<B> {
+public abstract class NumericAggregationBuilder<B extends NumericAggregationBuilder<B>> extends CalcAggregationBuilder<B> {
 
     private String field;
     private String script;
@@ -21,21 +21,25 @@ public abstract class NumericAggregationBuilder<B extends NumericAggregationBuil
         super(name, type);
     }
 
+    @SuppressWarnings("unchecked")
     public B field(String field) {
         this.field = field;
         return (B) this;
     }
 
+    @SuppressWarnings("unchecked")
     public B script(String script) {
         this.script = script;
         return (B) this;
     }
 
+    @SuppressWarnings("unchecked")
     public B scriptLang(String scriptLang) {
         this.scriptLang = scriptLang;
         return (B) this;
     }
 
+    @SuppressWarnings("unchecked")
     public B params(Map<String, Object> params) {
         if (this.params == null) {
             this.params = params;
@@ -45,6 +49,7 @@ public abstract class NumericAggregationBuilder<B extends NumericAggregationBuil
         return (B) this;
     }
 
+    @SuppressWarnings("unchecked")
     public B param(String name, Object value) {
         if (this.params == null) {
             this.params = Maps.newHashMap();

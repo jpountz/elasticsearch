@@ -19,9 +19,8 @@
 
 package org.elasticsearch.search.aggregations;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
+import com.google.common.base.Function;
+import com.google.common.collect.*;
 import org.elasticsearch.cache.recycler.CacheRecycler;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -42,6 +41,12 @@ import static com.google.common.collect.Maps.newHashMap;
 public class InternalAggregations implements Aggregations, ToXContent, Streamable {
 
     public final static InternalAggregations EMPTY = new InternalAggregations();
+    private static final Function<InternalAggregation, Aggregation> SUPERTYPE_CAST = new Function<InternalAggregation, Aggregation>() {
+        @Override
+        public Aggregation apply(InternalAggregation input) {
+            return input;
+        }
+    };
 
     private List<InternalAggregation> aggregations = ImmutableList.of();
 
@@ -68,16 +73,14 @@ public class InternalAggregations implements Aggregations, ToXContent, Streamabl
      */
     @Override
     public Iterator<Aggregation> iterator() {
-        Object iter = aggregations.iterator();
-        return (Iterator<Aggregation>) iter;
+        return Iterators.transform(aggregations.iterator(), SUPERTYPE_CAST);
     }
 
     /**
      * The list of {@link Aggregation}s.
      */
     public List<Aggregation> asList() {
-        Object agg = aggregations;
-        return (List<Aggregation>)agg;
+        return Lists.transform(aggregations, SUPERTYPE_CAST);
     }
 
     /**
@@ -98,16 +101,16 @@ public class InternalAggregations implements Aggregations, ToXContent, Streamabl
             }
             this.aggregationsAsMap = aggregationsAsMap;
         }
-        Object map = aggregationsAsMap;
-        return (Map<String, Aggregation>) map;
+        return Maps.transformValues(aggregationsAsMap, SUPERTYPE_CAST);
     }
 
     /**
      * @return the aggregation of the specified name.
      */
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     @Override
     public <A extends Aggregation> A get(String name) {
+        // nocommit is this unchecked cast ok?
         return (A) asMap().get(name);
     }
 

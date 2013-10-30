@@ -39,7 +39,7 @@ public class UnmappedTerms extends InternalTerms {
     private static final Collection<Bucket> BUCKETS = Collections.emptyList();
     private static final Map<String, Bucket> BUCKETS_MAP = Collections.emptyMap();
 
-    public static AggregationStreams.Stream STREAM = new AggregationStreams.Stream<UnmappedTerms>() {
+    public static AggregationStreams.Stream STREAM = new AggregationStreams.Stream() {
         @Override
         public UnmappedTerms readResult(StreamInput in) throws IOException {
             UnmappedTerms buckets = new UnmappedTerms();
