@@ -82,13 +82,13 @@ public class RangeAggregator extends DoubleBucketsAggregator {
 
     private final Range[] ranges;
     private final boolean keyed;
-    private final AbstractRangeBase.Factory<?> rangeFactory;
+    private final AbstractRangeBase.Factory rangeFactory;
     BucketCollector[] bucketCollectors;
 
     public RangeAggregator(String name,
                            List<Aggregator.Factory> factories,
                            NumericValuesSource valuesSource,
-                           AbstractRangeBase.Factory<?> rangeFactory,
+                           AbstractRangeBase.Factory rangeFactory,
                            List<Range> ranges,
                            boolean keyed,
                            AggregationContext aggregationContext,
@@ -121,7 +121,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
 
         // value source can be null in the case of unmapped fields
         ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-        return rangeFactory.create(name, buckets, valuesSource.formatter(), keyed);
+        return rangeFactory.create(name, buckets, formatter, keyed);
     }
 
     class Collector implements Aggregator.Collector {
@@ -197,7 +197,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
             return true;
         }
 
-        RangeBase.Bucket buildBucket(AbstractRangeBase.Factory<?> factory) {
+        RangeBase.Bucket buildBucket(AbstractRangeBase.Factory factory) {
             return factory.createBucket(range.key, range.from, range.to, docCount, buildAggregations(subAggregators), valuesSource.formatter());
         }
     }
@@ -205,7 +205,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
     public static class Unmapped extends Aggregator {
         private final List<RangeAggregator.Range> ranges;
         private final boolean keyed;
-        private final AbstractRangeBase.Factory<?> factory;
+        private final AbstractRangeBase.Factory factory;
         private final ValueFormatter formatter;
         private final ValueParser parser;
 
@@ -216,7 +216,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
                         ValueParser parser,
                         AggregationContext aggregationContext,
                         Aggregator parent,
-                        AbstractRangeBase.Factory<?> factory) {
+                        AbstractRangeBase.Factory factory) {
 
             super(name, aggregationContext, parent);
             this.ranges = ranges;
