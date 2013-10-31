@@ -45,7 +45,7 @@ public class HistogramAggregator extends LongBucketsAggregator {
     private final InternalOrder order;
     private final boolean keyed;
     private final boolean computeEmptyBuckets;
-    private final AbstractHistogramBase.Factory<?> histogramFactory;
+    private final AbstractHistogramBase.Factory histogramFactory;
     private final Recycler.V<LongObjectOpenHashMap<HistogramCollector.BucketCollector>> collectors;
 
     public HistogramAggregator(String name,
