@@ -25,7 +25,7 @@ import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.LongBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
@@ -39,7 +39,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.bui
 /**
  *
  */
-public class LongTermsAggregator extends LongBucketsAggregator {
+public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
 
     private final List<Aggregator.Factory> factories;
     private final InternalOrder order;
@@ -126,7 +126,7 @@ public class LongTermsAggregator extends LongBucketsAggregator {
 
     }
 
-    static class BucketCollector extends LongBucketsAggregator.BucketCollector {
+    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
 
         final long term;
         long docCount;
@@ -137,7 +137,7 @@ public class LongTermsAggregator extends LongBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, LongValues values) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             docCount++;
             return true;
         }

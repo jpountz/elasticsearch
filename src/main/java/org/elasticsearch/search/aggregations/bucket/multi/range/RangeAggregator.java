@@ -25,7 +25,7 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.DoubleBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -43,7 +43,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.cre
  *
  */
 // nocommit range aggregations should use binary search to find the matching ranges
-public class RangeAggregator extends DoubleBucketsAggregator {
+public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
 
     public static class Range {
 
@@ -129,7 +129,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         final boolean[] matched;
         final IntArrayList matchedList;
 
-        {
+        Collector() {
             matched = new boolean[ranges.length];
             matchedList = new IntArrayList();
         }
@@ -180,7 +180,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         }
     }
 
-    static class BucketCollector extends DoubleBucketsAggregator.BucketCollector {
+    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
 
         private final Range range;
 
@@ -192,7 +192,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, DoubleValues values) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             ++docCount;
             return true;
         }

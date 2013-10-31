@@ -26,7 +26,7 @@ import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.bucket.LongBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -38,7 +38,7 @@ import java.util.List;
 /**
  *
  */
-public class HistogramAggregator extends LongBucketsAggregator {
+public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
 
     private final List<Aggregator.Factory> factories;
     private final Rounding rounding;
