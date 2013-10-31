@@ -92,16 +92,6 @@ public class ScriptLongValues extends LongValues implements ScriptValues {
     }
 
     @Override
-    public boolean hasValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) == 0");
-    }
-
-    @Override
-    public long getValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
-    }
-
-    @Override
     public long nextValue() {
         assert valueOffset < valueCount;
         return values[valueOffset++];

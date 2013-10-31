@@ -155,6 +155,9 @@ public class TermsParser implements AggregatorParser {
 
         } else {
             config = new ValuesSourceConfig<BytesValuesSource>(BytesValuesSource.class);
+            // TODO: it will make sense to set false instead here if the aggregator factory uses
+            // ordinals instead of hash tables
+            config.needsHashes(true);
         }
 
         config.script(searchScript);

@@ -32,18 +32,20 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
     protected final String field;
     protected final IndexFieldData<?> indexFieldData;
+    protected final boolean needsHashes;
     protected AtomicFieldData<?> fieldData;
     protected BytesValues bytesValues;
 
-    public FieldDataSource(String field, IndexFieldData<?> indexFieldData) {
+    public FieldDataSource(String field, IndexFieldData<?> indexFieldData, boolean needsHashes) {
         this.field = field;
         this.indexFieldData = indexFieldData;
+        this.needsHashes = needsHashes;
     }
 
     public void setNextReader(AtomicReaderContext reader) {
         fieldData = indexFieldData.load(reader);
         if (bytesValues != null) {
-            bytesValues = fieldData.getBytesValues();
+            bytesValues = fieldData.getBytesValues(needsHashes);
         }
     }
 
@@ -53,7 +55,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
     public BytesValues bytesValues() {
         if (bytesValues == null) {
-            bytesValues = fieldData.getBytesValues();
+            bytesValues = fieldData.getBytesValues(needsHashes);
         }
         return bytesValues;
     }
@@ -64,7 +66,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
         private final BytesValues bytesValues;
 
         public WithScript(FieldDataSource delegate, SearchScript script) {
-            super(null, null);
+            super(null, null, false); // hashes can't be cached with scripts anyway
             this.delegate = delegate;
             this.bytesValues = new BytesValues(delegate, script);
 
@@ -99,19 +101,6 @@ public abstract class FieldDataSource implements ReaderContextAware {
             }
 
             @Override
-            public boolean hasValue(int docId) {
-                return source.bytesValues().hasValue(docId);
-            }
-
-            @Override
-            public BytesRef getValue(int docId) {
-                BytesRef value = source.bytesValues().getValue(docId);
-                script.setNextVar("_value", value.utf8ToString());
-                value.copyChars(script.run().toString());
-                return value;
-            }
-
-            @Override
             public int setDocument(int docId) {
                 return source.bytesValues().setDocument(docId);
             }
@@ -132,7 +121,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
         private LongValues longValues;
 
         public Numeric(String field, IndexFieldData<?> indexFieldData) {
-            super(field, indexFieldData);
+            super(field, indexFieldData, false); // don't cache hashes with numerics, they can be hashed very quickly
         }
 
         @Override
@@ -222,17 +211,6 @@ public abstract class FieldDataSource implements ReaderContextAware {
                 }
 
                 @Override
-                public boolean hasValue(int docId) {
-                    return source.longValues().hasValue(docId);
-                }
-
-                @Override
-                public long getValue(int docId) {
-                    script.setNextVar("_value", source.longValues().getValue(docId));
-                    return script.runAsLong();
-                }
-
-                @Override
                 public int setDocument(int docId) {
                     return source.longValues().setDocument(docId);
                 }
@@ -256,17 +234,6 @@ public abstract class FieldDataSource implements ReaderContextAware {
                 }
 
                 @Override
-                public boolean hasValue(int docId) {
-                    return source.doubleValues().hasValue(docId);
-                }
-
-                @Override
-                public double getValue(int docId) {
-                    script.setNextVar("_value", source.doubleValues().getValue(docId));
-                    return script.runAsDouble();
-                }
-
-                @Override
                 public int setDocument(int docId) {
                     return source.doubleValues().setDocument(docId);
                 }
@@ -283,8 +250,8 @@ public abstract class FieldDataSource implements ReaderContextAware {
 
     public static class Bytes extends FieldDataSource {
 
-        public Bytes(String field, IndexFieldData<?> indexFieldData) {
-            super(field, indexFieldData);
+        public Bytes(String field, IndexFieldData<?> indexFieldData, boolean needsHashes) {
+            super(field, indexFieldData, needsHashes);
         }
 
     }
@@ -294,7 +261,7 @@ public abstract class FieldDataSource implements ReaderContextAware {
         private GeoPointValues geoPointValues;
 
         public GeoPoint(String field, IndexFieldData<?> indexFieldData) {
-            super(field, indexFieldData);
+            super(field, indexFieldData, false); // geo points are useful for distances, no hashes needed
         }
 
         @Override

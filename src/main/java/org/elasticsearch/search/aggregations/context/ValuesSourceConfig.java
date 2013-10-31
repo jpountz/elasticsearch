@@ -35,6 +35,7 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
     ValueParser parser;
     ScriptValueType scriptValueType;
     boolean unmapped = false;
+    boolean needsHashes = false;
 
     public ValuesSourceConfig(Class<VS> valueSourceType) {
         this.valueSourceType = valueSourceType;
@@ -95,6 +96,11 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
 
     public ValuesSourceConfig<VS> unmapped(boolean unmapped) {
         this.unmapped = unmapped;
+        return this;
+    }
+
+    public ValuesSourceConfig<VS> needsHashes(boolean needsHashes) {
+        this.needsHashes = needsHashes;
         return this;
     }
 }

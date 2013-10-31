@@ -128,7 +128,7 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
             return (VS) numericField(fieldDataSources, config.fieldContext, config.script, config.formatter, config.parser);
         }
         if (BytesValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) bytesField(fieldDataSources, config.fieldContext, config.script);
+            return (VS) bytesField(fieldDataSources, config.fieldContext, config.script, config.needsHashes);
         }
         if (GeoPointValuesSource.class.isAssignableFrom(config.valueSourceType)) {
             return (VS) geoPointField(fieldDataSources, config.fieldContext);
@@ -162,10 +162,10 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         return new NumericValuesSource.FieldData(dataSource, formatter, parser);
     }
 
-    private BytesValuesSource bytesField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script) {
+    private BytesValuesSource bytesField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script, boolean needsHashes) {
         FieldDataSource dataSource = fieldDataSources.get(fieldContext.field());
         if (dataSource == null) {
-            dataSource = new FieldDataSource.Bytes(fieldContext.field(), fieldContext.indexFieldData());
+            dataSource = new FieldDataSource.Bytes(fieldContext.field(), fieldContext.indexFieldData(), needsHashes && script == null);
             setReaderIfNeeded(dataSource);
             fieldDataSources.put(fieldContext.field(), dataSource);
         }
