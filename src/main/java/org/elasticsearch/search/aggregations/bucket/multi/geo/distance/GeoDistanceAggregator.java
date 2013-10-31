@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.geo.distance;
 
+import com.carrotsearch.hppc.IntArrayList;
 import com.google.common.collect.Lists;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.unit.DistanceUnit;
@@ -26,7 +27,7 @@ import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
-import org.elasticsearch.search.aggregations.bucket.GeoPointBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
@@ -39,7 +40,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.bui
 /**
  *
  */
-public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
+public class GeoDistanceAggregator extends ValuesSourceBucketsAggregator<GeoPointValuesSource> {
 
     static class DistanceRange {
 
@@ -101,10 +102,49 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
 
     class Collector implements Aggregator.Collector {
 
+        final boolean[] matched;
+        final IntArrayList matchedList;
+
+        Collector() {
+            matched = new boolean[collectors.length];
+            matchedList = new IntArrayList(matched.length);
+        }
+
         @Override
         public void collect(int doc) throws IOException {
-            for (BucketCollector collector : collectors) {
-                collector.collect(doc);
+            final GeoPointValues values = valuesSource.values();
+            final int valuesCount = values.setDocument(doc);
+            assert noMatchYet();
+            for (int i = 0; i < valuesCount; ++i) {
+                final GeoPoint value = values.nextValue();
+                collect(doc, value);
+            }
+            resetMatches();
+        }
+
+        private boolean noMatchYet() {
+            for (int i = 0; i < matched.length; ++i) {
+                if (matched[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void resetMatches() {
+            for (int i = 0; i < matchedList.size(); ++i) {
+                matched[matchedList.get(i)] = false;
+            }
+            matchedList.clear();
+        }
+
+        private void collect(int doc, GeoPoint value) throws IOException {
+            for (int i = 0; i < collectors.length; ++i) {
+                if (!matched[i] && collectors[i].range.matches(value)) {
+                    matched[i] = true;
+                    matchedList.add(i);
+                    collectors[i].collect(doc);
+                }
             }
         }
 
@@ -116,7 +156,7 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
         }
     }
 
-    static class BucketCollector extends GeoPointBucketsAggregator.BucketCollector {
+    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<GeoPointValuesSource> {
 
         private final DistanceRange range;
 
@@ -128,28 +168,9 @@ public class GeoDistanceAggregator extends GeoPointBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, GeoPointValues values) throws IOException {
-            if (matches(doc, values)) {
-                docCount++;
-                return true;
-            }
-            return false;
-        }
-
-        private boolean matches(int doc, GeoPointValues values) {
-            int valuesCount = values.setDocument(doc);
-            if (valuesCount == 0) {
-                return false;
-            }
-            if (valuesCount == 1) {
-                return range.matches(values.nextValue());
-            }
-            for (int i = 0; i < valuesCount; i++) {
-                if (range.matches(values.nextValue())) {
-                    return true;
-                }
-            }
-            return false;
+        protected boolean onDoc(int doc) throws IOException {
+            docCount++;
+            return true;
         }
 
         InternalGeoDistance.Bucket buildBucket() {

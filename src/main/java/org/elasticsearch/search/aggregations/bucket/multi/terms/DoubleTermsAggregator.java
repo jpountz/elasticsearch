@@ -25,7 +25,7 @@ import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.DoubleBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
@@ -39,7 +39,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.bui
 /**
  *
  */
-public class DoubleTermsAggregator extends DoubleBucketsAggregator {
+public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
 
     private final List<Aggregator.Factory> factories;
     private final InternalOrder order;
@@ -129,7 +129,7 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
         }
     }
 
-    static class BucketCollector extends DoubleBucketsAggregator.BucketCollector {
+    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
 
         final double term;
 
@@ -141,7 +141,7 @@ public class DoubleTermsAggregator extends DoubleBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, DoubleValues values) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             docCount++;
             return true;
         }

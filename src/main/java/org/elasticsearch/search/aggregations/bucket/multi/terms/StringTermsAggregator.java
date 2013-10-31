@@ -27,7 +27,7 @@ import org.elasticsearch.common.lucene.HashedBytesRef;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.BytesBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
@@ -41,7 +41,7 @@ import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.bui
 /**
  * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
  */
-public class StringTermsAggregator extends BytesBucketsAggregator {
+public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
 
     private final List<Aggregator.Factory> factories;
     private final InternalOrder order;
@@ -135,7 +135,7 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
         }
     }
 
-    static class BucketCollector extends BytesBucketsAggregator.BucketCollector {
+    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector {
 
         final BytesRef term;
 
@@ -147,7 +147,7 @@ public class StringTermsAggregator extends BytesBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, BytesValues values) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
             docCount++;
             return true;
         }

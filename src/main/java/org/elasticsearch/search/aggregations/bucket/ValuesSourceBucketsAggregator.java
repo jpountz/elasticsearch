@@ -53,7 +53,7 @@ public abstract class ValuesSourceBucketsAggregator<VS extends ValuesSource> ext
      *
      * @param <VS>
      */
-    protected static abstract class BucketCollector<VS extends ValuesSource> implements Collector {
+    public static abstract class BucketCollector<VS extends ValuesSource> implements Collector {
 
         protected final Aggregator aggregator;
         protected final VS valuesSource;

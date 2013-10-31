@@ -24,7 +24,7 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
-import org.elasticsearch.search.aggregations.bucket.BytesBucketsAggregator;
+import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
@@ -35,7 +35,7 @@ import java.util.List;
 /**
  *
  */
-public class MissingAggregator extends BytesBucketsAggregator {
+public class MissingAggregator extends ValuesSourceBucketsAggregator {
 
     private final Aggregator[] subAggregators;
 
@@ -57,7 +57,7 @@ public class MissingAggregator extends BytesBucketsAggregator {
         return new InternalMissing(name, docCount, BucketsAggregator.buildAggregations(subAggregators));
     }
 
-    class Collector extends BytesBucketsAggregator.BucketCollector {
+    class Collector extends ValuesSourceBucketsAggregator.BucketCollector {
 
         private long docCount;
 
@@ -66,7 +66,8 @@ public class MissingAggregator extends BytesBucketsAggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, BytesValues values) throws IOException {
+        protected boolean onDoc(int doc) throws IOException {
+            BytesValues values = valuesSource.bytesValues();
             if (values.setDocument(doc) == 0) {
                 docCount++;
                 return true;
