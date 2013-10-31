@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.range;
 
+import com.carrotsearch.hppc.IntArrayList;
 import com.google.common.collect.Lists;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
@@ -79,14 +80,15 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         }
     }
 
+    private final Range[] ranges;
     private final boolean keyed;
-    private final AbstractRangeBase.Factory rangeFactory;
+    private final AbstractRangeBase.Factory<?> rangeFactory;
     BucketCollector[] bucketCollectors;
 
     public RangeAggregator(String name,
                            List<Aggregator.Factory> factories,
                            NumericValuesSource valuesSource,
-                           AbstractRangeBase.Factory rangeFactory,
+                           AbstractRangeBase.Factory<?> rangeFactory,
                            List<Range> ranges,
                            boolean keyed,
                            AggregationContext aggregationContext,
@@ -96,11 +98,12 @@ public class RangeAggregator extends DoubleBucketsAggregator {
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
         bucketCollectors = new BucketCollector[ranges.size()];
-        int i = 0;
-        for (Range range : ranges) {
+        this.ranges = ranges.toArray(new Range[ranges.size()]);
+        for (int i = 0; i < this.ranges.length; ++i) {
+            final Range range = this.ranges[i];
             ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
             range.process(parser, aggregationContext);
-            bucketCollectors[i++] = new BucketCollector(range, valuesSource, createSubAggregators(factories, this), this);
+            bucketCollectors[i] = new BucketCollector(range, valuesSource, createSubAggregators(factories, this), this);
         }
     }
 
@@ -123,10 +126,49 @@ public class RangeAggregator extends DoubleBucketsAggregator {
 
     class Collector implements Aggregator.Collector {
 
+        final boolean[] matched;
+        final IntArrayList matchedList;
+
+        {
+            matched = new boolean[ranges.length];
+            matchedList = new IntArrayList();
+        }
+
         @Override
         public void collect(int doc) throws IOException {
-            for (int i = 0; i < bucketCollectors.length; i++) {
-                bucketCollectors[i].collect(doc);
+            final DoubleValues values = valuesSource.doubleValues();
+            final int valuesCount = values.setDocument(doc);
+            assert noMatchYet();
+            for (int i = 0; i < valuesCount; ++i) {
+                final double value = values.nextValue();
+                collect(doc, value);
+            }
+            resetMatches();
+        }
+
+        private boolean noMatchYet() {
+            for (int i = 0; i < ranges.length; ++i) {
+                if (matched[i]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private void resetMatches() {
+            for (int i = 0; i < matchedList.size(); ++i) {
+                matched[matchedList.get(i)] = false;
+            }
+            matchedList.clear();
+        }
+
+        private void collect(int doc, double value) throws IOException {
+            for (int i = 0; i < ranges.length; ++i) {
+                if (!matched[i] && ranges[i].matches(value)) {
+                    matched[i] = true;
+                    matchedList.add(i);
+                    bucketCollectors[i].collect(doc);
+                }
             }
         }
 
@@ -151,19 +193,11 @@ public class RangeAggregator extends DoubleBucketsAggregator {
 
         @Override
         protected boolean onDoc(int doc, DoubleValues values) throws IOException {
-            int valuesCount = values.setDocument(doc);
-
-            for (int i = 0; i < valuesCount; i++) {
-                double value = values.nextValue();
-                if (range.matches(value)) {
-                    ++docCount;
-                    return true;
-                }
-            }
-            return false;
+            ++docCount;
+            return true;
         }
 
-        RangeBase.Bucket buildBucket(AbstractRangeBase.Factory factory) {
+        RangeBase.Bucket buildBucket(AbstractRangeBase.Factory<?> factory) {
             return factory.createBucket(range.key, range.from, range.to, docCount, buildAggregations(subAggregators), valuesSource.formatter());
         }
     }
@@ -171,7 +205,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
     public static class Unmapped extends Aggregator {
         private final List<RangeAggregator.Range> ranges;
         private final boolean keyed;
-        private final AbstractRangeBase.Factory factory;
+        private final AbstractRangeBase.Factory<?> factory;
         private final ValueFormatter formatter;
         private final ValueParser parser;
 
@@ -182,7 +216,7 @@ public class RangeAggregator extends DoubleBucketsAggregator {
                         ValueParser parser,
                         AggregationContext aggregationContext,
                         Aggregator parent,
-                        AbstractRangeBase.Factory factory) {
+                        AbstractRangeBase.Factory<?> factory) {
 
             super(name, aggregationContext, parent);
             this.ranges = ranges;

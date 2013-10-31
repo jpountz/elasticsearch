@@ -731,5 +731,51 @@ public class RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(5l));
     }
 
+    @Test
+    public void overlappingRanges() throws Exception {
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(range("range")
+                        .field("values")
+                        .addUnboundedTo(5)
+                        .addRange(3, 6)
+                        .addRange(4, 5)
+                        .addUnboundedFrom(4))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        Range range = response.getAggregations().get("range");
+        assertThat(range, notNullValue());
+        assertThat(range.getName(), equalTo("range"));
+        assertThat(range.buckets().size(), equalTo(4));
+
+        Range.Bucket bucket = range.getByKey("*-5.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("*-5.0"));
+        assertThat(bucket.getFrom(), equalTo(Double.NEGATIVE_INFINITY));
+        assertThat(bucket.getTo(), equalTo(5.0));
+        assertThat(bucket.getDocCount(), equalTo(4l));
+
+        bucket = range.getByKey("3.0-6.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("3.0-6.0"));
+        assertThat(bucket.getFrom(), equalTo(3.0));
+        assertThat(bucket.getTo(), equalTo(6.0));
+        assertThat(bucket.getDocCount(), equalTo(4l));
+
+        bucket = range.getByKey("4.0-5.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("4.0-5.0"));
+        assertThat(bucket.getFrom(), equalTo(4.0));
+        assertThat(bucket.getTo(), equalTo(5.0));
+        assertThat(bucket.getDocCount(), equalTo(2l));
+
+        bucket = range.getByKey("4.0-*");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("4.0-*"));
+        assertThat(bucket.getFrom(), equalTo(4.0));
+        assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
+        assertThat(bucket.getDocCount(), equalTo(8l));
+    }
 
 }
