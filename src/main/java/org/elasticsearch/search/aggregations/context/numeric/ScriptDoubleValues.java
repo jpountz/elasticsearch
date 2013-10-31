@@ -93,16 +93,6 @@ public class ScriptDoubleValues extends DoubleValues implements ScriptValues {
     }
 
     @Override
-    public boolean hasValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) == 0");
-    }
-
-    @Override
-    public double getValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
-    }
-
-    @Override
     public double nextValue() {
         assert valueOffset < valueCount;
         return values[valueOffset++];

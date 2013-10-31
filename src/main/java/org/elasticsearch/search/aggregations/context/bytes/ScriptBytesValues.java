@@ -51,20 +51,6 @@ public class ScriptBytesValues extends BytesValues implements ScriptValues {
     }
 
     @Override
-    public boolean hasValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) == 0");
-    }
-
-    public BytesRef getValueScratch(int docId, BytesRef ret) {
-        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
-    }
-
-    @Override
-    public BytesRef getValue(int docId) {
-        throw new UnsupportedOperationException("Use setDocument(doc) and nextValue()");
-    }
-
-    @Override
     public int setDocument(int docId) {
         this.docId = docId;
         script.setNextDocId(docId);
