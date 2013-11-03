@@ -34,33 +34,23 @@ public abstract class Aggregator extends AbstractAggregator {
     protected final AggregatorFactories factories;
     protected final OrdsAggregator[] ordsAggregators;
 
-    protected Aggregator(String name, AggregatorFactories factories, AggregationContext context, Aggregator parent) {
+    protected Aggregator(String name, AggregatorFactories factories, int initialBucketsCount, AggregationContext context, Aggregator parent) {
         super(name, context, parent);
         this.factories = factories;
         assert factories != null : "sub-factories provided to BucketAggregator must not be null, use AggragatorFactories.EMPTY instead";
-        this.ordsAggregators = factories.createOrdsAggregators(this);
+        this.ordsAggregators = factories.createOrdsAggregators(this, initialBucketsCount);
     }
 
-    /**
-     * @return  The collector what is responsible for the aggregation.
-     */
-    public abstract Collector collector();
+    public abstract boolean shouldCollect();
+
+    public abstract void collect(int doc) throws IOException;
+
+    public abstract void postCollection();
 
     /**
      * @return  The aggregated & built get.
      */
     public abstract InternalAggregation buildAggregation();
-
-    /**
-     * The lucene collector that will be responsible for the aggregation
-     */
-    public static abstract interface Collector {
-
-        public abstract void collect(int doc) throws IOException;
-
-        public abstract void postCollection();
-
-    }
 
 
 }

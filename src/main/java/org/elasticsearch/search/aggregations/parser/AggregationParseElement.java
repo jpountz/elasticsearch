@@ -24,10 +24,7 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.search.SearchParseElement;
 import org.elasticsearch.search.aggregations.SearchContextAggregations;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
-import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 import org.elasticsearch.search.internal.SearchContext;
-
-import java.util.List;
 
 /**
  * The search parse element that is responsible for parsing the get part of the request.

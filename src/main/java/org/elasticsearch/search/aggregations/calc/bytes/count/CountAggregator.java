@@ -40,38 +40,33 @@ public class CountAggregator extends Aggregator {
     long count;
 
     public CountAggregator(String name, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.valuesSource = valuesSource;
     }
 
     @Override
-    public Aggregator.Collector collector() {
-        return valuesSource != null ? new Collector() : null;
+    public boolean shouldCollect() {
+        return valuesSource != null;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        BytesValues values = valuesSource.bytesValues();
+        if (values == null) {
+            return;
+        }
+        int valuesCount = values.setDocument(doc);
+        count += valuesCount;
+    }
+
+    @Override
+    public void postCollection() {
+
     }
 
     @Override
     public InternalAggregation buildAggregation() {
         return new InternalCount(name, count);
-    }
-
-    class Collector implements Aggregator.Collector {
-
-        long count;
-
-        @Override
-        public void collect(int doc) throws IOException {
-            BytesValues values = valuesSource.bytesValues();
-            if (values == null) {
-                return;
-            }
-            int valuesCount = values.setDocument(doc);
-            count += valuesCount;
-        }
-
-        @Override
-        public void postCollection() {
-            CountAggregator.this.count = count;
-        }
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.Normal<BytesValuesSource> {

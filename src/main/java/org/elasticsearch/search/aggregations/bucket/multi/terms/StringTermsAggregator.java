@@ -28,7 +28,6 @@ import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
-import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -40,13 +39,13 @@ import java.util.Arrays;
 /**
  * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
  */
-public class StringTermsAggregator extends MultiBucketAggregator {
+public class StringTermsAggregator extends Aggregator {
 
     private final ValuesSource valuesSource;
     private final InternalOrder order;
     private final int requiredSize;
-
-    Recycler.V<ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector>> bucketCollectors;
+    private final Collector collector;
+    private final Recycler.V<ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector>> bucketCollectors;
 
     public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
@@ -55,12 +54,23 @@ public class StringTermsAggregator extends MultiBucketAggregator {
         this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
-        bucketCollectors = aggregationContext.cacheRecycler().hashMap(-1);
+        this.bucketCollectors = aggregationContext.cacheRecycler().hashMap(-1);
+        this.collector = new Collector(bucketCollectors.v());
     }
 
     @Override
-    public Collector collector() {
-        return new Collector();
+    public boolean shouldCollect() {
+        return true;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
+    }
+
+    @Override
+    public void postCollection() {
+        collector.postCollection();
     }
 
     @Override
@@ -77,7 +87,7 @@ public class StringTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < allocated.length; i++) {
                 if (allocated[i]) {
                     BucketCollector collector = (BucketCollector) collectors[i];
-                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                     ordered.insertWithOverflow(bucket);
                 }
             }
@@ -94,7 +104,7 @@ public class StringTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < allocated.length; i++) {
                 if (allocated[i]) {
                     BucketCollector collector = (BucketCollector) collectors[i];
-                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                     ordered.add(bucket);
                 }
             }
@@ -103,13 +113,18 @@ public class StringTermsAggregator extends MultiBucketAggregator {
         }
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector {
+
+        private final ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector> bucketCollectors;
+
+        Collector(ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector> bucketCollectors) {
+            this.bucketCollectors = bucketCollectors;
+        }
 
         private HashedBytesRef scratch = new HashedBytesRef(new BytesRef());
 
         int ordCounter;
 
-        @Override
         public void collect(int doc) throws IOException {
             BytesValues values = valuesSource.bytesValues();
             int valuesCount = values.setDocument(doc);
@@ -117,36 +132,39 @@ public class StringTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < valuesCount; ++i) {
                 scratch.bytes = values.nextValue();
                 scratch.hash = values.currentValueHash();
-                BucketCollector bucket = bucketCollectors.v().get(scratch);
+                BucketCollector bucket = bucketCollectors.get(scratch);
                 if (bucket == null) {
                     HashedBytesRef put = scratch.deepCopy();
-                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createAggregators(StringTermsAggregator.this), ordsCollectors);
-                    bucketCollectors.v().put(put, bucket);
+                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createAggregators(StringTermsAggregator.this), ordsAggregators);
+                    bucketCollectors.put(put, bucket);
                 }
                 bucket.collect(doc);
             }
         }
 
-        @Override
         public void postCollection() {
-            boolean[] states = bucketCollectors.v().allocated;
-            Object[] collectors = bucketCollectors.v().values;
+            boolean[] states = bucketCollectors.allocated;
+            Object[] collectors = bucketCollectors.values;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     ((BucketCollector) collectors[i]).postCollection();
                 }
             }
-            StringTermsAggregator.this.bucketCollectors = bucketCollectors;
         }
     }
 
-    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
 
         final BytesRef term;
 
-        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
-            super(ord, aggregators, ordsCollectors);
+        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(ord, aggregators, ordsAggregators);
             this.term = term;
+        }
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return true;
         }
     }
 

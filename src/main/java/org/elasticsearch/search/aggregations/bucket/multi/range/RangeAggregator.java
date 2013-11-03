@@ -26,7 +26,6 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
-import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -43,7 +42,7 @@ import java.util.List;
  *
  */
 // nocommit range aggregations should use binary search to find the matching ranges
-public class RangeAggregator extends MultiBucketAggregator {
+public class RangeAggregator extends Aggregator {
 
     public static class Range {
 
@@ -84,7 +83,7 @@ public class RangeAggregator extends MultiBucketAggregator {
     private final Range[] ranges;
     private final boolean keyed;
     private final AbstractRangeBase.Factory rangeFactory;
-
+    private final Collector collector;
     private final BucketCollector[] bucketCollectors;
 
     public RangeAggregator(String name,
@@ -106,13 +105,24 @@ public class RangeAggregator extends MultiBucketAggregator {
             final Range range = this.ranges[i];
             ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
             range.process(parser, aggregationContext);
-            bucketCollectors[i] = new BucketCollector(i, range, factories.createAggregators(this), ordsCollectors);
+            bucketCollectors[i] = new BucketCollector(i, range, factories.createAggregators(this), ordsAggregators);
         }
+        collector = valuesSource == null ? null : new Collector();
     }
 
     @Override
-    public Collector collector() {
-        return valuesSource != null ? new Collector() : null;
+    public boolean shouldCollect() {
+        return collector != null;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
+    }
+
+    @Override
+    public void postCollection() {
+        collector.postCollection();
     }
 
     @Override
@@ -121,7 +131,7 @@ public class RangeAggregator extends MultiBucketAggregator {
         for (int i = 0; i < bucketCollectors.length; i++) {
             Range range = bucketCollectors[i].range;
             RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketCollectors[i].docCount(),
-                    bucketCollectors[i].buildAggregations(ordsAggregators), valuesSource.formatter());
+                    bucketCollectors[i].buildAggregations(), valuesSource.formatter());
             buckets.add(bucket);
         }
 
@@ -130,7 +140,7 @@ public class RangeAggregator extends MultiBucketAggregator {
         return rangeFactory.create(name, buckets, formatter, keyed);
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector {
 
         final boolean[] matched;
         final IntArrayList matchedList;
@@ -140,7 +150,6 @@ public class RangeAggregator extends MultiBucketAggregator {
             matchedList = new IntArrayList();
         }
 
-        @Override
         public void collect(int doc) throws IOException {
             final DoubleValues values = valuesSource.doubleValues();
             final int valuesCount = values.setDocument(doc);
@@ -178,7 +187,6 @@ public class RangeAggregator extends MultiBucketAggregator {
             }
         }
 
-        @Override
         public void postCollection() {
             for (int i = 0; i < bucketCollectors.length; i++) {
                 bucketCollectors[i].postCollection();
@@ -186,13 +194,18 @@ public class RangeAggregator extends MultiBucketAggregator {
         }
     }
 
-    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
 
         private final Range range;
 
-        BucketCollector(int ord, Range range, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
-            super(ord, aggregators, ordsCollectors);
+        BucketCollector(int ord, Range range, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(ord, aggregators, ordsAggregators);
             this.range = range;
+        }
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return true;
         }
     }
 
@@ -212,7 +225,7 @@ public class RangeAggregator extends MultiBucketAggregator {
                         Aggregator parent,
                         AbstractRangeBase.Factory factory) {
 
-            super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
+            super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
             this.ranges = ranges;
             this.keyed = keyed;
             this.formatter = formatter;
@@ -221,8 +234,16 @@ public class RangeAggregator extends MultiBucketAggregator {
         }
 
         @Override
-        public Collector collector() {
-            return null;
+        public boolean shouldCollect() {
+            return false;
+        }
+
+        @Override
+        public void collect(int doc) throws IOException {
+        }
+
+        @Override
+        public void postCollection() {
         }
 
         @Override

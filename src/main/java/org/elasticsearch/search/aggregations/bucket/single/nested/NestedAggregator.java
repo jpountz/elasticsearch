@@ -30,6 +30,7 @@ import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
 import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -47,8 +48,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
     private Bits childDocs;
     private FixedBitSet parentDocs;
-
-    private long docCount;
 
     public NestedAggregator(String name, AggregatorFactories factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
         super(name, factories, aggregationContext, parent);
@@ -70,12 +69,12 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
         return new Collector(aggregators, ordsAggregators);
     }
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations) {
+    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalNested(name, docCount, aggregations);
     }
 
@@ -95,15 +94,10 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
     }
 
-    class Collector extends SingleBucketAggregator.Collector {
+    class Collector extends BucketCollector {
 
         Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
             super(aggregators, ordsAggregators);
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
-            NestedAggregator.this.docCount = docCount;
         }
 
         @Override
@@ -125,7 +119,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
             // this will always be called for every nested (we make sure of that in the #collect method above)
             return true;
         }
-
     }
 
     public static class Factory extends AggregatorFactory {

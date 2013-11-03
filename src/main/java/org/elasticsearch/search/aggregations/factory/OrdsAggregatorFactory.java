@@ -20,8 +20,8 @@
 package org.elasticsearch.search.aggregations.factory;
 
 import org.elasticsearch.search.aggregations.AggregationInitializationException;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 
 /**
@@ -38,6 +38,10 @@ public abstract class OrdsAggregatorFactory extends AggregatorFactory {
         throw new AggregationInitializationException("Aggregator [" + name + "] of type [" + type + "] cannot accept sub-aggregations");
     }
 
-    public abstract OrdsAggregator create(AggregationContext context, Aggregator parent);
+    public OrdsAggregator create(AggregationContext context, Aggregator parent) {
+        return create(context, parent, 1);
+    }
 
+
+    public abstract OrdsAggregator create(AggregationContext context, Aggregator parent, int initialOrdsCount);
 }

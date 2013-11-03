@@ -20,9 +20,13 @@
 package org.elasticsearch.search.aggregations.bucket;
 
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A base class for a bucket collector. The bucket collector will be called for every document in the current context
@@ -33,57 +37,64 @@ import java.io.IOException;
  *     <li>perform any aggregation that is associated with this bucket</li>
  * </ol>
  */
-public abstract class BucketCollector implements Aggregator.Collector {
+public abstract class BucketCollector {
 
     // the ordinal of the bucket
     protected int ord;
 
     protected final Aggregator[] aggregators;
-    protected final Aggregator.Collector[] collectors;
-    protected final OrdsAggregator.Collector[] ordsCollectors;
+    protected final OrdsAggregator[] ordsAggregators;
 
     protected long docCount;
 
-    public BucketCollector(Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
-        this(0, aggregators, ordsCollectors);
+    public BucketCollector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        this(0, aggregators, ordsAggregators);
     }
 
-    public BucketCollector(int ord, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+    public BucketCollector(int ord, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
         this.ord = ord;
-        this.ordsCollectors = ordsCollectors;
         this.aggregators = aggregators;
-        this.collectors = new Aggregator.Collector[aggregators.length];
-        for (int i = 0; i < aggregators.length; i++) {
-            collectors[i] = aggregators[i].collector();
-        }
+        this.ordsAggregators = ordsAggregators;
     }
 
-    @Override
     public void collect(int doc) throws IOException {
         if (onDoc(doc)) {
             docCount++;
-            for (int i = 0; i < ordsCollectors.length; i++) {
-                ordsCollectors[i].collect(doc, ord);
+            for (int i = 0; i < ordsAggregators.length; i++) {
+                if (ordsAggregators[i].shouldCollect()) {
+                    ordsAggregators[i].collect(doc, ord);
+                }
             }
-            for (int i = 0; i < collectors.length; i++) {
-                if (collectors[i] != null) {
-                    collectors[i].collect(doc);
+            for (int i = 0; i < aggregators.length; i++) {
+                if (aggregators[i].shouldCollect()) {
+                    aggregators[i].collect(doc);
                 }
             }
         }
     }
 
-    @Override
-    public final void postCollection() {
-        for (int i = 0; i < collectors.length; i++) {
-            if (collectors[i] != null) {
-                collectors[i].postCollection();
+    public void postCollection() {
+        for (int i = 0; i < aggregators.length; i++) {
+            if (aggregators[i].shouldCollect()) {
+                aggregators[i].postCollection();
             }
         }
-        for (int i = 0; i < ordsCollectors.length; i++) {
-            ordsCollectors[i].postCollection();
+        for (int i = 0; i < ordsAggregators.length; i++) {
+            if (ordsAggregators[i].shouldCollect()) {
+                ordsAggregators[i].postCollection();
+            }
         }
-        postCollection(aggregators, docCount);
+    }
+
+    public InternalAggregations buildAggregations() {
+        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length + ordsAggregators.length);
+        for (int i = 0; i < aggregators.length; i++) {
+            aggregations.add(aggregators[i].buildAggregation());
+        }
+        for (int i = 0; i < ordsAggregators.length; i++) {
+            aggregations.add(ordsAggregators[i].buildAggregation(ord));
+        }
+        return new InternalAggregations(aggregations);
     }
 
     public int ord() {
@@ -100,20 +111,11 @@ public abstract class BucketCollector implements Aggregator.Collector {
 
 
     /**
-     * Called to aggregate the data in the given doc and returns whether the value space that should be used for all sub-aggregators
-     * of this bucket.
+     * Called to aggregate the data in the given doc and returns whether the document falls in this bucket or not.
      *
      * @param doc   The doc to aggregate
      * @return      {@code true} if the give doc falls in the bucket, {@code false} otherwise.
-     * @throws java.io.IOException
      */
     protected abstract boolean onDoc(int doc) throws IOException;
-
-    /**
-     * Called when collection is finished
-     *
-     * @param aggregators   The sub aggregators of this bucket
-     */
-    protected abstract void postCollection(Aggregator[] aggregators, long docCount);
 
 }

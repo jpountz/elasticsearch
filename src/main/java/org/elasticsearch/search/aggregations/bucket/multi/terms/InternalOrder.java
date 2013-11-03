@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -71,11 +70,11 @@ class InternalOrder extends Terms.Order {
         static final byte ID = 0;
 
         Aggregation(String key, boolean asc) {
-            super(ID, key, asc, new Aggregated.Comparator<Terms.Bucket>(key, asc));
+            super(ID, key, asc, new Terms.Bucket.Comparator<Terms.Bucket>(key, asc));
         }
 
         Aggregation(String aggName, String valueName, boolean asc) {
-            super(ID, key(aggName, valueName), asc, new Aggregated.Comparator<Terms.Bucket>(aggName, valueName, asc));
+            super(ID, key(aggName, valueName), asc, new Terms.Bucket.Comparator<Terms.Bucket>(aggName, valueName, asc));
         }
 
         private static String key(String aggName, String valueName) {
@@ -89,12 +88,12 @@ class InternalOrder extends Terms.Order {
         public static void writeOrder(InternalOrder order, StreamOutput out) throws IOException {
             out.writeByte(order.id());
             if (order instanceof Aggregation) {
-                out.writeBoolean(((Aggregated.Comparator) order.comparator).asc());
-                out.writeString(((Aggregated.Comparator) order.comparator).aggName());
-                boolean hasValueName = ((Aggregated.Comparator) order.comparator).aggName() != null;
+                out.writeBoolean(((Terms.Bucket.Comparator) order.comparator).asc());
+                out.writeString(((Terms.Bucket.Comparator) order.comparator).aggName());
+                boolean hasValueName = ((Terms.Bucket.Comparator) order.comparator).aggName() != null;
                 out.writeBoolean(hasValueName);
                 if (hasValueName) {
-                    out.writeString(((Aggregated.Comparator) order.comparator).valueName());
+                    out.writeString(((Terms.Bucket.Comparator) order.comparator).valueName());
                 }
             }
         }

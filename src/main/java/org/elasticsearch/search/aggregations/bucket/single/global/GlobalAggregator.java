@@ -23,6 +23,7 @@ import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -35,23 +36,21 @@ import java.io.IOException;
  */
 public class GlobalAggregator extends SingleBucketAggregator {
 
-    long docCount;
-
     public GlobalAggregator(String name, AggregatorFactories subFactories, AggregationContext aggregationContext) {
         super(name, subFactories, aggregationContext, null);
     }
 
     @Override
-    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
         return new Collector(aggregators, ordsAggregators);
     }
 
     @Override
-    public InternalGlobal buildAggregation(InternalAggregations aggregations) {
+    public InternalGlobal buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalGlobal(name, docCount, aggregations);
     }
 
-    class Collector extends SingleBucketAggregator.Collector {
+    class Collector extends BucketCollector {
 
         Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
             super(aggregators, ordsAggregators);
@@ -60,11 +59,6 @@ public class GlobalAggregator extends SingleBucketAggregator {
         @Override
         protected boolean onDoc(int doc) throws IOException {
             return true;
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
-            GlobalAggregator.this.docCount = docCount;
         }
     }
 

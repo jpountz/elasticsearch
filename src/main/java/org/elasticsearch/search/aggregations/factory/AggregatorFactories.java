@@ -64,11 +64,11 @@ public class AggregatorFactories {
         return aggregators;
     }
 
-    public OrdsAggregator[] createOrdsAggregators(Aggregator parent) {
+    public OrdsAggregator[] createOrdsAggregators(Aggregator parent, int initialOrdCount) {
         int i = 0;
         OrdsAggregator[] aggregators = new OrdsAggregator[ordsAggregatorFactories.size()];
         for (OrdsAggregatorFactory factory : ordsAggregatorFactories) {
-            aggregators[i++] = factory.create(parent.context(), parent);
+            aggregators[i++] = factory.create(parent.context(), parent, initialOrdCount);
         }
         return aggregators;
     }
@@ -83,14 +83,6 @@ public class AggregatorFactories {
             aggregators[i++] = (Aggregator) factory.create(ctx, null);
         }
         return aggregators;
-    }
-
-    public List<AggregatorFactory> aggregatorFactories() {
-        return aggregatorFactories;
-    }
-
-    public List<OrdsAggregatorFactory> ordsAggregatorFactories() {
-        return ordsAggregatorFactories;
     }
 
     public int count() {
@@ -130,7 +122,7 @@ public class AggregatorFactories {
         }
 
         @Override
-        public OrdsAggregator[] createOrdsAggregators(Aggregator parent) {
+        public OrdsAggregator[] createOrdsAggregators(Aggregator parent, int initialOrdCount) {
             return EMPTY_LEAVES;
         }
 

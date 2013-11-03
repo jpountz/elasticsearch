@@ -24,6 +24,7 @@ import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -40,8 +41,6 @@ public class MissingAggregator extends SingleBucketAggregator {
 
     private ValuesSource valuesSource;
 
-    long docCount;
-
     public MissingAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                              AggregationContext aggregationContext, Aggregator parent) {
         super(name, factories, aggregationContext, parent);
@@ -49,16 +48,16 @@ public class MissingAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        return valuesSource != null ? new Collector(aggregators, ordsAggregators) : new AllMissingCollector(aggregators, ordsAggregators);
+    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        return new Collector(aggregators, ordsAggregators);
     }
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations) {
+    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalMissing(name, docCount, aggregations);
     }
 
-    class Collector extends SingleBucketAggregator.Collector {
+    class Collector extends BucketCollector {
 
         Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
             super(aggregators, ordsAggregators);
@@ -66,33 +65,14 @@ public class MissingAggregator extends SingleBucketAggregator {
 
         @Override
         protected boolean onDoc(int doc) throws IOException {
+            if (valuesSource == null) {
+                return true;
+            }
             BytesValues values = valuesSource.bytesValues();
             if (values.setDocument(doc) == 0) {
                 return true;
             }
             return false;
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
-            MissingAggregator.this.docCount = docCount;
-        }
-    }
-
-    public class AllMissingCollector extends SingleBucketAggregator.Collector {
-
-        AllMissingCollector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsAggregators);
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            return true;
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
-            MissingAggregator.this.docCount = docCount;
         }
     }
 
