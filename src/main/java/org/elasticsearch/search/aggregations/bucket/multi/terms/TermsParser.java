@@ -26,8 +26,8 @@ import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.index.mapper.core.DateFieldMapper;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
 import org.elasticsearch.script.SearchScript;
-import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.AggregatorParser;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
+import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.aggregations.context.FieldContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
@@ -54,7 +54,7 @@ public class TermsParser implements AggregatorParser {
     //nocommit add support for term filtering (regexp/include/exclude) a lat terms facets
 
     @Override
-    public Aggregator.Factory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
+    public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 
         String field = null;
         String script = null;

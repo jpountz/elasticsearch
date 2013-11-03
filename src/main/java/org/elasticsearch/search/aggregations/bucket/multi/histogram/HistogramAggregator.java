@@ -21,35 +21,42 @@ package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import com.carrotsearch.hppc.LongObjectOpenHashMap;
 import org.apache.lucene.util.CollectionUtil;
+import org.elasticsearch.common.collect.ReusableGrowableArray;
 import org.elasticsearch.common.inject.internal.Nullable;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.common.rounding.Rounding;
+import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  *
  */
-public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
+public class HistogramAggregator extends MultiBucketAggregator {
 
-    private final List<Aggregator.Factory> factories;
+    private final NumericValuesSource valuesSource;
     private final Rounding rounding;
     private final InternalOrder order;
     private final boolean keyed;
     private final boolean computeEmptyBuckets;
     private final AbstractHistogramBase.Factory histogramFactory;
-    private final Recycler.V<LongObjectOpenHashMap<HistogramCollector.BucketCollector>> collectors;
+
+    private final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
     public HistogramAggregator(String name,
-                               List<Aggregator.Factory> factories,
+                               AggregatorFactories factories,
                                Rounding rounding,
                                InternalOrder order,
                                boolean keyed,
@@ -59,36 +66,32 @@ public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericVa
                                AggregationContext aggregationContext,
                                Aggregator parent) {
 
-        super(name, valuesSource, aggregationContext, parent);
-        this.factories = factories;
+        super(name, factories, 50, aggregationContext, parent);
+        this.valuesSource = valuesSource;
         this.rounding = rounding;
         this.order = order;
         this.keyed = keyed;
         this.computeEmptyBuckets = computeEmptyBuckets;
         this.histogramFactory = histogramFactory;
-        this.collectors = aggregationContext.cacheRecycler().longObjectMap(-1);
+        this.bucketCollectors = aggregationContext.cacheRecycler().longObjectMap(-1);
     }
 
     @Override
     public Collector collector() {
-        return valuesSource != null ? new HistogramCollector(this, factories, valuesSource, rounding, collectors.v()) : null;
+        return valuesSource == null ? null : new Collector();
     }
 
     @Override
     public InternalAggregation buildAggregation() {
-        List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(collectors.v().size());
-        boolean[] allocated = collectors.v().allocated;
-        Object[] bucketCollectors = collectors.v().values;
+        List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(bucketCollectors.v().size());
+        boolean[] allocated = bucketCollectors.v().allocated;
+        Object[] collectors = this.bucketCollectors.v().values;
         for (int i = 0; i < allocated.length; i++) {
             if (!allocated[i]) {
                 continue;
             }
-            HistogramCollector.BucketCollector bucketCollector = (HistogramCollector.BucketCollector) bucketCollectors[i];
-            List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(bucketCollector.subAggregators.length);
-            for (int j = 0; j < bucketCollector.subAggregators.length; j++) {
-                aggregations.add(bucketCollector.subAggregators[j].buildAggregation());
-            }
-            buckets.add(histogramFactory.createBucket(bucketCollector.key, bucketCollector.docCount, aggregations));
+            BucketCollector collector = (BucketCollector) collectors[i];
+            buckets.add(histogramFactory.createBucket(collector.key, collector.docCount(), collector.buildAggregations(ordsAggregators)));
         }
         CollectionUtil.introSort(buckets, order.comparator());
 
@@ -98,7 +101,82 @@ public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericVa
         return histogramFactory.create(name, buckets, order, computeEmptyBuckets ? rounding : null, formatter, keyed);
     }
 
-    public static class Factory extends CompoundFactory<NumericValuesSource> {
+    class Collector implements Aggregator.Collector {
+
+        int ordCounter;
+        LongObjectOpenHashMap<BucketCollector> bucketCollectors;
+
+        Collector() {
+             bucketCollectors = HistogramAggregator.this.bucketCollectors.v();
+        }
+
+        // a reusable list of matched buckets which is used when dealing with multi-valued fields. see #populateMatchedBuckets method
+        private final ReusableGrowableArray<BucketCollector> matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
+
+        @Override
+        public void postCollection() {
+            Object[] values = bucketCollectors.values;
+            for (int i = 0; i < bucketCollectors.allocated.length; i++) {
+                if (bucketCollectors.allocated[i]) {
+                    ((BucketCollector) values[i]).postCollection();
+                }
+            }
+        }
+
+        @Override
+        public void collect(int doc) throws IOException {
+
+            LongValues values = valuesSource.longValues();
+
+            int valuesCount = values.setDocument(doc);
+
+            // nocommit the matched logic could be more efficient if we knew the values are in order
+            matchedBuckets.reset();
+            for (int i = 0; i < valuesCount; ++i) {
+                long value = values.nextValue();
+                long key = rounding.round(value);
+                BucketCollector bucketCollector = bucketCollectors.get(key);
+                if (bucketCollector == null) {
+                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createAggregators(HistogramAggregator.this), ordsCollectors);
+                    bucketCollectors.put(key, bucketCollector);
+                } else if (bucketCollector.matched) {
+                    continue;
+                }
+                bucketCollector.collect(doc);
+                bucketCollector.matched = true;
+                matchedBuckets.add(bucketCollector);
+            }
+            for (int i = 0; i < matchedBuckets.size(); ++i) {
+                matchedBuckets.innerValues()[i].matched = false;
+            }
+        }
+
+
+    }
+
+    /**
+     * A collector for a histogram bucket. This collector counts the number of documents that fall into it,
+     * but also serves as the get context for all the sub addAggregation it contains.
+     */
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+
+        // hacky, but needed for performance. We use this in the #findMatchedBuckets method, to keep track of the buckets
+        // we already matched (we don't want to pick up the same bucket twice). An alternative for this hack would have
+        // been to use a set in that method instead of a list, but that comes with performance costs (every time
+        // a bucket is added to the set it's being hashed and compared to other buckets)
+        boolean matched = false;
+
+        final long key;
+        final Rounding rounding;
+
+        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators, OrdsAggregator.Collector[] leavesCollectors) {
+            super(ord, subAggregators, leavesCollectors);
+            this.key = key;
+            this.rounding = rounding;
+        }
+    }
+
+    public static class Factory extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
 
         private final Rounding rounding;
         private final InternalOrder order;
@@ -108,7 +186,7 @@ public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericVa
 
         public Factory(String name, ValuesSourceConfig<NumericValuesSource> valueSourceConfig,
                        Rounding rounding, InternalOrder order, boolean keyed, boolean computeEmptyBuckets, AbstractHistogramBase.Factory<?> histogramFactory) {
-            super(name, valueSourceConfig);
+            super(name, histogramFactory.type(), valueSourceConfig);
             this.rounding = rounding;
             this.order = order;
             this.keyed = keyed;
@@ -117,13 +195,14 @@ public class HistogramAggregator extends ValuesSourceBucketsAggregator<NumericVa
         }
 
         @Override
-        protected HistogramAggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new HistogramAggregator(name, factories, rounding, order, keyed, computeEmptyBuckets, null, histogramFactory, aggregationContext, parent);
         }
 
         @Override
-        protected HistogramAggregator create(NumericValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
             return new HistogramAggregator(name, factories, rounding, order, keyed, computeEmptyBuckets, valuesSource, histogramFactory, aggregationContext, parent);
         }
+
     }
 }

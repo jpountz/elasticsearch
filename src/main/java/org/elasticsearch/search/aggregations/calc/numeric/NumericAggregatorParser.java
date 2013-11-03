@@ -22,8 +22,8 @@ package org.elasticsearch.search.aggregations.calc.numeric;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.mapper.FieldMapper;
-import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.AggregatorParser;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
+import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.aggregations.context.FieldContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -51,7 +51,7 @@ public class NumericAggregatorParser<S extends NumericAggregation> implements Ag
     }
 
     @Override
-    public Aggregator.Factory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
+    public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 
         ValuesSourceConfig<NumericValuesSource> config = new ValuesSourceConfig<NumericValuesSource>(NumericValuesSource.class);
 

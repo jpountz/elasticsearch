@@ -135,6 +135,12 @@ public class InternalExtendedStats extends InternalStats implements ExtendedStat
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalExtendedStats> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalExtendedStats create(String name) {
             return new InternalExtendedStats(name);

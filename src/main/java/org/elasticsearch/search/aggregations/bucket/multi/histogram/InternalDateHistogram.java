@@ -73,12 +73,17 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
         }
 
         @Override
+        public String type() {
+            return TYPE.name();
+        }
+
+        @Override
         public AbstractHistogramBase<?> create(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
             return new InternalDateHistogram(name, buckets, order, rounding, formatter, keyed);
         }
 
         @Override
-        public AbstractHistogramBase.Bucket createBucket(long key, long docCount, List<InternalAggregation> aggregations) {
+        public AbstractHistogramBase.Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
             return new Bucket(key, docCount, aggregations);
         }
     }

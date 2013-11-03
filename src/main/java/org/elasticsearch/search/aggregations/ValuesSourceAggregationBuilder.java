@@ -1,4 +1,4 @@
-package org.elasticsearch.search.aggregations.bucket;
+package org.elasticsearch.search.aggregations;
 
 import com.google.common.collect.Maps;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * A base class for all bucket aggregation builders that are based on values (either script generated or field data values)
  */
-public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourceBucketAggregationBuilder<B>> extends BucketAggregationBuilder<B> {
+public abstract class ValuesSourceAggregationBuilder<B extends ValuesSourceAggregationBuilder<B>> extends AggregationBuilder<B> {
 
     private String field;
     private String script;
@@ -22,7 +22,7 @@ public abstract class ValuesSourceBucketAggregationBuilder<B extends ValuesSourc
      * @param name  The name of the aggregation.
      * @param type  The type of the aggregation.
      */
-    protected ValuesSourceBucketAggregationBuilder(String name, String type) {
+    protected ValuesSourceAggregationBuilder(String name, String type) {
         super(name, type);
     }
 

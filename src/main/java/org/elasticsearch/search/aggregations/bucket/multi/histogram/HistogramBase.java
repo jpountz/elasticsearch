@@ -20,7 +20,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.search.aggregations.Aggregated;
+import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 import org.elasticsearch.search.aggregations.Aggregation;
 
 import java.util.Comparator;

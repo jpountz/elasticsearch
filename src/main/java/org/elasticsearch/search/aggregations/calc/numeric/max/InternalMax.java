@@ -125,6 +125,12 @@ public class InternalMax extends NumericAggregation.SingleValue implements Max {
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalMax> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalMax create(String name) {
             return new InternalMax(name);

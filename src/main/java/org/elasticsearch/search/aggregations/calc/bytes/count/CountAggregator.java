@@ -22,29 +22,31 @@ package org.elasticsearch.search.aggregations.calc.bytes.count;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
-import org.elasticsearch.search.aggregations.calc.bytes.BytesCalcAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
 
 /**
  * A field data based aggregator that counts the number of values a specific field has within the aggregation context.
  */
-public class CountAggregator extends BytesCalcAggregator {
+public class CountAggregator extends Aggregator {
+
+    private final BytesValuesSource valuesSource;
 
     long count;
 
     public CountAggregator(String name, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
+        this.valuesSource = valuesSource;
     }
 
     @Override
     public Aggregator.Collector collector() {
-        return valuesSource != null ? new Collector(valuesSource) : null;
+        return valuesSource != null ? new Collector() : null;
     }
 
     @Override
@@ -52,16 +54,16 @@ public class CountAggregator extends BytesCalcAggregator {
         return new InternalCount(name, count);
     }
 
-    class Collector extends BytesCalcAggregator.Collector {
+    class Collector implements Aggregator.Collector {
 
         long count;
 
-        Collector(ValuesSource valuesSource) {
-            super(valuesSource, CountAggregator.this);
-        }
-
         @Override
-        protected void collect(int doc, BytesValues values) throws IOException {
+        public void collect(int doc) throws IOException {
+            BytesValues values = valuesSource.bytesValues();
+            if (values == null) {
+                return;
+            }
             int valuesCount = values.setDocument(doc);
             count += valuesCount;
         }
@@ -72,19 +74,19 @@ public class CountAggregator extends BytesCalcAggregator {
         }
     }
 
-    public static class Factory extends ValuesSourceAggregator.Factory<BytesValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory.Normal<BytesValuesSource> {
 
         public Factory(String name, ValuesSourceConfig<BytesValuesSource> valuesSourceBuilder) {
-            super(name, valuesSourceBuilder);
+            super(name, InternalCount.TYPE.name(), valuesSourceBuilder);
         }
 
         @Override
-        protected CountAggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new CountAggregator(name, null, aggregationContext, parent);
         }
 
         @Override
-        protected CountAggregator create(BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
             return new CountAggregator(name, valuesSource, aggregationContext, parent);
         }
     }

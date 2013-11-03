@@ -77,6 +77,11 @@ public class InternalDateRange extends AbstractRangeBase<DateRange.Bucket> imple
     private static class Factory implements AbstractRangeBase.Factory<DateRange.Bucket> {
 
         @Override
+        public String type() {
+            return TYPE.name();
+        }
+
+        @Override
         public AbstractRangeBase<DateRange.Bucket> create(String name, List<DateRange.Bucket> buckets, ValueFormatter formatter, boolean keyed) {
             return new InternalDateRange(name, buckets, formatter, keyed);
         }

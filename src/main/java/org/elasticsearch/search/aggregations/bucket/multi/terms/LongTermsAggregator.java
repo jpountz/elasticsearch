@@ -25,32 +25,33 @@ import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
-
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
 
 /**
  *
  */
-public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
+public class LongTermsAggregator extends MultiBucketAggregator {
 
-    private final List<Aggregator.Factory> factories;
     private final InternalOrder order;
     private final int requiredSize;
+    private final NumericValuesSource valuesSource;
 
     final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
-    public LongTermsAggregator(String name, List<Aggregator.Factory> factories, NumericValuesSource valuesSource,
+    int ordCounter;
+
+    public LongTermsAggregator(String name, AggregatorFactories factories, NumericValuesSource valuesSource,
                                InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
-        this.factories = factories;
+        super(name, factories, 50, aggregationContext, parent);
+        this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
         this.bucketCollectors = aggregationContext.cacheRecycler().longObjectMap(-1);
@@ -73,7 +74,9 @@ public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericVa
             Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
-                    ordered.insertWithOverflow(((LongTermsAggregator.BucketCollector) collectors[i]).buildBucket());
+                    LongTermsAggregator.BucketCollector collector = (LongTermsAggregator.BucketCollector) collectors[i];
+                    LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    ordered.insertWithOverflow(bucket);
                 }
             }
             bucketCollectors.release();
@@ -87,7 +90,9 @@ public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericVa
             boolean[] states = bucketCollectors.v().allocated;
             Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < states.length; i++) {
-                ordered.add(((LongTermsAggregator.BucketCollector) collectors[i]).buildBucket());
+                LongTermsAggregator.BucketCollector collector = (LongTermsAggregator.BucketCollector) collectors[i];
+                LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                ordered.add(bucket);
             }
             bucketCollectors.release();
             return new LongTerms(name, order, valuesSource.formatter(), requiredSize, ordered);
@@ -96,18 +101,22 @@ public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericVa
 
     class Collector implements Aggregator.Collector {
 
+        LongObjectOpenHashMap<BucketCollector> bucketCollectors;
+
+        Collector() {
+            bucketCollectors = LongTermsAggregator.this.bucketCollectors.v();
+        }
+
         @Override
         public void collect(int doc) throws IOException {
-
             LongValues values = valuesSource.longValues();
             int valuesCount = values.setDocument(doc);
-
             for (int i = 0; i < valuesCount; ++i) {
                 long term = values.nextValue();
-                BucketCollector bucket = bucketCollectors.v().get(term);
+                BucketCollector bucket = bucketCollectors.get(term);
                 if (bucket == null) {
-                    bucket = new BucketCollector(valuesSource, term, LongTermsAggregator.this);
-                    bucketCollectors.v().put(term, bucket);
+                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(LongTermsAggregator.this), ordsCollectors);
+                    bucketCollectors.put(term, bucket);
                 }
                 bucket.collect(doc);
             }
@@ -115,8 +124,8 @@ public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericVa
 
         @Override
         public void postCollection() {
-            boolean[] states = bucketCollectors.v().allocated;
-            Object[] collectors = bucketCollectors.v().values;
+            boolean[] states = bucketCollectors.allocated;
+            Object[] collectors = bucketCollectors.values;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     ((LongTermsAggregator.BucketCollector) collectors[i]).postCollection();
@@ -126,24 +135,13 @@ public class LongTermsAggregator extends ValuesSourceBucketsAggregator<NumericVa
 
     }
 
-    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
 
         final long term;
-        long docCount;
 
-        BucketCollector(NumericValuesSource valuesSource, long term, LongTermsAggregator parent) {
-            super(valuesSource, parent.factories, parent);
+        BucketCollector(int ord, long term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+            super(ord, aggregators, ordsCollectors);
             this.term = term;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            docCount++;
-            return true;
-        }
-
-        LongTerms.Bucket buildBucket() {
-            return new LongTerms.Bucket(term, docCount, buildAggregations(subAggregators));
         }
     }
 

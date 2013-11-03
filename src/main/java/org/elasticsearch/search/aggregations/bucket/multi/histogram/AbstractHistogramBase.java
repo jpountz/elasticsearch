@@ -100,9 +100,11 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
 
     public static interface Factory<B extends HistogramBase.Bucket> {
 
-        public AbstractHistogramBase create(String name, List<B> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed);
+        String type();
 
-        public Bucket createBucket(long key, long docCount, List<InternalAggregation> aggregations);
+        AbstractHistogramBase create(String name, List<B> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed);
+
+        Bucket createBucket(long key, long docCount, InternalAggregations aggregations);
 
     }
 

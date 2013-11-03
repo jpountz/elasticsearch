@@ -3,7 +3,7 @@ package org.elasticsearch.search.aggregations.bucket.multi.range;
 import com.google.common.collect.Lists;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.ValuesSourceAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
 
 import java.io.IOException;
@@ -12,7 +12,7 @@ import java.util.List;
 /**
  *
  */
-public abstract class RangeBuilderBase<B extends RangeBuilderBase<B>> extends ValuesSourceBucketAggregationBuilder<B> {
+public abstract class RangeBuilderBase<B extends RangeBuilderBase<B>> extends ValuesSourceAggregationBuilder<B> {
 
     protected static class Range implements ToXContent {
 

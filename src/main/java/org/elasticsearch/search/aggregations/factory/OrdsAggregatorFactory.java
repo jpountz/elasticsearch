@@ -17,31 +17,27 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.calc;
+package org.elasticsearch.search.aggregations.factory;
 
+import org.elasticsearch.search.aggregations.AggregationInitializationException;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.context.ValuesSource;
 
 /**
- *
+ * A factory that knows how to create an {@link org.elasticsearch.search.aggregations.AbstractAggregator} of a specific type.
  */
-public abstract class ValuesSourceCalcAggregator<VS extends ValuesSource> extends ValuesSourceAggregator<VS> {
+public abstract class OrdsAggregatorFactory extends AggregatorFactory {
 
-    public ValuesSourceCalcAggregator(String name, VS valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
+    protected OrdsAggregatorFactory(String name, String type) {
+        super(name, type);
     }
 
-    protected static abstract class Collector<VS extends ValuesSource> implements Aggregator.Collector {
-
-        protected Aggregator aggregator;
-        protected VS valuesSource;
-
-        protected Collector(VS valuesSource, Aggregator aggregator) {
-            this.valuesSource = valuesSource;
-            this.aggregator = aggregator;
-        }
+    @Override
+    public AggregatorFactory subFactories(AggregatorFactories subFactories) {
+        throw new AggregationInitializationException("Aggregator [" + name + "] of type [" + type + "] cannot accept sub-aggregations");
     }
+
+    public abstract OrdsAggregator create(AggregationContext context, Aggregator parent);
 
 }

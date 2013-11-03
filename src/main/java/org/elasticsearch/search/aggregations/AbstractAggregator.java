@@ -20,47 +20,50 @@
 package org.elasticsearch.search.aggregations;
 
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
-
-import java.io.IOException;
 
 /**
  * Instantiated per named get in the request (every get type has a dedicated aggregator). The aggregator
  * handles the aggregation by providing the appropriate collector (see {@link #collector()}), and when the aggregation finishes, it is also used
  * for generating the result aggregation (see {@link #buildAggregation()}).
  */
-public abstract class Aggregator extends AbstractAggregator {
+public abstract class AbstractAggregator {
 
-    protected final AggregatorFactories factories;
-    protected final OrdsAggregator[] ordsAggregators;
+    protected final String name;
+    protected final Aggregator parent;
+    protected final AggregationContext context;
+    protected final int depth;
 
-    protected Aggregator(String name, AggregatorFactories factories, AggregationContext context, Aggregator parent) {
-        super(name, context, parent);
-        this.factories = factories;
-        assert factories != null : "sub-factories provided to BucketAggregator must not be null, use AggragatorFactories.EMPTY instead";
-        this.ordsAggregators = factories.createOrdsAggregators(this);
+    protected AbstractAggregator(String name, AggregationContext context, Aggregator parent) {
+        this.name = name;
+        this.parent = parent;
+        this.context = context;
+        this.depth = parent == null ? 0 : 1 + parent.depth();
     }
 
     /**
-     * @return  The collector what is responsible for the aggregation.
+     * @return  The name of the aggregation.
      */
-    public abstract Collector collector();
-
-    /**
-     * @return  The aggregated & built get.
-     */
-    public abstract InternalAggregation buildAggregation();
-
-    /**
-     * The lucene collector that will be responsible for the aggregation
-     */
-    public static abstract interface Collector {
-
-        public abstract void collect(int doc) throws IOException;
-
-        public abstract void postCollection();
-
+    public String name() {
+        return name;
     }
 
+    /** Return the depth of this aggregator in the aggregation tree. */
+    public final int depth() {
+        return depth;
+    }
+
+    /**
+     * @return  The parent aggregator of this aggregator. The addAggregation are hierarchical in the sense that some can
+     *          be composed out of others (more specifically, bucket addAggregation can define other addAggregation that will
+     *          be aggregated per bucket). This method returns the direct parent aggregator that contains this aggregator, or
+     *          {@code null} if there is none (meaning, this aggregator is a top level one)
+     */
+    public AbstractAggregator parent() {
+        return parent;
+    }
+
+    public AggregationContext context() {
+        return context;
+    }
 
 }

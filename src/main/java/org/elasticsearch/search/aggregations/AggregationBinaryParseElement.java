@@ -22,6 +22,8 @@ package org.elasticsearch.search.aggregations;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.search.aggregations.parser.AggregationParseElement;
+import org.elasticsearch.search.aggregations.parser.AggregatorParsers;
 import org.elasticsearch.search.internal.SearchContext;
 
 /**

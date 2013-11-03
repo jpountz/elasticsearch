@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.search.aggregations.AggregationStreams;
-import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
 
@@ -63,12 +62,17 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
         private Factory() {
         }
 
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         public AbstractHistogramBase<?> create(String name, List<Histogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
             return new InternalHistogram(name, buckets, order, rounding, formatter, keyed);
         }
 
-        public Bucket createBucket(long key, long docCount, List<InternalAggregation> aggregations) {
-            return new Bucket(key, docCount, new InternalAggregations(aggregations));
+        public Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
+            return new Bucket(key, docCount, aggregations);
         }
 
     }

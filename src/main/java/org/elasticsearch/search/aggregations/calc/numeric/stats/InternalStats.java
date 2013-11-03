@@ -214,6 +214,12 @@ public class InternalStats extends NumericAggregation.MultiValue implements Stat
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalStats> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalStats create(String name) {
             return new InternalStats(name);

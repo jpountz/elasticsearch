@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations;
+package org.elasticsearch.search.aggregations.parser;
 
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
@@ -27,7 +28,7 @@ import java.io.IOException;
 /**
  * Parses the aggregation request and creates the appropriate aggregator factory for it.
  *
- * @see {@link Aggregator.Factory}
+ * @see {@link org.elasticsearch.search.aggregations.factory.AggregatorFactory}
 */
 public interface AggregatorParser {
 
@@ -46,6 +47,6 @@ public interface AggregatorParser {
      * @return                  The resolved aggregator factory or {@code null} in case the aggregation should be skipped
      * @throws IOException      When parsing fails
      */
-    Aggregator.Factory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException;
+    AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException;
 
 }

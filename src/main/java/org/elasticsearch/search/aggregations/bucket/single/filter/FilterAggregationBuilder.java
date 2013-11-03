@@ -2,7 +2,7 @@ package org.elasticsearch.search.aggregations.bucket.single.filter;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.query.FilterBuilder;
-import org.elasticsearch.search.aggregations.bucket.BucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
 
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.io.IOException;
 /**
  *
  */
-public class FilterAggregationBuilder extends BucketAggregationBuilder<FilterAggregationBuilder> {
+public class FilterAggregationBuilder extends AggregationBuilder<FilterAggregationBuilder> {
 
     private FilterBuilder filter;
 

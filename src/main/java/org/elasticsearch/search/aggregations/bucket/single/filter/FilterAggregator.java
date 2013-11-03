@@ -24,15 +24,13 @@ import org.apache.lucene.search.Filter;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
-import org.elasticsearch.search.aggregations.AggregationExecutionException;
-import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.*;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  * Aggregate all docs that match a filter.
@@ -47,7 +45,7 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
     public FilterAggregator(String name,
                             org.apache.lucene.search.Filter filter,
-                            List<Aggregator.Factory> factories,
+                            AggregatorFactories factories,
                             AggregationContext aggregationContext,
                             Aggregator parent) {
 
@@ -56,9 +54,10 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    public Collector collector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
+    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        return new Collector(aggregators, ordsAggregators);
     }
+
 
     @Override
     protected InternalAggregation buildAggregation(InternalAggregations aggregations) {
@@ -74,42 +73,34 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
         }
     }
 
-    class Collector extends SingleBucketAggregator.BucketCollector {
+    class Collector extends SingleBucketAggregator.Collector {
 
-        private long docCount;
-
-        Collector(Aggregator[] subAggregators) {
-            super(subAggregators, FilterAggregator.this);
-        }
-
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            if (bits.get(doc)) {
-                docCount++;
-                return true;
-            }
-            return false;
+        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsAggregators);
         }
 
         @Override
-        protected void postCollection(Aggregator[] aggregators) {
+        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
             FilterAggregator.this.docCount = docCount;
         }
 
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return bits.get(doc);
+        }
     }
 
-    public static class Factory extends Aggregator.CompoundFactory {
+    public static class Factory extends AggregatorFactory {
 
         private org.apache.lucene.search.Filter filter;
 
-        public Factory(String name, org.apache.lucene.search.Filter filter) {
-            super(name);
+        public Factory(String name, Filter filter) {
+            super(name, InternalFilter.TYPE.name());
             this.filter = filter;
         }
 
         @Override
-        public FilterAggregator create(AggregationContext context, Aggregator parent) {
+        public Aggregator create(AggregationContext context, Aggregator parent) {
             FilterAggregator aggregator = new FilterAggregator(name, filter, factories, context, parent);
             context.registerReaderContextAware(aggregator);
             return aggregator;

@@ -26,21 +26,22 @@ import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
 import java.util.List;
 
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
-
 /**
  *
  */
-public class GeoDistanceAggregator extends ValuesSourceBucketsAggregator<GeoPointValuesSource> {
+public class GeoDistanceAggregator extends MultiBucketAggregator {
 
     static class DistanceRange {
 
@@ -74,28 +75,34 @@ public class GeoDistanceAggregator extends ValuesSourceBucketsAggregator<GeoPoin
         }
     }
 
-    private final BucketCollector[] collectors;
+    private final BucketCollector[] bucketCollectors;
 
-    public GeoDistanceAggregator(String name, GeoPointValuesSource valuesSource, List<Aggregator.Factory> factories,
+    private final GeoPointValuesSource valuesSource;
+
+    public GeoDistanceAggregator(String name, GeoPointValuesSource valuesSource, AggregatorFactories factories,
                                  List<DistanceRange> ranges, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
-        collectors = new BucketCollector[ranges.size()];
+        super(name, factories, ranges.size(), aggregationContext, parent);
+        this.valuesSource = valuesSource;
+        bucketCollectors = new BucketCollector[ranges.size()];
         int i = 0;
         for (DistanceRange range : ranges) {
-            collectors[i++] = new BucketCollector(range, valuesSource, BucketsAggregator.createSubAggregators(factories, this), this);
+            bucketCollectors[i++] = new BucketCollector(i, range, factories.createAggregators(this), ordsCollectors);
         }
     }
 
     @Override
     public Collector collector() {
-        return valuesSource != null ? new Collector() : null;
+        return valuesSource == null ? null : new Collector();
     }
 
     @Override
     public InternalAggregation buildAggregation() {
-        List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(collectors.length);
-        for (BucketCollector collector : collectors) {
-            buckets.add(collector.buildBucket());
+        List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
+        for (BucketCollector collector : bucketCollectors) {
+            InternalAggregations aggregations = collector.buildAggregations(ordsAggregators);
+            DistanceRange range = collector.range;
+            InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, collector.docCount(), aggregations);
+            buckets.add(bucket);
         }
         return new InternalGeoDistance(name, buckets);
     }
@@ -106,7 +113,7 @@ public class GeoDistanceAggregator extends ValuesSourceBucketsAggregator<GeoPoin
         final IntArrayList matchedList;
 
         Collector() {
-            matched = new boolean[collectors.length];
+            matched = new boolean[bucketCollectors.length];
             matchedList = new IntArrayList(matched.length);
         }
 
@@ -139,63 +146,53 @@ public class GeoDistanceAggregator extends ValuesSourceBucketsAggregator<GeoPoin
         }
 
         private void collect(int doc, GeoPoint value) throws IOException {
-            for (int i = 0; i < collectors.length; ++i) {
-                if (!matched[i] && collectors[i].range.matches(value)) {
+            for (int i = 0; i < bucketCollectors.length; ++i) {
+                if (!matched[i] && bucketCollectors[i].range.matches(value)) {
                     matched[i] = true;
                     matchedList.add(i);
-                    collectors[i].collect(doc);
+                    bucketCollectors[i].collect(doc);
                 }
             }
         }
 
         @Override
         public void postCollection() {
-            for (BucketCollector collector : collectors) {
+            for (BucketCollector collector : bucketCollectors) {
                 collector.postCollection();
             }
         }
     }
 
-    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<GeoPointValuesSource> {
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
 
         private final DistanceRange range;
 
-        long docCount;
-
-        BucketCollector(DistanceRange range, GeoPointValuesSource valuesSource, Aggregator[] subAggregators, Aggregator aggregator) {
-            super(valuesSource, subAggregators, aggregator);
+        BucketCollector(int ord, DistanceRange range, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+            super(ord, aggregators, ordsCollectors);
             this.range = range;
         }
 
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            docCount++;
-            return true;
-        }
-
-        InternalGeoDistance.Bucket buildBucket() {
-            return new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCount, buildAggregations(subAggregators));
-        }
     }
 
-    public static class Factory extends CompoundFactory<GeoPointValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory.Normal<GeoPointValuesSource> {
 
         private final List<DistanceRange> ranges;
 
         public Factory(String name, ValuesSourceConfig<GeoPointValuesSource> valueSourceConfig, List<DistanceRange> ranges) {
-            super(name, valueSourceConfig);
+            super(name, InternalGeoDistance.TYPE.name(), valueSourceConfig);
             this.ranges = ranges;
         }
 
         @Override
-        protected GeoDistanceAggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new GeoDistanceAggregator(name, null, factories, ranges, aggregationContext, parent);
         }
 
         @Override
-        protected GeoDistanceAggregator create(GeoPointValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(GeoPointValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
             return new GeoDistanceAggregator(name, valuesSource, factories, ranges, aggregationContext, parent);
         }
+
     }
 
 }

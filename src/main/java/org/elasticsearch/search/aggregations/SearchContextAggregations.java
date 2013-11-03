@@ -20,32 +20,29 @@
 package org.elasticsearch.search.aggregations;
 
 import org.elasticsearch.search.aggregations.context.AggregationContext;
-
-import java.util.List;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 /**
  * The aggregation context that is part of the search context.
  */
 public class SearchContextAggregations {
 
-    private final List<Aggregator.Factory> factories;
-    private List<Aggregator> aggregators;
+    private final AggregatorFactories factories;
+    private Aggregator[] aggregators;
     private AggregationContext aggregationContext;
 
     /**
-     * Creates a new aggregation context with all parsed aggregator factories
-     *
-     * @param factories The parsed aggregator factories
+     * Creates a new aggregation context with the parsed aggregator factories
      */
-    public SearchContextAggregations(List<Aggregator.Factory> factories) {
+    public SearchContextAggregations(AggregatorFactories factories) {
         this.factories = factories;
     }
 
-    public List<Aggregator.Factory> factories() {
+    public AggregatorFactories factories() {
         return factories;
     }
 
-    public List<Aggregator> aggregators() {
+    public Aggregator[] aggregators() {
         return aggregators;
     }
 
@@ -62,7 +59,7 @@ public class SearchContextAggregations {
      *
      * @param aggregators The top level aggregators of the search execution.
      */
-    public void aggregators(List<Aggregator> aggregators) {
+    public void aggregators(Aggregator[] aggregators) {
         this.aggregators = aggregators;
     }
 

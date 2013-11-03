@@ -22,90 +22,84 @@ package org.elasticsearch.search.aggregations.bucket.single.missing;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.ValuesSourceAggregator;
-import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  *
  */
-public class MissingAggregator extends ValuesSourceBucketsAggregator {
+public class MissingAggregator extends SingleBucketAggregator {
 
-    private final Aggregator[] subAggregators;
+    private ValuesSource valuesSource;
 
     long docCount;
 
-    public MissingAggregator(String name, List<Aggregator.Factory> factories, ValuesSource valuesSource,
+    public MissingAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                              AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
-        this.subAggregators = BucketsAggregator.createSubAggregators(factories, this);
+        super(name, factories, aggregationContext, parent);
+        this.valuesSource = valuesSource;
     }
 
     @Override
-    public Aggregator.Collector collector() {
-        return valuesSource != null ? new Collector(valuesSource, subAggregators) : new AllMissingCollector(subAggregators, this);
+    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        return valuesSource != null ? new Collector(aggregators, ordsAggregators) : new AllMissingCollector(aggregators, ordsAggregators);
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
-        return new InternalMissing(name, docCount, BucketsAggregator.buildAggregations(subAggregators));
+    protected InternalAggregation buildAggregation(InternalAggregations aggregations) {
+        return new InternalMissing(name, docCount, aggregations);
     }
 
-    class Collector extends ValuesSourceBucketsAggregator.BucketCollector {
+    class Collector extends SingleBucketAggregator.Collector {
 
-        private long docCount;
-
-        Collector(ValuesSource valuesSource, Aggregator[] subAggregators) {
-            super(valuesSource, subAggregators, MissingAggregator.this);
+        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsAggregators);
         }
 
         @Override
         protected boolean onDoc(int doc) throws IOException {
             BytesValues values = valuesSource.bytesValues();
             if (values.setDocument(doc) == 0) {
-                docCount++;
                 return true;
             }
             return false;
         }
 
         @Override
-        protected void doPostCollection() {
+        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
             MissingAggregator.this.docCount = docCount;
         }
     }
 
-    public class AllMissingCollector extends BucketsAggregator.BucketCollector {
+    public class AllMissingCollector extends SingleBucketAggregator.Collector {
 
-        private long docCount;
-
-        public AllMissingCollector(Aggregator[] subAggregators, Aggregator aggregator) {
-            super(subAggregators, aggregator);
+        AllMissingCollector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsAggregators);
         }
 
         @Override
         protected boolean onDoc(int doc) throws IOException {
-            docCount++;
             return true;
         }
 
         @Override
-        protected void postCollection(Aggregator[] aggregators) {
+        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
             MissingAggregator.this.docCount = docCount;
         }
-
     }
 
-    public static class Factory extends ValuesSourceAggregator.CompoundFactory<ValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory.Normal {
 
-        public Factory(String name, ValuesSourceConfig<? extends ValuesSource> valueSourceConfig) {
-            super(name, valueSourceConfig);
+        public Factory(String name, ValuesSourceConfig valueSourceConfig) {
+            super(name, InternalMissing.TYPE.name(), valueSourceConfig);
         }
 
         @Override

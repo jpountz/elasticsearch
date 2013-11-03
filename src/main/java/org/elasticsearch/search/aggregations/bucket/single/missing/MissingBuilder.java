@@ -1,14 +1,14 @@
 package org.elasticsearch.search.aggregations.bucket.single.missing;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.BucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 
 import java.io.IOException;
 
 /**
  *
  */
-public class MissingBuilder extends BucketAggregationBuilder<MissingBuilder> {
+public class MissingBuilder extends AggregationBuilder<MissingBuilder> {
 
     private String field;
 

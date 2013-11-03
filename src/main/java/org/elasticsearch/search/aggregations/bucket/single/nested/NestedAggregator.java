@@ -29,15 +29,13 @@ import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
-import org.elasticsearch.search.aggregations.AggregationExecutionException;
-import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.*;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  *
@@ -52,7 +50,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
     private long docCount;
 
-    public NestedAggregator(String name, List<Aggregator.Factory> factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
+    public NestedAggregator(String name, AggregatorFactories factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
         super(name, factories, aggregationContext, parent);
         MapperService.SmartNameObjectMapper mapper = aggregationContext.searchContext().smartNameObjectMapper(nestedPath);
         if (mapper == null) {
@@ -72,8 +70,8 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    protected Collector collector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
+    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        return new Collector(aggregators, ordsAggregators);
     }
 
     @Override
@@ -97,26 +95,14 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector extends SingleBucketAggregator.Collector {
 
-        private final Aggregator.Collector[] collectors;
-
-        private long docCount;
-
-        public Collector(Aggregator[] subAggregators) {
-            this.collectors = new Aggregator.Collector[subAggregators.length];
-            for (int i = 0; i < subAggregators.length; i++) {
-                collectors[i] = subAggregators[i].collector();
-            }
+        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsAggregators);
         }
 
         @Override
-        public final void postCollection() {
-            for (int i = 0; i < collectors.length; i++) {
-                if (collectors[i] != null) {
-                    collectors[i].postCollection();
-                }
-            }
+        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
             NestedAggregator.this.docCount = docCount;
         }
 
@@ -128,30 +114,33 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
             int prevParentDoc = parentDocs.prevSetBit(parentDoc - 1);
             for (int i = (parentDoc - 1); i > prevParentDoc; i--) {
                 if (childDocs.get(i)) {
-                    docCount++;
-                    for (int j = 0; j < collectors.length; j++) {
-                        if (collectors[j] != null) {
-                            collectors[j].collect(i);
-                        }
-                    }
+                    super.collect(i);
                 }
             }
         }
 
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            // this will always be called for every nested (we make sure of that in the #collect method above)
+            return true;
+        }
+
     }
 
-    public static class Factory extends Aggregator.CompoundFactory {
+    public static class Factory extends AggregatorFactory {
 
         private final String path;
 
         public Factory(String name, String path) {
-            super(name);
+            super(name, InternalNested.TYPE.name());
             this.path = path;
         }
 
         @Override
-        public NestedAggregator create(AggregationContext context, Aggregator parent) {
+        public Aggregator create(AggregationContext context, Aggregator parent) {
             return new NestedAggregator(name, factories, path, context, parent);
         }
+
     }
 }

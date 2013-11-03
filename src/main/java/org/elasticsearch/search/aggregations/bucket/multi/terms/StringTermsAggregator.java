@@ -27,36 +27,35 @@ import org.elasticsearch.common.lucene.HashedBytesRef;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
-
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
 
 /**
  * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
  */
-public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
+public class StringTermsAggregator extends MultiBucketAggregator {
 
-    private final List<Aggregator.Factory> factories;
+    private final ValuesSource valuesSource;
     private final InternalOrder order;
     private final int requiredSize;
 
-    Recycler.V<ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector>> buckets;
+    Recycler.V<ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector>> bucketCollectors;
 
-    public StringTermsAggregator(String name, List<Aggregator.Factory> factories, ValuesSource valuesSource,
+    public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
 
-        super(name, valuesSource, aggregationContext, parent);
-        this.factories = factories;
+        super(name, factories, 50, aggregationContext, parent);
+        this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
-        buckets = aggregationContext.cacheRecycler().hashMap(-1);
+        bucketCollectors = aggregationContext.cacheRecycler().hashMap(-1);
     }
 
     @Override
@@ -67,20 +66,22 @@ public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
     @Override
     public StringTerms buildAggregation() {
 
-        if (buckets.v().isEmpty()) {
+        if (bucketCollectors.v().isEmpty()) {
             return new StringTerms(name, order, requiredSize, ImmutableList.<InternalTerms.Bucket>of());
         }
 
         if (requiredSize < EntryPriorityQueue.LIMIT) {
             BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
-            boolean[] allocated = buckets.v().allocated;
-            Object[] collectors = buckets.v().values;
+            boolean[] allocated = bucketCollectors.v().allocated;
+            Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < allocated.length; i++) {
                 if (allocated[i]) {
-                    ordered.insertWithOverflow(((BucketCollector) collectors[i]).buildBucket());
+                    BucketCollector collector = (BucketCollector) collectors[i];
+                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    ordered.insertWithOverflow(bucket);
                 }
             }
-            buckets.release();
+            bucketCollectors.release();
             InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
             for (int i = ordered.size() - 1; i >= 0; i--) {
                 list[i] = (StringTerms.Bucket) ordered.pop();
@@ -88,14 +89,16 @@ public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
             return new StringTerms(name, order, requiredSize, Arrays.asList(list));
         } else {
             BoundedTreeSet<InternalTerms.Bucket> ordered = new BoundedTreeSet<InternalTerms.Bucket>(order.comparator(), requiredSize);
-            boolean[] allocated = buckets.v().allocated;
-            Object[] collectors = buckets.v().values;
+            boolean[] allocated = bucketCollectors.v().allocated;
+            Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < allocated.length; i++) {
                 if (allocated[i]) {
-                    ordered.add(((BucketCollector) collectors[i]).buildBucket());
+                    BucketCollector collector = (BucketCollector) collectors[i];
+                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    ordered.add(bucket);
                 }
             }
-            buckets.release();
+            bucketCollectors.release();
             return new StringTerms(name, order, requiredSize, ordered);
         }
     }
@@ -103,6 +106,8 @@ public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
     class Collector implements Aggregator.Collector {
 
         private HashedBytesRef scratch = new HashedBytesRef(new BytesRef());
+
+        int ordCounter;
 
         @Override
         public void collect(int doc) throws IOException {
@@ -112,11 +117,11 @@ public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
             for (int i = 0; i < valuesCount; ++i) {
                 scratch.bytes = values.nextValue();
                 scratch.hash = values.currentValueHash();
-                BucketCollector bucket = buckets.v().get(scratch);
+                BucketCollector bucket = bucketCollectors.v().get(scratch);
                 if (bucket == null) {
                     HashedBytesRef put = scratch.deepCopy();
-                    bucket = new BucketCollector(valuesSource, put.bytes, factories, StringTermsAggregator.this);
-                    buckets.v().put(put, bucket);
+                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createAggregators(StringTermsAggregator.this), ordsCollectors);
+                    bucketCollectors.v().put(put, bucket);
                 }
                 bucket.collect(doc);
             }
@@ -124,36 +129,24 @@ public class StringTermsAggregator extends ValuesSourceBucketsAggregator {
 
         @Override
         public void postCollection() {
-            boolean[] states = buckets.v().allocated;
-            Object[] collectors = buckets.v().values;
+            boolean[] states = bucketCollectors.v().allocated;
+            Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     ((BucketCollector) collectors[i]).postCollection();
                 }
             }
-            StringTermsAggregator.this.buckets = buckets;
+            StringTermsAggregator.this.bucketCollectors = bucketCollectors;
         }
     }
 
-    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector {
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
 
         final BytesRef term;
 
-        long docCount;
-
-        BucketCollector(ValuesSource valuesSource, BytesRef term, List<Aggregator.Factory> factories, Aggregator aggregator) {
-            super(valuesSource, factories, aggregator);
+        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+            super(ord, aggregators, ordsCollectors);
             this.term = term;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            docCount++;
-            return true;
-        }
-
-        StringTerms.Bucket buildBucket() {
-            return new StringTerms.Bucket(term, docCount, buildAggregations(subAggregators));
         }
     }
 

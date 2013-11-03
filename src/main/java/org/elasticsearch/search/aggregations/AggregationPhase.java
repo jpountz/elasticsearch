@@ -34,6 +34,7 @@ import org.elasticsearch.search.SearchParseElement;
 import org.elasticsearch.search.SearchPhase;
 import org.elasticsearch.search.aggregations.bucket.single.global.GlobalAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.parser.AggregationParseElement;
 import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.search.query.QueryPhaseExecutionException;
 
@@ -74,15 +75,14 @@ public class AggregationPhase implements SearchPhase {
         if (context.aggregations() != null) {
             AggregationContext aggregationContext = new AggregationContext(context);
             context.aggregations().aggregationContext(aggregationContext);
+
             List<Aggregator.Collector> collectors = new ArrayList<Aggregator.Collector>();
-            List<Aggregator> aggregators = new ArrayList<Aggregator>(context.aggregations().factories().size());
-            for (Aggregator.Factory factory : context.aggregations().factories()) {
-                Aggregator aggregator = factory.create(aggregationContext, null);
-                aggregators.add(aggregator);
-                if (!(aggregator instanceof GlobalAggregator)) {
-                    Aggregator.Collector collector = aggregator.collector();
+            Aggregator[] aggregators = context.aggregations().factories().createTopLevelAggregators(aggregationContext);
+            for (int i = 0; i < aggregators.length; i++) {
+                if (!(aggregators[i] instanceof GlobalAggregator)) {
+                    Aggregator.Collector collector = aggregators[i].collector();
                     if (collector != null) {
-                        collectors.add(aggregator.collector());
+                        collectors.add(collector);
                     }
                 }
             }
@@ -104,10 +104,11 @@ public class AggregationPhase implements SearchPhase {
             return;
         }
 
+        Aggregator[] aggregators = context.aggregations().aggregators();
         List<Aggregator.Collector> globals = new ArrayList<Aggregator.Collector>();
-        for (Aggregator aggregator : context.aggregations().aggregators()) {
-            if (aggregator instanceof GlobalAggregator) {
-                globals.add(aggregator.collector());
+        for (int i = 0; i < aggregators.length; i++) {
+            if (aggregators[i] instanceof GlobalAggregator) {
+                globals.add(aggregators[i].collector());
             }
         }
 
@@ -127,7 +128,7 @@ public class AggregationPhase implements SearchPhase {
             collector.postCollection();
         }
 
-        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(context.aggregations().aggregators().size());
+        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length);
         for (Aggregator aggregator : context.aggregations().aggregators()) {
             aggregations.add(aggregator.buildAggregation());
         }

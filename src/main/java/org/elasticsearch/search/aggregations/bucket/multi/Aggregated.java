@@ -17,9 +17,10 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations;
+package org.elasticsearch.search.aggregations.bucket.multi;
 
 import org.elasticsearch.ElasticSearchIllegalArgumentException;
+import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.calc.CalcAggregation;
 
 /**

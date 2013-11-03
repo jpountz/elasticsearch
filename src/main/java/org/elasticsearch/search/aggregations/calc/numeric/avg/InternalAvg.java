@@ -131,6 +131,12 @@ public class InternalAvg extends NumericAggregation.SingleValue implements Avg {
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalAvg> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalAvg create(String name) {
             return new InternalAvg(name);

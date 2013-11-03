@@ -21,19 +21,19 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 /**
  *
  */
-public class UnmappedTermsAggregator extends BucketsAggregator {
+public class UnmappedTermsAggregator extends Aggregator {
 
     private final InternalOrder order;
     private final int requiredSize;
 
     public UnmappedTermsAggregator(String name, InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
         this.order = order;
         this.requiredSize = requiredSize;
     }

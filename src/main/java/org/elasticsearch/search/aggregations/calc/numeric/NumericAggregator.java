@@ -21,21 +21,23 @@ package org.elasticsearch.search.aggregations.calc.numeric;
 
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.calc.ValuesSourceCalcAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
 
 /**
  *
  */
-public class NumericAggregator<A extends NumericAggregation> extends ValuesSourceCalcAggregator<NumericValuesSource> {
+public class NumericAggregator<A extends NumericAggregation> extends Aggregator {
 
     protected final NumericAggregation.Factory<A> aggregationFactory;
+    protected final NumericValuesSource valuesSource;
 
-    A stats;
+    protected final A stats;
 
     public NumericAggregator(String name,
                              NumericValuesSource valuesSource,
@@ -43,34 +45,25 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
                              AggregationContext aggregationContext,
                              Aggregator parent) {
 
-        super(name, valuesSource, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
         this.aggregationFactory = aggregationFactory;
+        this.valuesSource = valuesSource;
+        this.stats = valuesSource == null ? aggregationFactory.createUnmapped(name) : aggregationFactory.create(name);
     }
 
     @Override
     public Collector collector() {
-        if (valuesSource == null) {
-            return null;
-        }
-        A stats = aggregationFactory.create(name);
-        return new Collector(valuesSource, stats);
+        return valuesSource != null ? new Collector() : null;
     }
 
     @Override
     public NumericAggregation buildAggregation() {
-        return stats != null ? stats : aggregationFactory.createUnmapped(name);
+        return stats;
     }
 
     //========================================= Collector ===============================================//
 
-    class Collector extends ValuesSourceCalcAggregator.Collector<NumericValuesSource> {
-
-        private A stats;
-
-        Collector(NumericValuesSource valuesSource, A stats) {
-            super(valuesSource, NumericAggregator.this);
-            this.stats = stats;
-        }
+    class Collector implements Aggregator.Collector {
 
         @Override
         public void collect(int doc) throws IOException {
@@ -81,7 +74,6 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
             }
 
             int valuesCount = values.setDocument(doc);
-
             for (int i = 0; i < valuesCount; i++) {
                 stats.collect(doc, values.nextValue());
             }
@@ -89,30 +81,30 @@ public class NumericAggregator<A extends NumericAggregation> extends ValuesSourc
 
         @Override
         public void postCollection() {
-            NumericAggregator.this.stats = stats;
         }
     }
 
     //============================================== Factory ===============================================//
 
-    public static class Factory<A extends NumericAggregation> extends ValuesSourceCalcAggregator.Factory<NumericValuesSource> {
+    public static class Factory<A extends NumericAggregation> extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
 
         private final NumericAggregation.Factory<A> aggregationFactory;
 
         public Factory(String name, ValuesSourceConfig<NumericValuesSource> valuesSourceConfig, NumericAggregation.Factory<A> aggregationFactory) {
-            super(name, valuesSourceConfig);
+            super(name, aggregationFactory.type(), valuesSourceConfig);
             this.aggregationFactory = aggregationFactory;
         }
 
         @Override
-        protected NumericAggregator<A> createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new NumericAggregator<A>(name, null, aggregationFactory, aggregationContext, parent);
         }
 
         @Override
-        protected NumericAggregator<A> create(NumericValuesSource vs, AggregationContext aggregationContext, Aggregator parent) {
-            return new NumericAggregator<A>(name, vs, aggregationFactory, aggregationContext, parent);
+        protected Aggregator create(NumericValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+            return new NumericAggregator<A>(name, valuesSource, aggregationFactory, aggregationContext, parent);
         }
+
     }
 
 }
