@@ -22,11 +22,13 @@ package org.elasticsearch.search.aggregations.bucket.single.global;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
  *
@@ -35,13 +37,13 @@ public class GlobalAggregator extends SingleBucketAggregator {
 
     long docCount;
 
-    public GlobalAggregator(String name, List<Aggregator.Factory> factories, AggregationContext aggregationContext) {
-        super(name, factories, aggregationContext, null);
+    public GlobalAggregator(String name, AggregatorFactories subFactories, AggregationContext aggregationContext) {
+        super(name, subFactories, aggregationContext, null);
     }
 
     @Override
-    public Collector collector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
+    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+        return new Collector(aggregators, ordsAggregators);
     }
 
     @Override
@@ -49,30 +51,27 @@ public class GlobalAggregator extends SingleBucketAggregator {
         return new InternalGlobal(name, docCount, aggregations);
     }
 
-    class Collector extends BucketCollector {
+    class Collector extends SingleBucketAggregator.Collector {
 
-        long docCount;
-
-        Collector(Aggregator[] subAggregators) {
-            super(subAggregators, GlobalAggregator.this);
+        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsAggregators);
         }
 
         @Override
         protected boolean onDoc(int doc) throws IOException {
-            docCount++;
             return true;
         }
 
         @Override
-        protected void postCollection(Aggregator[] aggregators) {
+        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
             GlobalAggregator.this.docCount = docCount;
         }
     }
 
-    public static class Factory extends Aggregator.CompoundFactory {
+    public static class Factory extends AggregatorFactory {
 
         public Factory(String name) {
-            super(name);
+            super(name, InternalGlobal.TYPE.name());
         }
 
         @Override

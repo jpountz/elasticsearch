@@ -1,7 +1,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.ValuesSourceAggregationBuilder;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -9,7 +9,7 @@ import java.util.Locale;
 /**
  *
  */
-public class TermsBuilder extends ValuesSourceBucketAggregationBuilder<TermsBuilder> {
+public class TermsBuilder extends ValuesSourceAggregationBuilder<TermsBuilder> {
 
     private int size = -1;
     private Terms.ValueType valueType;

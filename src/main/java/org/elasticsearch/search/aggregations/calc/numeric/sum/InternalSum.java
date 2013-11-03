@@ -123,6 +123,12 @@ public class InternalSum extends NumericAggregation.SingleValue implements Sum {
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalSum> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalSum create(String name) {
             return new InternalSum(name);

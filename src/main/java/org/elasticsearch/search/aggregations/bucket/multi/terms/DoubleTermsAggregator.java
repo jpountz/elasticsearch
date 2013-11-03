@@ -25,32 +25,33 @@ import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
 import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
-
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
 
 /**
  *
  */
-public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
+public class DoubleTermsAggregator extends MultiBucketAggregator {
 
-    private final List<Aggregator.Factory> factories;
     private final InternalOrder order;
     private final int requiredSize;
+    private final NumericValuesSource valuesSource;
 
     Recycler.V<DoubleObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
-    public DoubleTermsAggregator(String name, List<Aggregator.Factory> factories, NumericValuesSource valuesSource,
+    private int ordCounter;
+
+    public DoubleTermsAggregator(String name, AggregatorFactories factories, NumericValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, valuesSource, aggregationContext, parent);
-        this.factories = factories;
+        super(name, factories, 50, aggregationContext, parent);
+        this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
         this.bucketCollectors = aggregationContext.cacheRecycler().doubleObjectMap(-1);
@@ -74,7 +75,9 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
             boolean[] states = bucketCollectors.v().allocated;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
-                    ordered.insertWithOverflow(((BucketCollector) collectors[i]).buildBucket());
+                    BucketCollector collector = (BucketCollector) collectors[i];
+                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    ordered.insertWithOverflow(bucket);
                 }
             }
             bucketCollectors.release();
@@ -89,7 +92,9 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
             boolean[] states = bucketCollectors.v().allocated;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
-                    ordered.add(((BucketCollector) collectors[i]).buildBucket());
+                    BucketCollector collector = (BucketCollector) collectors[i];
+                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    ordered.add(bucket);
                 }
             }
             bucketCollectors.release();
@@ -99,6 +104,12 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
 
     class Collector implements Aggregator.Collector {
 
+        DoubleObjectOpenHashMap<BucketCollector> bucketCollectors;
+
+        Collector() {
+            this.bucketCollectors = DoubleTermsAggregator.this.bucketCollectors.v();
+        }
+
         @Override
         public void collect(int doc) throws IOException {
 
@@ -107,10 +118,10 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
 
             for (int i = 0; i < valuesCount; ++i) {
                 double term = values.nextValue();
-                BucketCollector bucket = bucketCollectors.v().get(term);
+                BucketCollector bucket = bucketCollectors.get(term);
                 if (bucket == null) {
-                    bucket = new BucketCollector(valuesSource, term, DoubleTermsAggregator.this);
-                    bucketCollectors.v().put(term, bucket);
+                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(DoubleTermsAggregator.this), ordsCollectors);
+                    bucketCollectors.put(term, bucket);
                 }
                 bucket.collect(doc);
             }
@@ -119,8 +130,8 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
 
         @Override
         public void postCollection() {
-            Object[] collectors = bucketCollectors.v().values;
-            boolean[] states = bucketCollectors.v().allocated;
+            Object[] collectors = bucketCollectors.values;
+            boolean[] states = bucketCollectors.allocated;
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     ((BucketCollector) collectors[i]).postCollection();
@@ -129,25 +140,13 @@ public class DoubleTermsAggregator extends ValuesSourceBucketsAggregator<Numeric
         }
     }
 
-    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
 
         final double term;
 
-        long docCount;
-
-        BucketCollector(NumericValuesSource valuesSource, double term, DoubleTermsAggregator parent) {
-            super(valuesSource, parent.factories, parent);
+        BucketCollector(int ord, double term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+            super(ord, aggregators, ordsCollectors);
             this.term = term;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            docCount++;
-            return true;
-        }
-
-        DoubleTerms.Bucket buildBucket() {
-            return new DoubleTerms.Bucket(term, docCount, buildAggregations(subAggregators));
         }
     }
 

@@ -60,6 +60,11 @@ public class InternalRange extends AbstractRangeBase<Range.Bucket> implements Ra
     public static class Factory implements AbstractRangeBase.Factory<Range.Bucket> {
 
         @Override
+        public String type() {
+            return TYPE.name();
+        }
+
+        @Override
         public AbstractRangeBase<Range.Bucket> create(String name, List<Range.Bucket> ranges, ValueFormatter formatter, boolean keyed) {
             return new InternalRange(name, ranges, formatter, keyed);
         }

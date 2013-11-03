@@ -36,7 +36,7 @@ import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.query.FilterBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 import org.elasticsearch.search.facet.FacetBuilder;
 import org.elasticsearch.search.fetch.source.FetchSourceContext;
 import org.elasticsearch.search.highlight.HighlightBuilder;
@@ -105,7 +105,7 @@ public class SearchSourceBuilder implements ToXContent {
     private List<FacetBuilder> facets;
     private BytesReference facetsBinary;
 
-    private List<AggregationBuilder> aggregations;
+    private List<AbstractAggregationBuilder> aggregations;
     private BytesReference aggregationsBinary;
 
 
@@ -400,7 +400,7 @@ public class SearchSourceBuilder implements ToXContent {
     /**
      * Add an get to perform as part of the search.
      */
-    public SearchSourceBuilder aggregation(AggregationBuilder aggregation) {
+    public SearchSourceBuilder aggregation(AbstractAggregationBuilder aggregation) {
         if (aggregations == null) {
             aggregations = Lists.newArrayList();
         }
@@ -849,7 +849,7 @@ public class SearchSourceBuilder implements ToXContent {
         if (aggregations != null) {
             builder.field("aggregations");
             builder.startObject();
-            for (AggregationBuilder aggregation : aggregations) {
+            for (AbstractAggregationBuilder aggregation : aggregations) {
                 aggregation.toXContent(builder, params);
             }
             builder.endObject();

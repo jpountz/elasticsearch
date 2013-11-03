@@ -17,11 +17,14 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations;
+package org.elasticsearch.search.aggregations.parser;
 
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.search.SearchParseElement;
+import org.elasticsearch.search.aggregations.SearchContextAggregations;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.util.List;
@@ -60,7 +63,7 @@ public class AggregationParseElement implements SearchParseElement {
 
     @Override
     public void parse(XContentParser parser, SearchContext context) throws Exception {
-        List<Aggregator.Factory> factories = aggregatorParsers.parseAggregators(parser, context);
+        AggregatorFactories factories = aggregatorParsers.parseAggregators(parser, context);
         context.aggregations(new SearchContextAggregations(factories));
     }
 }

@@ -1,7 +1,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.ValuesSourceAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
 
 import java.io.IOException;
@@ -9,7 +9,7 @@ import java.io.IOException;
 /**
  *
  */
-public class HistogramBuilder extends ValuesSourceBucketAggregationBuilder<HistogramBuilder> {
+public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBuilder> {
 
     private Long interval;
     private HistogramBase.Order order;

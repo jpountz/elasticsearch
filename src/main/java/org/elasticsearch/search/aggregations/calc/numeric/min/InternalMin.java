@@ -126,6 +126,12 @@ public class InternalMin extends NumericAggregation.SingleValue implements Min {
     }
 
     public static class Factory implements NumericAggregation.Factory<InternalMin> {
+
+        @Override
+        public String type() {
+            return TYPE.name();
+        }
+
         @Override
         public InternalMin create(String name) {
             return new InternalMin(name);

@@ -6,7 +6,7 @@ import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.BucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
 
 import java.io.IOException;
@@ -16,7 +16,7 @@ import java.util.Locale;
 /**
  *
  */
-public class GeoDistanceBuilder extends BucketAggregationBuilder<GeoDistanceBuilder> {
+public class GeoDistanceBuilder extends AggregationBuilder<GeoDistanceBuilder> {
 
     public static class Range implements ToXContent {
 

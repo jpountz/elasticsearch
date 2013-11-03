@@ -19,22 +19,20 @@
 
 package org.elasticsearch.search.aggregations.bucket.single;
 
-import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
+import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * A bucket aggregator that creates a single bucket
  */
-public abstract class SingleBucketAggregator extends BucketsAggregator {
+public abstract class SingleBucketAggregator extends Aggregator {
 
-    // since we only have one bucket we can eagerly initialize the sub-aggregators
-
-    private final Aggregator[] subAggregators;
+    private final Aggregator[] aggregators;
 
     /**
      * Constructs a new single bucket aggregator.
@@ -44,36 +42,60 @@ public abstract class SingleBucketAggregator extends BucketsAggregator {
      * @param aggregationContext    The aggregation context.
      * @param parent                The parent aggregator of this aggregator.
      */
-    protected SingleBucketAggregator(String name, List<Aggregator.Factory> factories,
+    protected SingleBucketAggregator(String name, AggregatorFactories factories,
                                      AggregationContext aggregationContext, Aggregator parent) {
-        super(name, aggregationContext, parent);
-        subAggregators = createSubAggregators(factories, this);
+        super(name, factories, aggregationContext, parent);
+        aggregators = factories.createAggregators(this);
     }
 
     @Override
-    public final Collector collector() {
-        return collector(subAggregators);
+    public final Aggregator.Collector collector() {
+        return collector(aggregators, ordsAggregators);
     }
 
-    /**
-     * Creates the collector for this aggregator with the given sub-aggregators (for the single bucket)
-     *
-     * @param aggregators   The sub-aggregators
-     * @return              The collector
-     */
-    protected abstract Collector collector(Aggregator[] aggregators);
+    protected abstract Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators);
 
     @Override
     public final InternalAggregation buildAggregation() {
-        return buildAggregation(buildAggregations(subAggregators));
+        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length + ordsAggregators.length);
+        for (int i = 0; i < aggregators.length; i++) {
+            aggregations.add(aggregators[i].buildAggregation());
+        }
+        for (int i = 0; i < ordsAggregators.length; i++) {
+            aggregations.add(ordsAggregators[i].buildAggregation(0));
+        }
+        return buildAggregation(new InternalAggregations(aggregations));
     }
 
-    /**
-     * Builds the aggregation of this aggregator, with the given sub-aggregations.
-     *
-     * @param aggregations  The already built sub-aggregations that are associated with the single bucket of this aggregator.
-     * @return              The created aggregation.
-     */
     protected abstract InternalAggregation buildAggregation(InternalAggregations aggregations);
+
+    protected static abstract class Collector extends BucketCollector {
+
+        private final OrdsAggregator[] ordsAggregators;
+
+        public Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(aggregators, ordsCollectors(ordsAggregators));
+            this.ordsAggregators = ordsAggregators;
+        }
+
+        @Override
+        protected void postCollection(Aggregator[] aggregators, long docCount) {
+            for (int i = 0; i < ordsCollectors.length; i++) {
+                ordsCollectors[i].postCollection();
+            }
+            postCollection(aggregators, ordsAggregators, docCount);
+        }
+
+        protected abstract void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount);
+
+
+        private static OrdsAggregator.Collector[] ordsCollectors(OrdsAggregator[] aggregators) {
+            OrdsAggregator.Collector[] collectors = new OrdsAggregator.Collector[aggregators.length];
+            for (int i = 0; i < aggregators.length; i++) {
+                collectors[i] = aggregators[i].collector(0);
+            }
+            return collectors;
+        }
+    }
 
 }

@@ -17,33 +17,20 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.bucket.multi.geo.distance;
+package org.elasticsearch.search.aggregations;
 
-import org.elasticsearch.common.unit.DistanceUnit;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
-import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.bucket.multi.Bucket;
-
-import java.util.List;
+import org.elasticsearch.ElasticSearchException;
 
 /**
- *
+ * Thrown when failing to execute an aggregation
  */
-public interface GeoDistance extends Aggregation, Iterable<GeoDistance.Bucket> {
+public class AggregationInitializationException extends ElasticSearchException {
 
-    public static interface Bucket extends org.elasticsearch.search.aggregations.bucket.multi.Bucket {
-
-        String getKey();
-
-        DistanceUnit getUnit();
-
-        double getFrom();
-
-        double getTo();
-
+    public AggregationInitializationException(String msg) {
+        super(msg);
     }
 
-    List<Bucket> buckets();
-
-    Bucket getByKey(String key);
+    public AggregationInitializationException(String msg, Throwable cause) {
+        super(msg, cause);
+    }
 }

@@ -141,6 +141,8 @@ public abstract class AbstractRangeBase<B extends RangeBase.Bucket> extends Inte
 
     public static interface Factory<B extends RangeBase.Bucket> {
 
+        public String type();
+
         public AbstractRangeBase<B> create(String name, List<B> buckets, ValueFormatter formatter, boolean keyed);
 
         public B createBucket(String key, double from, double to, long docCount, InternalAggregations aggregations, ValueFormatter formatter);

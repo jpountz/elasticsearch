@@ -25,25 +25,25 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.ValuesSourceBucketsAggregator;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
 import org.elasticsearch.search.aggregations.context.numeric.ValueParser;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.buildAggregations;
-import static org.elasticsearch.search.aggregations.bucket.BucketsAggregator.createSubAggregators;
-
 /**
  *
  */
 // nocommit range aggregations should use binary search to find the matching ranges
-public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValuesSource> {
+public class RangeAggregator extends MultiBucketAggregator {
 
     public static class Range {
 
@@ -80,13 +80,15 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
         }
     }
 
+    private final NumericValuesSource valuesSource;
     private final Range[] ranges;
     private final boolean keyed;
     private final AbstractRangeBase.Factory rangeFactory;
-    BucketCollector[] bucketCollectors;
+
+    private final BucketCollector[] bucketCollectors;
 
     public RangeAggregator(String name,
-                           List<Aggregator.Factory> factories,
+                           AggregatorFactories factories,
                            NumericValuesSource valuesSource,
                            AbstractRangeBase.Factory rangeFactory,
                            List<Range> ranges,
@@ -94,7 +96,8 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
                            AggregationContext aggregationContext,
                            Aggregator parent) {
 
-        super(name, valuesSource, aggregationContext, parent);
+        super(name, factories, ranges.size(), aggregationContext, parent);
+        this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
         bucketCollectors = new BucketCollector[ranges.size()];
@@ -103,7 +106,7 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
             final Range range = this.ranges[i];
             ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
             range.process(parser, aggregationContext);
-            bucketCollectors[i] = new BucketCollector(range, valuesSource, createSubAggregators(factories, this), this);
+            bucketCollectors[i] = new BucketCollector(i, range, factories.createAggregators(this), ordsCollectors);
         }
     }
 
@@ -116,7 +119,10 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
     public InternalAggregation buildAggregation() {
         List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
         for (int i = 0; i < bucketCollectors.length; i++) {
-            buckets.add(bucketCollectors[i].buildBucket(rangeFactory));
+            Range range = bucketCollectors[i].range;
+            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketCollectors[i].docCount(),
+                    bucketCollectors[i].buildAggregations(ordsAggregators), valuesSource.formatter());
+            buckets.add(bucket);
         }
 
         // value source can be null in the case of unmapped fields
@@ -180,25 +186,13 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
         }
     }
 
-    static class BucketCollector extends ValuesSourceBucketsAggregator.BucketCollector<NumericValuesSource> {
+    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
 
         private final Range range;
 
-        long docCount;
-
-        BucketCollector(Range range, NumericValuesSource valuesSource, Aggregator[] aggregators, Aggregator aggregator) {
-            super(valuesSource, aggregators, aggregator);
+        BucketCollector(int ord, Range range, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
+            super(ord, aggregators, ordsCollectors);
             this.range = range;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            ++docCount;
-            return true;
-        }
-
-        RangeBase.Bucket buildBucket(AbstractRangeBase.Factory factory) {
-            return factory.createBucket(range.key, range.from, range.to, docCount, buildAggregations(subAggregators), valuesSource.formatter());
         }
     }
 
@@ -218,7 +212,7 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
                         Aggregator parent,
                         AbstractRangeBase.Factory factory) {
 
-            super(name, aggregationContext, parent);
+            super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
             this.ranges = ranges;
             this.keyed = keyed;
             this.formatter = formatter;
@@ -242,14 +236,14 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
         }
     }
 
-    public static class Factory extends CompoundFactory<NumericValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
 
         private final AbstractRangeBase.Factory rangeFactory;
         private final List<Range> ranges;
         private final boolean keyed;
 
         public Factory(String name, ValuesSourceConfig<NumericValuesSource> valueSourceConfig, AbstractRangeBase.Factory rangeFactory, List<Range> ranges, boolean keyed) {
-            super(name, valueSourceConfig);
+            super(name, rangeFactory.type(), valueSourceConfig);
             this.rangeFactory = rangeFactory;
             this.ranges = ranges;
             this.keyed = keyed;
@@ -257,7 +251,7 @@ public class RangeAggregator extends ValuesSourceBucketsAggregator<NumericValues
 
         @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
-            return new Unmapped(name, ranges, keyed, valueSourceConfig.formatter(), valueSourceConfig.parser(), aggregationContext, parent, rangeFactory);
+            return new Unmapped(name, ranges, keyed, valuesSourceConfig.formatter(), valuesSourceConfig.parser(), aggregationContext, parent, rangeFactory);
         }
 
         @Override

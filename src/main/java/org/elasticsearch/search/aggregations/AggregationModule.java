@@ -40,6 +40,9 @@ import org.elasticsearch.search.aggregations.calc.numeric.min.MinParser;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.ExtendedStatsParser;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.StatsParser;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.SumParser;
+import org.elasticsearch.search.aggregations.parser.AggregationParseElement;
+import org.elasticsearch.search.aggregations.parser.AggregatorParser;
+import org.elasticsearch.search.aggregations.parser.AggregatorParsers;
 
 import java.util.List;
 

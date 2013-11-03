@@ -63,6 +63,8 @@ public abstract class NumericAggregation extends InternalAggregation implements 
 
     public static interface Factory<S extends NumericAggregation> {
 
+        String type();
+
         S create(String name);
 
         S createUnmapped(String name);

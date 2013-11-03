@@ -1,7 +1,7 @@
 package org.elasticsearch.search.aggregations.bucket.single.nested;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.BucketAggregationBuilder;
+import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
 
 import java.io.IOException;
@@ -9,7 +9,7 @@ import java.io.IOException;
 /**
  *
  */
-public class NestedBuilder extends BucketAggregationBuilder<NestedBuilder> {
+public class NestedBuilder extends AggregationBuilder<NestedBuilder> {
 
     private String path;
 

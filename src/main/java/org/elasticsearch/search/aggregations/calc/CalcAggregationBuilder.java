@@ -1,14 +1,14 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.AggregationBuilder;
+import org.elasticsearch.search.aggregations.AbstractAggregationBuilder;
 
 import java.io.IOException;
 
 /**
  *
  */
-public abstract class CalcAggregationBuilder<B extends CalcAggregationBuilder<B>> extends AggregationBuilder {
+public abstract class CalcAggregationBuilder<B extends CalcAggregationBuilder<B>> extends AbstractAggregationBuilder {
 
     public CalcAggregationBuilder(String name, String type) {
         super(name, type);

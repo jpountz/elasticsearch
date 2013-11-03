@@ -77,6 +77,11 @@ public class InternalIPv4Range extends AbstractRangeBase<IPv4Range.Bucket> imple
     private static class Factory implements AbstractRangeBase.Factory<IPv4Range.Bucket> {
 
         @Override
+        public String type() {
+            return TYPE.name();
+        }
+
+        @Override
         public AbstractRangeBase<IPv4Range.Bucket> create(String name, List<IPv4Range.Bucket> buckets, ValueFormatter formatter, boolean keyed) {
             return new InternalIPv4Range(name, buckets, keyed);
         }
