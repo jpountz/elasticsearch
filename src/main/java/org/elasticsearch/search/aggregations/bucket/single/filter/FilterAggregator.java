@@ -25,6 +25,7 @@ import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -39,8 +40,6 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
     private final Filter filter;
 
-    long docCount;
-
     Bits bits;
 
     public FilterAggregator(String name,
@@ -54,13 +53,13 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    protected SingleBucketAggregator.Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
         return new Collector(aggregators, ordsAggregators);
     }
 
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations) {
+    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalFilter(name, docCount, aggregations);
     }
 
@@ -73,15 +72,10 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
         }
     }
 
-    class Collector extends SingleBucketAggregator.Collector {
+    class Collector extends BucketCollector {
 
         Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
             super(aggregators, ordsAggregators);
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount) {
-            FilterAggregator.this.docCount = docCount;
         }
 
         @Override

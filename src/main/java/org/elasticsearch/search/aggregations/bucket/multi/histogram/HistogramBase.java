@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 import org.elasticsearch.search.aggregations.Aggregation;
 
 import java.util.Comparator;
@@ -34,17 +33,12 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
     /**
      * A bucket in the histogram where documents fall in
      */
-    static interface Bucket extends Aggregated {
+    static interface Bucket extends org.elasticsearch.search.aggregations.bucket.multi.Bucket {
 
         /**
          * @return The key associated with the bucket (all documents that fall in this bucket were rounded to this key)
          */
         long getKey();
-
-        /**
-         * @return The number of documents that fall within this bucket (number of documents that were rounded to the key of this bucket)
-         */
-        long getDocCount();
 
     }
 

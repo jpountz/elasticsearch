@@ -34,10 +34,12 @@ public abstract class OrdsAggregator extends AbstractAggregator {
         return new AsAggregatorWrapper(this);
     }
 
-    /**
-     * @return  The collector what is responsible for the aggregation.
-     */
-    public abstract Collector collector(int initialSize);
+    public abstract boolean shouldCollect();
+
+    public abstract void collect(int doc, int ord) throws IOException;
+
+    public abstract void postCollection();
+
 
     /**
      * @return  The aggregated & built get.
@@ -45,53 +47,33 @@ public abstract class OrdsAggregator extends AbstractAggregator {
     public abstract InternalAggregation buildAggregation(int ord);
 
 
-    /**
-     * The collector that will be responsible for the aggregation
-     */
-    public static interface Collector {
-
-        void collect(int doc, int ord) throws IOException;
-
-        void postCollection();
-    }
-
-
     static class AsAggregatorWrapper extends Aggregator {
 
         private final OrdsAggregator inner;
 
         AsAggregatorWrapper(OrdsAggregator inner) {
-            super(inner.name, AggregatorFactories.EMPTY, inner.context, inner.parent);
+            super(inner.name, AggregatorFactories.EMPTY, 1, inner.context, inner.parent);
             this.inner = inner;
         }
 
         @Override
-        public Collector collector() {
-            return new AsBucketCollector(inner.collector(1));
+        public boolean shouldCollect() {
+            return inner.shouldCollect();
+        }
+
+        @Override
+        public void collect(int doc) throws IOException {
+            inner.collect(doc, 0);
+        }
+
+        @Override
+        public void postCollection() {
+            inner.postCollection();
         }
 
         @Override
         public InternalAggregation buildAggregation() {
             return inner.buildAggregation(0);
-        }
-
-        static class AsBucketCollector implements Aggregator.Collector {
-
-            private final OrdsAggregator.Collector innerCollector;
-
-            AsBucketCollector(OrdsAggregator.Collector innerCollector) {
-                this.innerCollector = innerCollector;
-            }
-
-            @Override
-            public void collect(int doc) throws IOException {
-                innerCollector.collect(doc, 0);
-            }
-
-            @Override
-            public void postCollection() {
-                innerCollector.postCollection();
-            }
         }
     }
 

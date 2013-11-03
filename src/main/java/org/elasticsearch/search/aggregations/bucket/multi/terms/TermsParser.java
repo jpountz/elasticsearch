@@ -26,8 +26,6 @@ import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.index.mapper.core.DateFieldMapper;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
 import org.elasticsearch.script.SearchScript;
-import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
-import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.aggregations.context.FieldContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
@@ -35,6 +33,8 @@ import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
 import org.elasticsearch.search.aggregations.context.numeric.ValueParser;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
+import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;

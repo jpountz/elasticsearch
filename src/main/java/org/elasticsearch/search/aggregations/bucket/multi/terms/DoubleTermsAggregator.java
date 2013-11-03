@@ -26,7 +26,6 @@ import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
-import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -38,13 +37,13 @@ import java.util.Arrays;
 /**
  *
  */
-public class DoubleTermsAggregator extends MultiBucketAggregator {
+public class DoubleTermsAggregator extends Aggregator {
 
     private final InternalOrder order;
     private final int requiredSize;
     private final NumericValuesSource valuesSource;
-
-    Recycler.V<DoubleObjectOpenHashMap<BucketCollector>> bucketCollectors;
+    private final Collector collector;
+    private final Recycler.V<DoubleObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
     private int ordCounter;
 
@@ -55,11 +54,22 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
         this.order = order;
         this.requiredSize = requiredSize;
         this.bucketCollectors = aggregationContext.cacheRecycler().doubleObjectMap(-1);
+        this.collector = new Collector(bucketCollectors.v());
     }
 
     @Override
-    public Collector collector() {
-        return new Collector();
+    public boolean shouldCollect() {
+        return true;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
+    }
+
+    @Override
+    public void postCollection() {
+        collector.postCollection();
     }
 
     @Override
@@ -76,7 +86,7 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     BucketCollector collector = (BucketCollector) collectors[i];
-                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                     ordered.insertWithOverflow(bucket);
                 }
             }
@@ -93,7 +103,7 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     BucketCollector collector = (BucketCollector) collectors[i];
-                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                     ordered.add(bucket);
                 }
             }
@@ -102,15 +112,14 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
         }
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector {
 
         DoubleObjectOpenHashMap<BucketCollector> bucketCollectors;
 
-        Collector() {
-            this.bucketCollectors = DoubleTermsAggregator.this.bucketCollectors.v();
+        Collector(DoubleObjectOpenHashMap<BucketCollector> bucketCollectors) {
+            this.bucketCollectors = bucketCollectors;
         }
 
-        @Override
         public void collect(int doc) throws IOException {
 
             DoubleValues values = valuesSource.doubleValues();
@@ -120,7 +129,7 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
                 double term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.get(term);
                 if (bucket == null) {
-                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(DoubleTermsAggregator.this), ordsCollectors);
+                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(DoubleTermsAggregator.this), ordsAggregators);
                     bucketCollectors.put(term, bucket);
                 }
                 bucket.collect(doc);
@@ -128,7 +137,6 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
 
         }
 
-        @Override
         public void postCollection() {
             Object[] collectors = bucketCollectors.values;
             boolean[] states = bucketCollectors.allocated;
@@ -140,13 +148,18 @@ public class DoubleTermsAggregator extends MultiBucketAggregator {
         }
     }
 
-    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
 
         final double term;
 
-        BucketCollector(int ord, double term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
-            super(ord, aggregators, ordsCollectors);
+        BucketCollector(int ord, double term, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(ord, aggregators, ordsAggregators);
             this.term = term;
+        }
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return true;
         }
     }
 

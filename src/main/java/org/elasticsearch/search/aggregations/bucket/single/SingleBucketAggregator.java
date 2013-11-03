@@ -19,13 +19,15 @@
 
 package org.elasticsearch.search.aggregations.bucket.single;
 
-import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.IOException;
 
 /**
  * A bucket aggregator that creates a single bucket
@@ -33,6 +35,7 @@ import java.util.List;
 public abstract class SingleBucketAggregator extends Aggregator {
 
     private final Aggregator[] aggregators;
+    protected BucketCollector collector;
 
     /**
      * Constructs a new single bucket aggregator.
@@ -44,58 +47,43 @@ public abstract class SingleBucketAggregator extends Aggregator {
      */
     protected SingleBucketAggregator(String name, AggregatorFactories factories,
                                      AggregationContext aggregationContext, Aggregator parent) {
-        super(name, factories, aggregationContext, parent);
+        super(name, factories, 1, aggregationContext, parent);
         aggregators = factories.createAggregators(this);
+        collector = collector(aggregators, ordsAggregators);
+        assert collector != null : "A single bucket collector must have a non-null collector (created by the #collector(Aggregator[], OrdsAggregator[]) callback method";
+    }
+
+    /**
+     * Constructs and returns a non-null bucket collector that will be responsible for the aggregation of the single bucket this aggregator
+     * represents.
+     *
+     * This method is called during initialization, meaning, sub-classes cannot rely on class internal class state for deciding which
+     * collector should be returned (it could be that this callback is called before other internal state is initialized)
+     *
+     * As mentioned above. The returned value <strong>must not be {@code null}</strong>
+     */
+    protected abstract BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators);
+
+    @Override
+    public boolean shouldCollect() {
+        return true;
     }
 
     @Override
-    public final Aggregator.Collector collector() {
-        return collector(aggregators, ordsAggregators);
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
     }
 
-    protected abstract Collector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators);
+    @Override
+    public void postCollection() {
+        collector.postCollection();
+    }
 
     @Override
     public final InternalAggregation buildAggregation() {
-        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length + ordsAggregators.length);
-        for (int i = 0; i < aggregators.length; i++) {
-            aggregations.add(aggregators[i].buildAggregation());
-        }
-        for (int i = 0; i < ordsAggregators.length; i++) {
-            aggregations.add(ordsAggregators[i].buildAggregation(0));
-        }
-        return buildAggregation(new InternalAggregations(aggregations));
+        return buildAggregation(collector.buildAggregations(), collector.docCount());
     }
 
-    protected abstract InternalAggregation buildAggregation(InternalAggregations aggregations);
-
-    protected static abstract class Collector extends BucketCollector {
-
-        private final OrdsAggregator[] ordsAggregators;
-
-        public Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsCollectors(ordsAggregators));
-            this.ordsAggregators = ordsAggregators;
-        }
-
-        @Override
-        protected void postCollection(Aggregator[] aggregators, long docCount) {
-            for (int i = 0; i < ordsCollectors.length; i++) {
-                ordsCollectors[i].postCollection();
-            }
-            postCollection(aggregators, ordsAggregators, docCount);
-        }
-
-        protected abstract void postCollection(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators, long docCount);
-
-
-        private static OrdsAggregator.Collector[] ordsCollectors(OrdsAggregator[] aggregators) {
-            OrdsAggregator.Collector[] collectors = new OrdsAggregator.Collector[aggregators.length];
-            for (int i = 0; i < aggregators.length; i++) {
-                collectors[i] = aggregators[i].collector(0);
-            }
-            return collectors;
-        }
-    }
+    protected abstract InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount);
 
 }

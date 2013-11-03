@@ -20,9 +20,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi.geo.distance;
 
 import org.elasticsearch.common.unit.DistanceUnit;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.bucket.multi.Bucket;
 
 import java.util.List;
 

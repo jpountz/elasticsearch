@@ -21,9 +21,7 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.Aggregations;
 import org.elasticsearch.search.aggregations.context.ScriptValueType;
 
 import java.util.Collection;
@@ -60,15 +58,11 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
         }
     }
 
-    static interface Bucket extends Comparable<Bucket>, Aggregated {
+    static interface Bucket extends Comparable<Bucket>, org.elasticsearch.search.aggregations.bucket.multi.Bucket {
 
         Text getTerm();
 
         Number getTermAsNumber();
-
-        long getDocCount();
-
-        Aggregations getAggregations();
     }
 
     Collection<Bucket> buckets();

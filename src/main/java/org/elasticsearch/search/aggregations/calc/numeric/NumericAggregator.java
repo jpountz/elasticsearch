@@ -45,15 +45,33 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
                              AggregationContext aggregationContext,
                              Aggregator parent) {
 
-        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.aggregationFactory = aggregationFactory;
         this.valuesSource = valuesSource;
         this.stats = valuesSource == null ? aggregationFactory.createUnmapped(name) : aggregationFactory.create(name);
     }
 
     @Override
-    public Collector collector() {
-        return valuesSource != null ? new Collector() : null;
+    public boolean shouldCollect() {
+        return valuesSource != null;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        DoubleValues values = valuesSource.doubleValues();
+        if (values == null) {
+            return;
+        }
+
+        int valuesCount = values.setDocument(doc);
+        for (int i = 0; i < valuesCount; i++) {
+            stats.collect(doc, values.nextValue());
+        }
+    }
+
+    @Override
+    public void postCollection() {
+        //To change body of implemented methods use File | Settings | File Templates.
     }
 
     @Override
@@ -61,28 +79,6 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
         return stats;
     }
 
-    //========================================= Collector ===============================================//
-
-    class Collector implements Aggregator.Collector {
-
-        @Override
-        public void collect(int doc) throws IOException {
-
-            DoubleValues values = valuesSource.doubleValues();
-            if (values == null) {
-                return;
-            }
-
-            int valuesCount = values.setDocument(doc);
-            for (int i = 0; i < valuesCount; i++) {
-                stats.collect(doc, values.nextValue());
-            }
-        }
-
-        @Override
-        public void postCollection() {
-        }
-    }
 
     //============================================== Factory ===============================================//
 

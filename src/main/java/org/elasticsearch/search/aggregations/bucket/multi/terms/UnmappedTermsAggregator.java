@@ -24,6 +24,8 @@ import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
+import java.io.IOException;
+
 /**
  *
  */
@@ -33,14 +35,22 @@ public class UnmappedTermsAggregator extends Aggregator {
     private final int requiredSize;
 
     public UnmappedTermsAggregator(String name, InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, AggregatorFactories.EMPTY, aggregationContext, parent);
+        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.order = order;
         this.requiredSize = requiredSize;
     }
 
     @Override
-    public Collector collector() {
-        return null;
+    public boolean shouldCollect() {
+        return false;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+    }
+
+    @Override
+    public void postCollection() {
     }
 
     @Override

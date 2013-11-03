@@ -29,7 +29,6 @@ import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
-import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -44,7 +43,7 @@ import java.util.List;
 /**
  *
  */
-public class HistogramAggregator extends MultiBucketAggregator {
+public class HistogramAggregator extends Aggregator {
 
     private final NumericValuesSource valuesSource;
     private final Rounding rounding;
@@ -52,6 +51,7 @@ public class HistogramAggregator extends MultiBucketAggregator {
     private final boolean keyed;
     private final boolean computeEmptyBuckets;
     private final AbstractHistogramBase.Factory histogramFactory;
+    private final Collector collector;
 
     private final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
@@ -74,11 +74,22 @@ public class HistogramAggregator extends MultiBucketAggregator {
         this.computeEmptyBuckets = computeEmptyBuckets;
         this.histogramFactory = histogramFactory;
         this.bucketCollectors = aggregationContext.cacheRecycler().longObjectMap(-1);
+        this.collector = valuesSource == null ? null : new Collector();
     }
 
     @Override
-    public Collector collector() {
-        return valuesSource == null ? null : new Collector();
+    public boolean shouldCollect() {
+        return collector != null;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
+    }
+
+    @Override
+    public void postCollection() {
+        collector.postCollection();
     }
 
     @Override
@@ -91,7 +102,7 @@ public class HistogramAggregator extends MultiBucketAggregator {
                 continue;
             }
             BucketCollector collector = (BucketCollector) collectors[i];
-            buckets.add(histogramFactory.createBucket(collector.key, collector.docCount(), collector.buildAggregations(ordsAggregators)));
+            buckets.add(histogramFactory.createBucket(collector.key, collector.docCount(), collector.buildAggregations()));
         }
         CollectionUtil.introSort(buckets, order.comparator());
 
@@ -101,7 +112,7 @@ public class HistogramAggregator extends MultiBucketAggregator {
         return histogramFactory.create(name, buckets, order, computeEmptyBuckets ? rounding : null, formatter, keyed);
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector {
 
         int ordCounter;
         LongObjectOpenHashMap<BucketCollector> bucketCollectors;
@@ -113,7 +124,6 @@ public class HistogramAggregator extends MultiBucketAggregator {
         // a reusable list of matched buckets which is used when dealing with multi-valued fields. see #populateMatchedBuckets method
         private final ReusableGrowableArray<BucketCollector> matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
 
-        @Override
         public void postCollection() {
             Object[] values = bucketCollectors.values;
             for (int i = 0; i < bucketCollectors.allocated.length; i++) {
@@ -123,7 +133,6 @@ public class HistogramAggregator extends MultiBucketAggregator {
             }
         }
 
-        @Override
         public void collect(int doc) throws IOException {
 
             LongValues values = valuesSource.longValues();
@@ -137,7 +146,7 @@ public class HistogramAggregator extends MultiBucketAggregator {
                 long key = rounding.round(value);
                 BucketCollector bucketCollector = bucketCollectors.get(key);
                 if (bucketCollector == null) {
-                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createAggregators(HistogramAggregator.this), ordsCollectors);
+                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createAggregators(HistogramAggregator.this), ordsAggregators);
                     bucketCollectors.put(key, bucketCollector);
                 } else if (bucketCollector.matched) {
                     continue;
@@ -158,7 +167,7 @@ public class HistogramAggregator extends MultiBucketAggregator {
      * A collector for a histogram bucket. This collector counts the number of documents that fall into it,
      * but also serves as the get context for all the sub addAggregation it contains.
      */
-    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
 
         // hacky, but needed for performance. We use this in the #findMatchedBuckets method, to keep track of the buckets
         // we already matched (we don't want to pick up the same bucket twice). An alternative for this hack would have
@@ -169,10 +178,15 @@ public class HistogramAggregator extends MultiBucketAggregator {
         final long key;
         final Rounding rounding;
 
-        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators, OrdsAggregator.Collector[] leavesCollectors) {
-            super(ord, subAggregators, leavesCollectors);
+        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators, OrdsAggregator[] ordsAggregators) {
+            super(ord, subAggregators, ordsAggregators);
             this.key = key;
             this.rounding = rounding;
+        }
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return true;
         }
     }
 

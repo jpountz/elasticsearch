@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.search.aggregations.bucket.multi.Aggregated;
 
 import java.io.IOException;
 import java.util.Comparator;
@@ -71,11 +70,11 @@ class InternalOrder extends HistogramBase.Order {
         static final byte ID = 0;
 
         Aggregation(String key, boolean asc) {
-            super(ID, key, asc, new Aggregated.Comparator<HistogramBase.Bucket>(key, asc));
+            super(ID, key, asc, new HistogramBase.Bucket.Comparator<HistogramBase.Bucket>(key, asc));
         }
 
         Aggregation(String aggName, String valueName, boolean asc) {
-            super(ID, key(aggName, valueName), asc, new Aggregated.Comparator<HistogramBase.Bucket>(aggName, valueName, asc));
+            super(ID, key(aggName, valueName), asc, new HistogramBase.Bucket.Comparator<HistogramBase.Bucket>(aggName, valueName, asc));
         }
 
         private static String key(String aggName, String valueName) {

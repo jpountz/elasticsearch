@@ -76,13 +76,13 @@ public class AggregationPhase implements SearchPhase {
             AggregationContext aggregationContext = new AggregationContext(context);
             context.aggregations().aggregationContext(aggregationContext);
 
-            List<Aggregator.Collector> collectors = new ArrayList<Aggregator.Collector>();
+            List<Aggregator> collectors = new ArrayList<Aggregator>();
             Aggregator[] aggregators = context.aggregations().factories().createTopLevelAggregators(aggregationContext);
             for (int i = 0; i < aggregators.length; i++) {
                 if (!(aggregators[i] instanceof GlobalAggregator)) {
-                    Aggregator.Collector collector = aggregators[i].collector();
-                    if (collector != null) {
-                        collectors.add(collector);
+                    Aggregator aggregator = aggregators[i];
+                    if (aggregator.shouldCollect()) {
+                        collectors.add(aggregator);
                     }
                 }
             }
@@ -105,10 +105,10 @@ public class AggregationPhase implements SearchPhase {
         }
 
         Aggregator[] aggregators = context.aggregations().aggregators();
-        List<Aggregator.Collector> globals = new ArrayList<Aggregator.Collector>();
+        List<Aggregator> globals = new ArrayList<Aggregator>();
         for (int i = 0; i < aggregators.length; i++) {
             if (aggregators[i] instanceof GlobalAggregator) {
-                globals.add(aggregators[i].collector());
+                globals.add(aggregators[i]);
             }
         }
 
@@ -140,9 +140,9 @@ public class AggregationPhase implements SearchPhase {
     static class AggregationsCollector extends XCollector {
 
         private final AggregationContext aggregationContext;
-        private final List<Aggregator.Collector> collectors;
+        private final List<Aggregator> collectors;
 
-        AggregationsCollector(List<Aggregator.Collector> collectors, AggregationContext aggregationContext) {
+        AggregationsCollector(List<Aggregator> collectors, AggregationContext aggregationContext) {
             this.collectors = collectors;
             this.aggregationContext = aggregationContext;
         }

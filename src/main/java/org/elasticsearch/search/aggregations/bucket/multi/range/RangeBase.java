@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.range;
 
 import org.elasticsearch.search.aggregations.Aggregation;
-import org.elasticsearch.search.aggregations.Aggregations;
 
 import java.util.List;
 
@@ -29,17 +28,13 @@ import java.util.List;
  */
 public interface RangeBase<B extends RangeBase.Bucket> extends Aggregation, Iterable<B> {
 
-    public static interface Bucket {
+    public static interface Bucket extends org.elasticsearch.search.aggregations.bucket.multi.Bucket {
 
         String getKey();
 
         double getFrom();
 
         double getTo();
-
-        long getDocCount();
-
-        Aggregations getAggregations();
     }
 
     List<B> buckets();

@@ -24,11 +24,11 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.search.SearchParseException;
-import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
-import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.aggregations.context.FieldContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
+import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;

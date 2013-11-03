@@ -26,7 +26,6 @@ import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.OrdsAggregator;
-import org.elasticsearch.search.aggregations.bucket.multi.MultiBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -38,13 +37,13 @@ import java.util.Arrays;
 /**
  *
  */
-public class LongTermsAggregator extends MultiBucketAggregator {
+public class LongTermsAggregator extends Aggregator {
 
     private final InternalOrder order;
     private final int requiredSize;
     private final NumericValuesSource valuesSource;
-
-    final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
+    private final Collector collector;
+    private final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
 
     int ordCounter;
 
@@ -55,11 +54,22 @@ public class LongTermsAggregator extends MultiBucketAggregator {
         this.order = order;
         this.requiredSize = requiredSize;
         this.bucketCollectors = aggregationContext.cacheRecycler().longObjectMap(-1);
+        this.collector = new Collector(this.bucketCollectors.v());
     }
 
     @Override
-    public Collector collector() {
-        return new Collector();
+    public boolean shouldCollect() {
+        return true;
+    }
+
+    @Override
+    public void collect(int doc) throws IOException {
+        collector.collect(doc);
+    }
+
+    @Override
+    public void postCollection() {
+        collector.postCollection();
     }
 
     @Override
@@ -75,7 +85,7 @@ public class LongTermsAggregator extends MultiBucketAggregator {
             for (int i = 0; i < states.length; i++) {
                 if (states[i]) {
                     LongTermsAggregator.BucketCollector collector = (LongTermsAggregator.BucketCollector) collectors[i];
-                    LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                    LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                     ordered.insertWithOverflow(bucket);
                 }
             }
@@ -91,7 +101,7 @@ public class LongTermsAggregator extends MultiBucketAggregator {
             Object[] collectors = bucketCollectors.v().values;
             for (int i = 0; i < states.length; i++) {
                 LongTermsAggregator.BucketCollector collector = (LongTermsAggregator.BucketCollector) collectors[i];
-                LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations(ordsAggregators));
+                LongTerms.Bucket bucket = new LongTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
                 ordered.add(bucket);
             }
             bucketCollectors.release();
@@ -99,15 +109,14 @@ public class LongTermsAggregator extends MultiBucketAggregator {
         }
     }
 
-    class Collector implements Aggregator.Collector {
+    class Collector {
 
         LongObjectOpenHashMap<BucketCollector> bucketCollectors;
 
-        Collector() {
-            bucketCollectors = LongTermsAggregator.this.bucketCollectors.v();
+        Collector(LongObjectOpenHashMap<BucketCollector> bucketCollectors) {
+            this.bucketCollectors = bucketCollectors;
         }
 
-        @Override
         public void collect(int doc) throws IOException {
             LongValues values = valuesSource.longValues();
             int valuesCount = values.setDocument(doc);
@@ -115,14 +124,13 @@ public class LongTermsAggregator extends MultiBucketAggregator {
                 long term = values.nextValue();
                 BucketCollector bucket = bucketCollectors.get(term);
                 if (bucket == null) {
-                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(LongTermsAggregator.this), ordsCollectors);
+                    bucket = new BucketCollector(ordCounter++, term, factories.createAggregators(LongTermsAggregator.this), ordsAggregators);
                     bucketCollectors.put(term, bucket);
                 }
                 bucket.collect(doc);
             }
         }
 
-        @Override
         public void postCollection() {
             boolean[] states = bucketCollectors.allocated;
             Object[] collectors = bucketCollectors.values;
@@ -135,13 +143,18 @@ public class LongTermsAggregator extends MultiBucketAggregator {
 
     }
 
-    static class BucketCollector extends MultiBucketAggregator.BucketCollector {
+    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
 
         final long term;
 
-        BucketCollector(int ord, long term, Aggregator[] aggregators, OrdsAggregator.Collector[] ordsCollectors) {
-            super(ord, aggregators, ordsCollectors);
+        BucketCollector(int ord, long term, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+            super(ord, aggregators, ordsAggregators);
             this.term = term;
+        }
+
+        @Override
+        protected boolean onDoc(int doc) throws IOException {
+            return true;
         }
     }
 
