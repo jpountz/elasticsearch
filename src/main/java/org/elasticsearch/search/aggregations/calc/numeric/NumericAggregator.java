@@ -101,7 +101,7 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new NumericAggregator<A>(name, valuesSource, aggregationFactory, aggregationContext, parent);
         }
 

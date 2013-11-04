@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.calc.bytes.count;
 
+import org.apache.lucene.util.ArrayUtil;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -32,16 +33,27 @@ import java.io.IOException;
 
 /**
  * A field data based aggregator that counts the number of values a specific field has within the aggregation context.
+ *
+ * This aggregator works in a multi-bucket mode, that is, when serves as a sub-aggregator, a single aggregator instance aggregates the
+ * counts for all buckets owned by the parent aggregator)
  */
 public class CountAggregator extends Aggregator {
 
     private final BytesValuesSource valuesSource;
 
+    // a count per bucket
+    long[] counts;
+
+    // a count for top level bucket
     long count;
 
-    public CountAggregator(String name, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
+    public CountAggregator(String name, int expectedBucketsCount, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.valuesSource = valuesSource;
+        // expectedBucketsCount == 0 means it's a top level bucket
+        if (valuesSource != null && expectedBucketsCount > 0) {
+            this.counts = new long[expectedBucketsCount];
+        }
     }
 
     @Override
@@ -55,8 +67,14 @@ public class CountAggregator extends Aggregator {
         if (values == null) {
             return;
         }
-        int valuesCount = values.setDocument(doc);
-        count += valuesCount;
+        if (counts == null) {
+            count += values.setDocument(doc);
+            return;
+        }
+        if (owningBucketOrdinal >= counts.length) {
+            counts = ArrayUtil.grow(counts, owningBucketOrdinal+1);
+        }
+        counts[owningBucketOrdinal] += values.setDocument(doc);
     }
 
     @Override
@@ -65,7 +83,16 @@ public class CountAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        return new InternalCount(name, count);
+        if (valuesSource == null) {
+            return new InternalCount(name, 0);
+        }
+        if (counts == null) {
+            return new InternalCount(name, count);
+        }
+        if (owningBucketOrdinal >= counts.length) {
+            return new InternalCount(name, 0);
+        }
+        return new InternalCount(name, counts[owningBucketOrdinal]);
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<BytesValuesSource> {
@@ -76,17 +103,17 @@ public class CountAggregator extends Aggregator {
 
         @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
-            return new CountAggregator(name, null, aggregationContext, parent);
+            return new CountAggregator(name, 0, null, aggregationContext, parent);
         }
 
         @Override
-        protected Aggregator create(BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-            return new CountAggregator(name, valuesSource, aggregationContext, parent);
+        protected Aggregator create(BytesValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+            return new CountAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
         }
 
     }

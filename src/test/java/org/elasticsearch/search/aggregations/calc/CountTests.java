@@ -127,5 +127,4 @@ public class CountTests extends AbstractIntegrationTest {
         assertThat(count.getName(), equalTo("count"));
         assertThat(count.getValue(), equalTo(20l));
     }
-
 }
