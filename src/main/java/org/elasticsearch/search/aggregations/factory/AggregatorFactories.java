@@ -19,10 +19,16 @@
 
 package org.elasticsearch.search.aggregations.factory;
 
+import org.apache.lucene.util.ArrayUtil;
+import org.apache.lucene.util.RamUsageEstimator;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.Aggregator.BucketAggregationMode;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -44,6 +50,7 @@ public class AggregatorFactories {
         this.ordinals = ordinals;
     }
 
+    /** Create all aggregators so that they can be consumed with a single bucket. */
     public Aggregator[] createBucketAggregators(Aggregator parent, Aggregator[] multiBucketAggregators, int estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[perBucket.length + multiBucketAggregators.length];
         for (int i = 0; i < perBucket.length; i++) {
@@ -55,6 +62,71 @@ public class AggregatorFactories {
         return aggregators;
     }
 
+    /** Create all aggregators so that they can be consumed with multiple buckets. */
+    public Aggregator[] createBucketAggregatorsAsMulti(Aggregator parent, final int estimatedBucketsCount) {
+        Aggregator[] aggregators = new Aggregator[count()];
+        for (int i = 0; i < perBucket.length; i++) {
+            final Aggregator first = perBucket[i].create(parent.context(), parent, estimatedBucketsCount);
+            aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, this, 1, first.context(), first.parent()) {
+
+                Aggregator[] aggregators;
+
+                {
+                    aggregators = new Aggregator[estimatedBucketsCount];
+                    aggregators[0] = first;
+                }
+
+                @Override
+                public boolean shouldCollect() {
+                    return first.shouldCollect();
+                }
+
+                @Override
+                protected void doPostCollection() {
+                    for (int i = 0; i < aggregators.length; ++i) {
+                        if (aggregators[i] != null) {
+                            aggregators[i].postCollection();
+                        }
+                    }
+                }
+
+                @Override
+                public void collect(int doc, int owningBucketOrdinal) throws IOException {
+                    if (aggregators.length <= owningBucketOrdinal) {
+                        aggregators = Arrays.copyOf(aggregators, ArrayUtil.oversize(owningBucketOrdinal + 1, RamUsageEstimator.NUM_BYTES_OBJECT_REF));
+                    }
+                    if (aggregators[owningBucketOrdinal] == null) {
+                        aggregators[owningBucketOrdinal] = perBucket[owningBucketOrdinal].create(parent.context(), parent, estimatedBucketsCount);
+                    }
+                    aggregators[owningBucketOrdinal].collect(doc, 0);
+                }
+
+                @Override
+                public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+                    if (aggregators[owningBucketOrdinal] != null) {
+                        return aggregators[owningBucketOrdinal].buildAggregation(0);
+                    } else {
+                        return first.buildAggregation(1); // we know 1 is unused since we used 0
+                    }
+                }
+            };
+        }
+        for (int i = 0; i < ordinals.length; i++) {
+            aggregators[i] = ordinals[i].create(parent.context(), parent, estimatedBucketsCount);
+        }
+        return aggregators;
+    }
+
+    /** Only create the single-bucket aggregators. */
+    public Aggregator[] createSingleBucketAggregators(Aggregator parent) {
+        Aggregator[] aggregators = new Aggregator[perBucket.length];
+        for (int i = 0; i < perBucket.length; i++) {
+            aggregators[i] = perBucket[i].create(parent.context(), parent, 1);
+        }
+        return aggregators;
+    }
+
+    /** Only create the multi-bucket aggregators */
     public Aggregator[] createMultiBucketAggregators(Aggregator parent, int estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[ordinals.length];
         for (int i = 0; i < ordinals.length; i++) {

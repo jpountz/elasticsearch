@@ -55,11 +55,7 @@ public class TermsAggregatorFactory extends ValueSourceAggregatorFactory {
     @Override
     protected Aggregator create(ValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
         if (valuesSource instanceof BytesValuesSource) {
-            if (factories.perBucketCount() == 0) {
-                return new LeafStringTermsAggregator(name, factories, valuesSource, order, requiredSize, aggregationContext, parent);
-            } else {
-                return new StringTermsAggregator(name, factories, valuesSource, order, requiredSize, aggregationContext, parent);
-            }
+            return new StringTermsAggregator(name, factories, valuesSource, order, requiredSize, aggregationContext, parent);
         }
 
         if (valuesSource instanceof NumericValuesSource) {
