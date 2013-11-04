@@ -24,7 +24,6 @@ import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.text.BytesText;
-import org.elasticsearch.common.text.StringText;
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.aggregations.AggregationStreams;
@@ -59,36 +58,26 @@ public class StringTerms extends InternalTerms {
 
     public static class Bucket extends InternalTerms.Bucket {
 
-        private Text term;
-
-        public Bucket(String term, long docCount, List<InternalAggregation> aggregations) {
-            super(docCount, aggregations);
-            this.term = new StringText(term);
-        }
+        final BytesRef termBytes;
 
         public Bucket(BytesRef term, long docCount, InternalAggregations aggregations) {
             super(docCount, aggregations);
-            this.term = new BytesText(new BytesArray(term));
-        }
-
-        public Bucket(Text term, long docCount, InternalAggregations aggregations) {
-            super(docCount, aggregations);
-            this.term = term;
+            this.termBytes = term;
         }
 
         @Override
         public Text getTerm() {
-            return term;
+            return new BytesText(new BytesArray(termBytes));
         }
 
         @Override
         public Number getTermAsNumber() {
-            return Double.parseDouble(term.string());
+            throw new UnsupportedOperationException("This term is not a number");
         }
 
         @Override
         protected int compareTerm(Terms.Bucket other) {
-            return this.term.compareTo(other.getTerm());
+            return BytesRef.getUTF8SortedAsUnicodeComparator().compare(termBytes, ((Bucket) other).termBytes);
         }
     }
 
@@ -111,7 +100,7 @@ public class StringTerms extends InternalTerms {
         int size = in.readVInt();
         List<InternalTerms.Bucket> buckets = new ArrayList<InternalTerms.Bucket>(size);
         for (int i = 0; i < size; i++) {
-            buckets.add(new Bucket(in.readText(), in.readVLong(), InternalAggregations.readAggregations(in)));
+            buckets.add(new Bucket(in.readBytesRef(), in.readVLong(), InternalAggregations.readAggregations(in)));
         }
         this.buckets = buckets;
         this.bucketMap = null;
@@ -124,7 +113,7 @@ public class StringTerms extends InternalTerms {
         out.writeVInt(requiredSize);
         out.writeVInt(buckets.size());
         for (InternalTerms.Bucket bucket : buckets) {
-            out.writeText(((Bucket) bucket).term);
+            out.writeBytesRef(((Bucket) bucket).termBytes);
             out.writeVLong(bucket.getDocCount());
             ((InternalAggregations) bucket.getAggregations()).writeTo(out);
         }
@@ -136,7 +125,7 @@ public class StringTerms extends InternalTerms {
         builder.startArray(Fields.TERMS);
         for (InternalTerms.Bucket bucket : buckets) {
             builder.startObject();
-            builder.field(Fields.TERM, ((Bucket) bucket).term);
+            builder.field(Fields.TERM, ((Bucket) bucket).termBytes);
             builder.field(CommonFields.DOC_COUNT, bucket.getDocCount());
             ((InternalAggregations) bucket.getAggregations()).toXContentInternal(builder, params);
             builder.endObject();
