@@ -55,10 +55,6 @@ public class InternalAvg extends NumericAggregation.SingleValue implements Avg {
 
     InternalAvg() {} // for serialization
 
-    public InternalAvg(String name) {
-        this(name, 0, 0);
-    }
-
     public InternalAvg(String name, double sum, long count) {
         super(name);
         this.sum = sum;
@@ -77,12 +73,6 @@ public class InternalAvg extends NumericAggregation.SingleValue implements Avg {
     @Override
     public Type type() {
         return TYPE;
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        sum += value;
-        count++;
     }
 
     @Override
@@ -128,24 +118,6 @@ public class InternalAvg extends NumericAggregation.SingleValue implements Avg {
         }
         builder.endObject();
         return builder;
-    }
-
-    public static class Factory implements NumericAggregation.Factory<InternalAvg> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalAvg create(String name) {
-            return new InternalAvg(name);
-        }
-
-        @Override
-        public InternalAvg createUnmapped(String name) {
-            return new InternalAvg(name);
-        }
     }
 
 }

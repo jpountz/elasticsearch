@@ -54,9 +54,9 @@ public class InternalMax extends NumericAggregation.SingleValue implements Max {
 
     InternalMax() {} // for serialization
 
-    public InternalMax(String name) {
+    public InternalMax(String name, double max) {
         super(name);
-        this.max = Double.NEGATIVE_INFINITY;
+        this.max = max;
     }
 
     @Override
@@ -71,11 +71,6 @@ public class InternalMax extends NumericAggregation.SingleValue implements Max {
     @Override
     public Type type() {
         return TYPE;
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        max = Math.max(value, max);
     }
 
     @Override
@@ -122,23 +117,5 @@ public class InternalMax extends NumericAggregation.SingleValue implements Max {
         }
         builder.endObject();
         return builder;
-    }
-
-    public static class Factory implements NumericAggregation.Factory<InternalMax> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalMax create(String name) {
-            return new InternalMax(name);
-        }
-
-        @Override
-        public InternalMax createUnmapped(String name) {
-            return new InternalMax(name);
-        }
     }
 }

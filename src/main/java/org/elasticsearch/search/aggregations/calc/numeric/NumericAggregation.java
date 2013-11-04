@@ -59,16 +59,4 @@ public abstract class NumericAggregation extends InternalAggregation implements 
         super(name);
     }
 
-    public abstract void collect(int doc, double value);
-
-    public static interface Factory<S extends NumericAggregation> {
-
-        String type();
-
-        S create(String name);
-
-        S createUnmapped(String name);
-
-    }
-
 }

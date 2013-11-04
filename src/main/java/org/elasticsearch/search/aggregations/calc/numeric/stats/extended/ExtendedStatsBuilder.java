@@ -1,4 +1,4 @@
-package org.elasticsearch.search.aggregations.calc.numeric.stats;
+package org.elasticsearch.search.aggregations.calc.numeric.stats.extended;
 
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregationBuilder;
 

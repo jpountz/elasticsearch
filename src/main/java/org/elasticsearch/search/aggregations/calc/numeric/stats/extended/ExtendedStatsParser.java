@@ -17,17 +17,25 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.calc.numeric.stats;
+package org.elasticsearch.search.aggregations.calc.numeric.stats.extended;
+
+import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
- * Statistics over a set of values (either aggregated over field data or scripts)
+ *
  */
-public interface ExtendedStats extends Stats {
+public class ExtendedStatsParser extends NumericAggregatorParser<InternalExtendedStats> {
 
-    double getSumOfSquares();
+    @Override
+    public String type() {
+        return InternalExtendedStats.TYPE.name();
+    }
 
-    double getVariance();
-
-    double getStdDeviation();
-
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new ExtendedStatsAggregator.Factory(aggregationName, config);
+    }
 }

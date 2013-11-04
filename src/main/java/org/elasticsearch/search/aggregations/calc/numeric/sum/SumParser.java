@@ -20,14 +20,22 @@
 package org.elasticsearch.search.aggregations.calc.numeric.sum;
 
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
  *
  */
 public class SumParser extends NumericAggregatorParser<InternalSum> {
 
-    public SumParser() {
-        super(InternalSum.TYPE, new InternalSum.Factory());
+    @Override
+    public String type() {
+        return InternalSum.TYPE.name();
     }
 
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new SumAggregator.Factory(aggregationName, config);
+    }
 }

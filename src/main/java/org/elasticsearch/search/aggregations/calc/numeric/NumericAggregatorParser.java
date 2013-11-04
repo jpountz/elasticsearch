@@ -35,20 +35,7 @@ import java.util.Map;
 /**
  *
  */
-public class NumericAggregatorParser<S extends NumericAggregation> implements AggregatorParser {
-
-    private final NumericAggregation.Type type;
-    private final NumericAggregation.Factory<S> aggregationFactory;
-
-    public NumericAggregatorParser(NumericAggregation.Type type, NumericAggregation.Factory<S> aggregationFactory) {
-        this.type = type;
-        this.aggregationFactory = aggregationFactory;
-    }
-
-    @Override
-    public String type() {
-        return type.name();
-    }
+public abstract class NumericAggregatorParser<S extends NumericAggregation> implements AggregatorParser {
 
     @Override
     public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
@@ -85,17 +72,19 @@ public class NumericAggregatorParser<S extends NumericAggregation> implements Ag
         }
 
         if (field == null) {
-            return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
+            return createFactory(aggregationName, config);
         }
 
         FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
-            return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
+            return createFactory(aggregationName, config);
         }
 
         IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
-        return new NumericAggregator.Factory<S>(aggregationName, config, aggregationFactory);
+        return createFactory(aggregationName, config);
     }
+
+    protected abstract AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config);
 }

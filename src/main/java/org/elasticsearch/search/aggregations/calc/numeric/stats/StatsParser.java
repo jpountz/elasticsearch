@@ -20,14 +20,22 @@
 package org.elasticsearch.search.aggregations.calc.numeric.stats;
 
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
  *
  */
 public class StatsParser extends NumericAggregatorParser<InternalStats> {
 
-    public StatsParser() {
-        super(InternalStats.TYPE, new InternalStats.Factory());
+    @Override
+    public String type() {
+        return InternalStats.TYPE.name();
     }
 
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new StatsAggegator.Factory(aggregationName, config);
+    }
 }

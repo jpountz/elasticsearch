@@ -55,9 +55,9 @@ public class InternalMin extends NumericAggregation.SingleValue implements Min {
 
     InternalMin() {} // for serialization
 
-    public InternalMin(String name) {
+    public InternalMin(String name, double min) {
         super(name);
-        this.min = Double.POSITIVE_INFINITY;
+        this.min = min;
     }
 
     @Override
@@ -72,11 +72,6 @@ public class InternalMin extends NumericAggregation.SingleValue implements Min {
     @Override
     public Type type() {
         return TYPE;
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        min = Math.min(value, min);
     }
 
     @Override
@@ -123,24 +118,6 @@ public class InternalMin extends NumericAggregation.SingleValue implements Min {
         }
         builder.endObject();
         return builder;
-    }
-
-    public static class Factory implements NumericAggregation.Factory<InternalMin> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalMin create(String name) {
-            return new InternalMin(name);
-        }
-
-        @Override
-        public InternalMin createUnmapped(String name) {
-            return new InternalMin(name);
-        }
     }
 
 }

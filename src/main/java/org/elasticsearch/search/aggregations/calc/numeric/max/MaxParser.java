@@ -20,14 +20,23 @@
 package org.elasticsearch.search.aggregations.calc.numeric.max;
 
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
  *
  */
 public class MaxParser extends NumericAggregatorParser<InternalMax> {
 
-    public MaxParser() {
-        super(InternalMax.TYPE, new InternalMax.Factory());
+    @Override
+    public String type() {
+        return InternalMax.TYPE.name();
+    }
+
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new MaxAggregator.Factory(aggregationName, config);
     }
 
 }

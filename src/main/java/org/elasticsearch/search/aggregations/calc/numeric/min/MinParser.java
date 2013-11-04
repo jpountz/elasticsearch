@@ -19,15 +19,24 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.min;
 
+import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregation;
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
  *
  */
 public class MinParser extends NumericAggregatorParser<InternalMin> {
 
-    public MinParser() {
-        super(InternalMin.TYPE, new InternalMin.Factory());
+    @Override
+    public String type() {
+        return InternalMin.TYPE.name();
     }
 
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new MinAggregator.Factory(aggregationName, config);
+    }
 }

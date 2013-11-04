@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.calc.numeric.stats;
+package org.elasticsearch.search.aggregations.calc.numeric.stats.extended;
 
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -25,7 +25,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentBuilderString;
 import org.elasticsearch.search.aggregations.AggregationStreams;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregation;
+import org.elasticsearch.search.aggregations.calc.numeric.stats.InternalStats;
 
 import java.io.IOException;
 
@@ -53,8 +53,9 @@ public class InternalExtendedStats extends InternalStats implements ExtendedStat
 
     InternalExtendedStats() {} // for serialization
 
-    public InternalExtendedStats(String name) {
-        super(name);
+    public InternalExtendedStats(String name, long count, double sum, double min, double max, double sumOfSqrs) {
+        super(name, count, sum, min, max);
+        this.sumOfSqrs = sumOfSqrs;
     }
 
     @Override
@@ -74,12 +75,6 @@ public class InternalExtendedStats extends InternalStats implements ExtendedStat
             return getStdDeviation();
         }
         return super.value(name);
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        super.collect(doc, value);
-        sumOfSqrs += value * value;
     }
 
     @Override
@@ -132,24 +127,6 @@ public class InternalExtendedStats extends InternalStats implements ExtendedStat
             builder.field(Fields.STD_DEVIATION_AS_STRING, valueFormatter.format(getStdDeviation()));
         }
         return builder;
-    }
-
-    public static class Factory implements NumericAggregation.Factory<InternalExtendedStats> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalExtendedStats create(String name) {
-            return new InternalExtendedStats(name);
-        }
-
-        @Override
-        public InternalExtendedStats createUnmapped(String name) {
-            return new InternalExtendedStats(name);
-        }
     }
 
 }

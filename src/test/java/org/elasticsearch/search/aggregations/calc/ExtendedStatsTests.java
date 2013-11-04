@@ -20,7 +20,7 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.search.aggregations.calc.numeric.stats.ExtendedStats;
+import org.elasticsearch.search.aggregations.calc.numeric.stats.extended.ExtendedStats;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;

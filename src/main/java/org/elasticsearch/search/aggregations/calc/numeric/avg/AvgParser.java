@@ -20,14 +20,23 @@
 package org.elasticsearch.search.aggregations.calc.numeric.avg;
 
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
+import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
+import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 
 /**
  *
  */
 public class AvgParser extends NumericAggregatorParser<InternalAvg> {
 
-    public AvgParser() {
-        super(InternalAvg.TYPE, new InternalAvg.Factory());
+    @Override
+    public String type() {
+        return InternalAvg.TYPE.name();
+    }
+
+    @Override
+    protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
+        return new AvgAggregator.Factory(aggregationName, type(), config);
     }
 
 }

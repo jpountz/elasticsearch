@@ -37,7 +37,7 @@ import org.elasticsearch.search.aggregations.calc.bytes.count.CountParser;
 import org.elasticsearch.search.aggregations.calc.numeric.avg.AvgParser;
 import org.elasticsearch.search.aggregations.calc.numeric.max.MaxParser;
 import org.elasticsearch.search.aggregations.calc.numeric.min.MinParser;
-import org.elasticsearch.search.aggregations.calc.numeric.stats.ExtendedStatsParser;
+import org.elasticsearch.search.aggregations.calc.numeric.stats.extended.ExtendedStatsParser;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.StatsParser;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.SumParser;
 import org.elasticsearch.search.aggregations.parser.AggregationParseElement;
