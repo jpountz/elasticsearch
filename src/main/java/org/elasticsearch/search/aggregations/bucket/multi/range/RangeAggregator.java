@@ -21,6 +21,7 @@ package org.elasticsearch.search.aggregations.bucket.multi.range;
 
 import com.carrotsearch.hppc.IntArrayList;
 import com.google.common.collect.Lists;
+import org.apache.lucene.util.InPlaceMergeSorter;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -100,6 +101,7 @@ public class RangeAggregator extends Aggregator {
         this.rangeFactory = rangeFactory;
         bucketCollectors = new BucketCollector[ranges.size()];
         this.ranges = ranges.toArray(new Range[ranges.size()]);
+        sortRanges();
         for (int i = 0; i < this.ranges.length; ++i) {
             final Range range = this.ranges[i];
             ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
@@ -107,6 +109,27 @@ public class RangeAggregator extends Aggregator {
             bucketCollectors[i] = new BucketCollector(i, range, factories.createBucketAggregators(this, multiBucketAggregators, ranges.size()));
         }
         collector = valuesSource == null ? null : new Collector();
+    }
+
+    private void sortRanges() {
+        new InPlaceMergeSorter() {
+
+            @Override
+            protected void swap(int i, int j) {
+                final Range tmp = ranges[i];
+                ranges[i] = ranges[j];
+                ranges[j] = tmp;
+            }
+
+            @Override
+            protected int compare(int i, int j) {
+                int cmp = Double.compare(ranges[i].from, ranges[j].from);
+                if (cmp == 0) {
+                    cmp = Double.compare(ranges[i].to, ranges[j].to);
+                }
+                return cmp;
+            }
+        };
     }
 
     @Override
@@ -142,10 +165,16 @@ public class RangeAggregator extends Aggregator {
     class Collector {
 
         final boolean[] matched;
+        final double[] maxTo;
         final IntArrayList matchedList;
 
         Collector() {
             matched = new boolean[ranges.length];
+            maxTo = new double[ranges.length];
+            maxTo[0] = ranges[0].to;
+            for (int i = 1; i < ranges.length; ++i) {
+                maxTo[i] = Math.max(ranges[i].to,maxTo[i-1]);
+            }
             matchedList = new IntArrayList();
         }
 
@@ -177,7 +206,45 @@ public class RangeAggregator extends Aggregator {
         }
 
         private void collect(int doc, double value) throws IOException {
-            for (int i = 0; i < ranges.length; ++i) {
+            int lo = 0, hi = ranges.length - 1; // all candidates are between these indexes
+            int mid = (lo + hi) >>> 1;
+            while (lo <= hi) {
+                if (value < ranges[mid].from) {
+                    hi = mid - 1;
+                } else if (value >= maxTo[mid]) {
+                    lo = mid + 1;
+                } else {
+                    break;
+                }
+                mid = (lo + hi) >>> 1;
+            }
+
+            // binary search the lower bound
+            int startLo = lo, startHi = mid;
+            while (startLo <= startHi) {
+                final int startMid = (startLo + startHi) >>> 1;
+                if (value >= maxTo[startMid]) {
+                    startLo = startMid + 1;
+                } else {
+                    startHi = startMid - 1;
+                }
+            }
+
+            // binary search the upper bound
+            int endLo = mid, endHi = hi;
+            while (endLo <= endHi) {
+                final int endMid = (endLo + endHi) >>> 1;
+                if (value < ranges[endMid].from) {
+                    endHi = endMid - 1;
+                } else {
+                    endLo = endMid + 1;
+                }
+            }
+
+            assert startLo == 0 || value >= maxTo[startLo - 1];
+            assert endHi == ranges.length - 1 || value < ranges[endHi + 1].from;
+
+            for (int i = startLo; i <= endHi; ++i) {
                 if (!matched[i] && ranges[i].matches(value)) {
                     matched[i] = true;
                     matchedList.add(i);
