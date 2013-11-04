@@ -32,8 +32,8 @@ public class AggregatorFactories {
 
     public static final AggregatorFactories EMPTY = new Empty();
 
-    private AggregatorFactory[] perBucket;
-    private AggregatorFactory[] ordinals;
+    private final AggregatorFactory[] perBucket;
+    private final AggregatorFactory[] ordinals;
 
     public static Builder builder() {
         return new Builder();
@@ -76,6 +76,10 @@ public class AggregatorFactories {
 
     public int count() {
         return perBucket.length + ordinals.length;
+    }
+
+    public int perBucketCount() {
+        return perBucket.length;
     }
 
     void setParent(AggregatorFactory parent) {
