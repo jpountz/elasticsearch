@@ -19,18 +19,16 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
-import com.carrotsearch.hppc.ObjectObjectOpenHashMap;
-import com.google.common.collect.ImmutableList;
+import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.common.collect.BoundedTreeSet;
-import org.elasticsearch.common.lucene.HashedBytesRef;
-import org.elasticsearch.common.recycler.Recycler;
+import org.apache.lucene.util.BytesRefHash;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
-import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -40,11 +38,13 @@ import java.util.Arrays;
  */
 public class StringTermsAggregator extends Aggregator {
 
+    private static final int INITIAL_CAPACITY = 50; // TODO sizing
+
     private final ValuesSource valuesSource;
     private final InternalOrder order;
     private final int requiredSize;
     private final Collector collector;
-    private final Recycler.V<ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector>> bucketCollectors;
+    private final Aggregator[] subAggregators;
 
     public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
@@ -53,8 +53,8 @@ public class StringTermsAggregator extends Aggregator {
         this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
-        this.bucketCollectors = aggregationContext.cacheRecycler().hashMap(-1);
-        this.collector = new Collector(bucketCollectors.v());
+        this.collector = new Collector();
+        subAggregators = factories.createBucketAggregatorsAsMulti(this, INITIAL_CAPACITY);
     }
 
     @Override
@@ -72,98 +72,83 @@ public class StringTermsAggregator extends Aggregator {
         collector.postCollection();
     }
 
+    // private impl that stores a bucket ord. This allows for computing the aggregations lazily.
+    static class OrdinalBucket extends StringTerms.Bucket {
+
+        int bucketOrd;
+
+        public OrdinalBucket() {
+            super(new BytesRef(), 0, null);
+        }
+
+    }
+
     @Override
     public StringTerms buildAggregation(int owningBucketOrdinal) {
 
-        if (bucketCollectors.v().isEmpty()) {
-            return new StringTerms(name, order, requiredSize, ImmutableList.<InternalTerms.Bucket>of());
+        final BytesRefHash bytes = collector.bucketOrds;
+        final long[] counts = collector.counts;
+        final int size = Math.min(bytes.size(), requiredSize);
+
+        BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
+        OrdinalBucket spare = null;
+        for (int i = 0; i < bytes.size(); ++i) {
+            if (spare == null) {
+                spare = new OrdinalBucket();
+            }
+            bytes.get(i, spare.termBytes);
+            spare.docCount = counts[i];
+            spare.bucketOrd = i;
+            spare = (OrdinalBucket) ordered.insertWithOverflow(spare);
         }
 
-        if (requiredSize < EntryPriorityQueue.LIMIT) {
-            BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
-            boolean[] allocated = bucketCollectors.v().allocated;
-            Object[] collectors = bucketCollectors.v().values;
-            for (int i = 0; i < allocated.length; i++) {
-                if (allocated[i]) {
-                    BucketCollector collector = (BucketCollector) collectors[i];
-                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
-                    ordered.insertWithOverflow(bucket);
-                }
+        final InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
+        for (int i = ordered.size() - 1; i >= 0; --i) {
+            final OrdinalBucket bucket = (OrdinalBucket) ordered.pop();
+            final InternalAggregation[] aggregations = new InternalAggregation[subAggregators.length];
+            for (int j = 0; j < subAggregators.length; ++j) {
+                aggregations[j] = subAggregators[j].buildAggregation(i);
             }
-            bucketCollectors.release();
-            InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
-            for (int i = ordered.size() - 1; i >= 0; i--) {
-                list[i] = (StringTerms.Bucket) ordered.pop();
-            }
-            return new StringTerms(name, order, requiredSize, Arrays.asList(list));
-        } else {
-            BoundedTreeSet<InternalTerms.Bucket> ordered = new BoundedTreeSet<InternalTerms.Bucket>(order.comparator(), requiredSize);
-            boolean[] allocated = bucketCollectors.v().allocated;
-            Object[] collectors = bucketCollectors.v().values;
-            for (int i = 0; i < allocated.length; i++) {
-                if (allocated[i]) {
-                    BucketCollector collector = (BucketCollector) collectors[i];
-                    StringTerms.Bucket bucket = new StringTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
-                    ordered.add(bucket);
-                }
-            }
-            bucketCollectors.release();
-            return new StringTerms(name, order, requiredSize, ordered);
+            bucket.aggregations = new InternalAggregations(Arrays.asList(aggregations));
+            list[i] = bucket;
         }
+        return new StringTerms(name, order, requiredSize, Arrays.asList(list));
     }
 
     class Collector {
 
-        private final ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector> bucketCollectors;
+        private final BytesRefHash bucketOrds;
+        private long[] counts;
 
-        Collector(ObjectObjectOpenHashMap<HashedBytesRef, BucketCollector> bucketCollectors) {
-            this.bucketCollectors = bucketCollectors;
+        Collector() {
+            bucketOrds = new BytesRefHash();
+            counts = new long[INITIAL_CAPACITY];
         }
 
-        private HashedBytesRef scratch = new HashedBytesRef(new BytesRef());
-
-        int ordCounter;
-
         public void collect(int doc) throws IOException {
-            BytesValues values = valuesSource.bytesValues();
-            int valuesCount = values.setDocument(doc);
+            final BytesValues values = valuesSource.bytesValues();
+            final int valuesCount = values.setDocument(doc);
 
             for (int i = 0; i < valuesCount; ++i) {
-                scratch.bytes = values.nextValue();
-                scratch.hash = values.currentValueHash();
-                BucketCollector bucket = bucketCollectors.get(scratch);
-                if (bucket == null) {
-                    HashedBytesRef put = scratch.deepCopy();
-                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createBucketAggregators(StringTermsAggregator.this, multiBucketAggregators, Math.max(50, bucketCollectors.size())));
-                    bucketCollectors.put(put, bucket);
+                final BytesRef bytes = values.nextValue();
+                final int hash = values.currentValueHash();
+                int bucketOrdinal = bucketOrds.add(bytes, hash);
+                if (bucketOrdinal < 0) { // already seen
+                    bucketOrdinal = - 1 - bucketOrdinal;
+                } else if (bucketOrdinal >= counts.length) { // new bucket, maybe grow
+                    counts = ArrayUtil.grow(counts, bucketOrdinal + 1);
                 }
-                bucket.collect(doc);
+                ++counts[bucketOrdinal];
+                for (Aggregator subAggregator : subAggregators) {
+                    subAggregator.collect(doc, bucketOrdinal);
+                }
             }
         }
 
         public void postCollection() {
-            boolean[] states = bucketCollectors.allocated;
-            Object[] collectors = bucketCollectors.values;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    ((BucketCollector) collectors[i]).postCollection();
-                }
+            for (Aggregator subAggregator : subAggregators) {
+                subAggregator.postCollection();
             }
-        }
-    }
-
-    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
-
-        final BytesRef term;
-
-        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators) {
-            super(ord, aggregators);
-            this.term = term;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            return true;
         }
     }
 
