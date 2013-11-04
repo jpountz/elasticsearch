@@ -35,7 +35,7 @@ public class UnmappedTermsAggregator extends Aggregator {
     private final int requiredSize;
 
     public UnmappedTermsAggregator(String name, InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.order = order;
         this.requiredSize = requiredSize;
     }
@@ -46,15 +46,15 @@ public class UnmappedTermsAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
     }
 
     @Override
-    public void postCollection() {
+    protected void doPostCollection() {
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         return new UnmappedTerms(name, order, requiredSize);
     }
 

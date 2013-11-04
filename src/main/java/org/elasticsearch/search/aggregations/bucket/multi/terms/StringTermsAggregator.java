@@ -27,7 +27,6 @@ import org.elasticsearch.common.lucene.HashedBytesRef;
 import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -50,7 +49,7 @@ public class StringTermsAggregator extends Aggregator {
     public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
 
-        super(name, factories, 50, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, factories, 50, aggregationContext, parent);
         this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
@@ -64,17 +63,17 @@ public class StringTermsAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         collector.collect(doc);
     }
 
     @Override
-    public void postCollection() {
+    protected void doPostCollection() {
         collector.postCollection();
     }
 
     @Override
-    public StringTerms buildAggregation() {
+    public StringTerms buildAggregation(int owningBucketOrdinal) {
 
         if (bucketCollectors.v().isEmpty()) {
             return new StringTerms(name, order, requiredSize, ImmutableList.<InternalTerms.Bucket>of());
@@ -135,7 +134,7 @@ public class StringTermsAggregator extends Aggregator {
                 BucketCollector bucket = bucketCollectors.get(scratch);
                 if (bucket == null) {
                     HashedBytesRef put = scratch.deepCopy();
-                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createAggregators(StringTermsAggregator.this), ordsAggregators);
+                    bucket = new BucketCollector(ordCounter++, put.bytes, factories.createBucketAggregators(StringTermsAggregator.this, multiBucketAggregators, Math.max(50, bucketCollectors.size())));
                     bucketCollectors.put(put, bucket);
                 }
                 bucket.collect(doc);
@@ -157,8 +156,8 @@ public class StringTermsAggregator extends Aggregator {
 
         final BytesRef term;
 
-        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(ord, aggregators, ordsAggregators);
+        BucketCollector(int ord, BytesRef term, Aggregator[] aggregators) {
+            super(ord, aggregators);
             this.term = term;
         }
 

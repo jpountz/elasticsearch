@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,72 +42,82 @@ public abstract class BucketCollector {
     protected int ord;
 
     protected final Aggregator[] aggregators;
-    protected final OrdsAggregator[] ordsAggregators;
 
     protected long docCount;
 
-    public BucketCollector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        this(0, aggregators, ordsAggregators);
+    /**
+     * Creates a new bucket collector. By default, the ordinal of this bucket will be considered to be 0.
+     *
+     * @param aggregators   The aggregators of this bucket
+     */
+    public BucketCollector(Aggregator[] aggregators) {
+        this(0, aggregators);
     }
 
-    public BucketCollector(int ord, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
+    /**
+     * Creates a new bucket.
+     *
+     * @param ord           The ordinal of this bucket (compared to other sibling buckets in the same aggregator).
+     * @param aggregators   The aggregators of this bucket.
+     */
+    public BucketCollector(int ord, Aggregator[] aggregators) {
         this.ord = ord;
         this.aggregators = aggregators;
-        this.ordsAggregators = ordsAggregators;
     }
 
+    /**
+     * Collects the given document. This method will first determine whether the given doc "falls in" this bucket. If so, it will
+     * propagate the doc to all the aggregators in the bucket.
+     *
+     * @param doc   The doc to collect
+     */
     public void collect(int doc) throws IOException {
         if (onDoc(doc)) {
             docCount++;
-            for (int i = 0; i < ordsAggregators.length; i++) {
-                if (ordsAggregators[i].shouldCollect()) {
-                    ordsAggregators[i].collect(doc, ord);
-                }
-            }
             for (int i = 0; i < aggregators.length; i++) {
-                if (aggregators[i].shouldCollect()) {
-                    aggregators[i].collect(doc);
-                }
+                aggregators[i].collect(doc, ord);
             }
         }
     }
 
+    /**
+     * Called after all documents where collected.
+     */
     public void postCollection() {
+        // we only need to call postCollection on the per_bucket aggregators. The ordinals aggregators are
+        // shared among all buckets and therefore they are "post collected" at the aggregator level (see Aggregator#postCollection())
         for (int i = 0; i < aggregators.length; i++) {
-            if (aggregators[i].shouldCollect()) {
+            if (aggregators[i].bucketAggregationMode() == Aggregator.BucketAggregationMode.PER_BUCKET && aggregators[i].shouldCollect()) {
                 aggregators[i].postCollection();
             }
         }
-        for (int i = 0; i < ordsAggregators.length; i++) {
-            if (ordsAggregators[i].shouldCollect()) {
-                ordsAggregators[i].postCollection();
-            }
-        }
+
     }
 
+    /**
+     * Builds and returns the aggregations of this bucket.
+     */
     public InternalAggregations buildAggregations() {
-        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length + ordsAggregators.length);
+        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length);
         for (int i = 0; i < aggregators.length; i++) {
-            aggregations.add(aggregators[i].buildAggregation());
-        }
-        for (int i = 0; i < ordsAggregators.length; i++) {
-            aggregations.add(ordsAggregators[i].buildAggregation(ord));
+            aggregations.add(aggregators[i].buildAggregation(ord));
         }
         return new InternalAggregations(aggregations);
     }
 
+    /**
+     * @return The ordinal of this bucket
+     */
     public int ord() {
         return ord;
     }
 
+    /**
+     * @return The number of documents in the bucket - should only be called after {@link #postCollection()} is called.
+     */
     public long docCount() {
         return docCount;
     }
-
-    public Aggregator[] aggregators() {
-        return aggregators;
-    }
-
 
     /**
      * Called to aggregate the data in the given doc and returns whether the document falls in this bucket or not.

@@ -28,7 +28,6 @@ import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -66,7 +65,7 @@ public class HistogramAggregator extends Aggregator {
                                AggregationContext aggregationContext,
                                Aggregator parent) {
 
-        super(name, factories, 50, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, factories, 50, aggregationContext, parent);
         this.valuesSource = valuesSource;
         this.rounding = rounding;
         this.order = order;
@@ -83,17 +82,17 @@ public class HistogramAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         collector.collect(doc);
     }
 
     @Override
-    public void postCollection() {
+    protected void doPostCollection() {
         collector.postCollection();
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(bucketCollectors.v().size());
         boolean[] allocated = bucketCollectors.v().allocated;
         Object[] collectors = this.bucketCollectors.v().values;
@@ -146,7 +145,7 @@ public class HistogramAggregator extends Aggregator {
                 long key = rounding.round(value);
                 BucketCollector bucketCollector = bucketCollectors.get(key);
                 if (bucketCollector == null) {
-                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createAggregators(HistogramAggregator.this), ordsAggregators);
+                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createBucketAggregators(HistogramAggregator.this, multiBucketAggregators, Math.max(50, bucketCollectors.size())));
                     bucketCollectors.put(key, bucketCollector);
                 } else if (bucketCollector.matched) {
                     continue;
@@ -178,8 +177,8 @@ public class HistogramAggregator extends Aggregator {
         final long key;
         final Rounding rounding;
 
-        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators, OrdsAggregator[] ordsAggregators) {
-            super(ord, subAggregators, ordsAggregators);
+        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators) {
+            super(ord, subAggregators);
             this.key = key;
             this.rounding = rounding;
         }
@@ -190,7 +189,7 @@ public class HistogramAggregator extends Aggregator {
         }
     }
 
-    public static class Factory extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory<NumericValuesSource> {
 
         private final Rounding rounding;
         private final InternalOrder order;
@@ -206,6 +205,11 @@ public class HistogramAggregator extends Aggregator {
             this.keyed = keyed;
             this.computeEmptyBuckets = computeEmptyBuckets;
             this.histogramFactory = histogramFactory;
+        }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
         @Override

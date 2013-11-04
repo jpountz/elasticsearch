@@ -40,7 +40,7 @@ public class CountAggregator extends Aggregator {
     long count;
 
     public CountAggregator(String name, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.valuesSource = valuesSource;
     }
 
@@ -50,7 +50,7 @@ public class CountAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         BytesValues values = valuesSource.bytesValues();
         if (values == null) {
             return;
@@ -60,16 +60,15 @@ public class CountAggregator extends Aggregator {
     }
 
     @Override
-    public void postCollection() {
-
+    protected void doPostCollection() {
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         return new InternalCount(name, count);
     }
 
-    public static class Factory extends ValueSourceAggregatorFactory.Normal<BytesValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<BytesValuesSource> {
 
         public Factory(String name, ValuesSourceConfig<BytesValuesSource> valuesSourceBuilder) {
             super(name, InternalCount.TYPE.name(), valuesSourceBuilder);
@@ -84,6 +83,12 @@ public class CountAggregator extends Aggregator {
         protected Aggregator create(BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
             return new CountAggregator(name, valuesSource, aggregationContext, parent);
         }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
+        }
+
     }
 
 }

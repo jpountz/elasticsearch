@@ -19,10 +19,9 @@
 
 package org.elasticsearch.search.aggregations.factory;
 
-import org.elasticsearch.search.aggregations.AbstractAggregator;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
+import org.elasticsearch.search.aggregations.AggregationInitializationException;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceBased;
@@ -31,25 +30,23 @@ import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 /**
  *
  */
-public abstract class ValueSourceAggregatorFactory<A extends AbstractAggregator, VS extends ValuesSource> extends AggregatorFactory implements ValuesSourceBased {
+public abstract class ValueSourceAggregatorFactory<VS extends ValuesSource> extends AggregatorFactory implements ValuesSourceBased {
 
-    public static abstract class Normal<VS extends ValuesSource> extends ValueSourceAggregatorFactory<Aggregator, VS> {
+    public static abstract class LeafOnly<VS extends ValuesSource> extends ValueSourceAggregatorFactory<VS> {
 
-        public Normal(String name, String type, ValuesSourceConfig<VS> valuesSourceConfig) {
+        protected LeafOnly(String name, String type, ValuesSourceConfig<VS> valuesSourceConfig) {
             super(name, type, valuesSourceConfig);
         }
-    }
 
-    public static abstract class Ords<VS extends ValuesSource> extends ValueSourceAggregatorFactory<OrdsAggregator, VS> {
-
-        public Ords(String name, String type, ValuesSourceConfig<VS> valuesSourceConfig) {
-            super(name, type, valuesSourceConfig);
+        @Override
+        public AggregatorFactory subFactories(AggregatorFactories subFactories) {
+            throw new AggregationInitializationException("Aggregator [" + name + "] of type [" + type + "] cannot accept sub-aggregations");
         }
     }
 
     protected ValuesSourceConfig<VS> valuesSourceConfig;
 
-    private ValueSourceAggregatorFactory(String name, String type, ValuesSourceConfig<VS> valuesSourceConfig) {
+    protected ValueSourceAggregatorFactory(String name, String type, ValuesSourceConfig<VS> valuesSourceConfig) {
         super(name, type);
         this.valuesSourceConfig = valuesSourceConfig;
     }
@@ -60,7 +57,7 @@ public abstract class ValueSourceAggregatorFactory<A extends AbstractAggregator,
     }
 
     @Override
-    public A create(AggregationContext context, Aggregator parent) {
+    public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
         if (valuesSourceConfig.unmapped()) {
             return createUnmapped(context, parent);
         }
@@ -75,9 +72,9 @@ public abstract class ValueSourceAggregatorFactory<A extends AbstractAggregator,
         }
     }
 
-    protected abstract A createUnmapped(AggregationContext aggregationContext, Aggregator parent);
+    protected abstract Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent);
 
-    protected abstract A create(VS valuesSource, AggregationContext aggregationContext, Aggregator parent);
+    protected abstract Aggregator create(VS valuesSource, AggregationContext aggregationContext, Aggregator parent);
 
     private static <VS extends ValuesSource> ValuesSourceConfig<VS> resolveValuesSourceConfigFromAncestors(String aggName, AggregatorFactory parent, Class<VS> requiredValuesSourceType) {
         ValuesSourceConfig config;

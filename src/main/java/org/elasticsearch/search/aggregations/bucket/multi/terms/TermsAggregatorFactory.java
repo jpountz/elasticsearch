@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
-import org.elasticsearch.search.aggregations.AbstractAggregator;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
@@ -32,7 +31,7 @@ import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactor
 /**
  *
  */
-public class TermsAggregatorFactory extends ValueSourceAggregatorFactory.Normal {
+public class TermsAggregatorFactory extends ValueSourceAggregatorFactory {
 
     private final InternalOrder order;
     private final int requiredSize;
@@ -44,12 +43,17 @@ public class TermsAggregatorFactory extends ValueSourceAggregatorFactory.Normal 
     }
 
     @Override
-    protected AbstractAggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+    public Aggregator.BucketAggregationMode bucketMode() {
+        return Aggregator.BucketAggregationMode.PER_BUCKET;
+    }
+
+    @Override
+    protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
         return new UnmappedTermsAggregator(name, order, requiredSize, aggregationContext, parent);
     }
 
     @Override
-    protected AbstractAggregator create(ValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+    protected Aggregator create(ValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
         if (valuesSource instanceof BytesValuesSource) {
             return new StringTermsAggregator(name, factories, valuesSource, order, requiredSize, aggregationContext, parent);
         }

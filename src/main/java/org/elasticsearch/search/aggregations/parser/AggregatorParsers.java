@@ -81,7 +81,7 @@ public class AggregatorParsers {
         XContentParser.Token token = null;
         String currentFieldName = null;
 
-        AggregatorFactories factories = new AggregatorFactories();
+        AggregatorFactories.Builder factories = new AggregatorFactories.Builder();
 
         String aggregationName = null;
         while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
@@ -125,7 +125,7 @@ public class AggregatorParsers {
             }
         }
 
-        return factories;
+        return factories.build();
     }
 
 }

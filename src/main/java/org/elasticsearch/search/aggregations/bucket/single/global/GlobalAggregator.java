@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.single.global;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
@@ -41,8 +40,8 @@ public class GlobalAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        return new Collector(aggregators, ordsAggregators);
+    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
+        return new Collector(aggregators);
     }
 
     @Override
@@ -52,8 +51,8 @@ public class GlobalAggregator extends SingleBucketAggregator {
 
     class Collector extends BucketCollector {
 
-        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsAggregators);
+        Collector(Aggregator[] aggregators) {
+            super(aggregators);
         }
 
         @Override
@@ -69,7 +68,12 @@ public class GlobalAggregator extends SingleBucketAggregator {
         }
 
         @Override
-        public GlobalAggregator create(AggregationContext context, Aggregator parent) {
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
+        }
+
+        @Override
+        public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
             if (parent != null) {
                 throw new AggregationExecutionException("Aggregation [" + parent.name() + "] cannot have a global " +
                         "sub-aggregation [" + name + "]. Global aggregations can only be defined as top level aggregations");

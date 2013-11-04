@@ -27,7 +27,6 @@ import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
@@ -82,12 +81,12 @@ public class GeoDistanceAggregator extends Aggregator {
 
     public GeoDistanceAggregator(String name, GeoPointValuesSource valuesSource, AggregatorFactories factories,
                                  List<DistanceRange> ranges, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, factories, ranges.size(), aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, factories, ranges.size(), aggregationContext, parent);
         this.valuesSource = valuesSource;
         bucketCollectors = new BucketCollector[ranges.size()];
         int i = 0;
         for (DistanceRange range : ranges) {
-            bucketCollectors[i++] = new BucketCollector(i, range, factories.createAggregators(this), ordsAggregators);
+            bucketCollectors[i++] = new BucketCollector(i, range, factories.createBucketAggregators(this, multiBucketAggregators, ranges.size()));
         }
         collector = valuesSource == null ? null : new Collector();
     }
@@ -98,17 +97,17 @@ public class GeoDistanceAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         collector.collect(doc);
     }
 
     @Override
-    public void postCollection() {
+    protected void doPostCollection() {
         collector.postCollection();
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
         for (BucketCollector collector : bucketCollectors) {
             InternalAggregations aggregations = collector.buildAggregations();
@@ -177,8 +176,8 @@ public class GeoDistanceAggregator extends Aggregator {
 
         private final DistanceRange range;
 
-        BucketCollector(int ord, DistanceRange range, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(ord, aggregators, ordsAggregators);
+        BucketCollector(int ord, DistanceRange range, Aggregator[] aggregators) {
+            super(ord, aggregators);
             this.range = range;
         }
 
@@ -188,13 +187,18 @@ public class GeoDistanceAggregator extends Aggregator {
         }
     }
 
-    public static class Factory extends ValueSourceAggregatorFactory.Normal<GeoPointValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory<GeoPointValuesSource> {
 
         private final List<DistanceRange> ranges;
 
         public Factory(String name, ValuesSourceConfig<GeoPointValuesSource> valueSourceConfig, List<DistanceRange> ranges) {
             super(name, InternalGeoDistance.TYPE.name(), valueSourceConfig);
             this.ranges = ranges;
+        }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
         @Override
