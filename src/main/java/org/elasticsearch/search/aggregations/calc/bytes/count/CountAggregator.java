@@ -44,15 +44,12 @@ public class CountAggregator extends Aggregator {
     // a count per bucket
     long[] counts;
 
-    // a count for top level bucket
-    long count;
-
     public CountAggregator(String name, int expectedBucketsCount, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.valuesSource = valuesSource;
-        // expectedBucketsCount == 0 means it's a top level bucket
-        if (valuesSource != null && expectedBucketsCount > 0) {
-            this.counts = new long[expectedBucketsCount];
+        if (valuesSource != null) {
+            // expectedBucketsCount == 0 means it's a top level bucket
+            this.counts = expectedBucketsCount == 0 ? new long[1] : new long[expectedBucketsCount];
         }
     }
 
@@ -65,10 +62,6 @@ public class CountAggregator extends Aggregator {
     public void collect(int doc, int owningBucketOrdinal) throws IOException {
         BytesValues values = valuesSource.bytesValues();
         if (values == null) {
-            return;
-        }
-        if (counts == null) {
-            count += values.setDocument(doc);
             return;
         }
         if (owningBucketOrdinal >= counts.length) {
@@ -85,9 +78,6 @@ public class CountAggregator extends Aggregator {
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         if (valuesSource == null) {
             return new InternalCount(name, 0);
-        }
-        if (counts == null) {
-            return new InternalCount(name, count);
         }
         if (owningBucketOrdinal >= counts.length) {
             return new InternalCount(name, 0);
