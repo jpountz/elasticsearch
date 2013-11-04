@@ -17,10 +17,12 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.calc.numeric;
+package org.elasticsearch.search.aggregations.calc.numeric.sum;
 
+import org.apache.lucene.util.ArrayUtil;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -32,23 +34,18 @@ import java.io.IOException;
 /**
  *
  */
-public class NumericAggregator<A extends NumericAggregation> extends Aggregator {
+public class SumAggregator extends Aggregator {
 
-    protected final NumericAggregation.Factory<A> aggregationFactory;
-    protected final NumericValuesSource valuesSource;
+    private final NumericValuesSource valuesSource;
 
-    protected final A stats;
+    private double[] sums;
 
-    public NumericAggregator(String name,
-                             NumericValuesSource valuesSource,
-                             NumericAggregation.Factory<A> aggregationFactory,
-                             AggregationContext aggregationContext,
-                             Aggregator parent) {
-
-        super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
-        this.aggregationFactory = aggregationFactory;
+    public SumAggregator(String name, int estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
+        super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, estimatedBucketsCount, context, parent);
         this.valuesSource = valuesSource;
-        this.stats = valuesSource == null ? aggregationFactory.createUnmapped(name) : aggregationFactory.create(name);
+        if (valuesSource != null) {
+            sums = estimatedBucketsCount < 2 ? new double[1] : new double[estimatedBucketsCount];
+        }
     }
 
     @Override
@@ -58,14 +55,20 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
 
     @Override
     public void collect(int doc, int owningBucketOrdinal) throws IOException {
+        assert valuesSource != null : "collect must only be called after #shouldCollect returns true";
+
         DoubleValues values = valuesSource.doubleValues();
         if (values == null) {
             return;
         }
 
+        if (owningBucketOrdinal >= sums.length) {
+            sums = ArrayUtil.grow(sums, owningBucketOrdinal + 1);
+        }
+
         int valuesCount = values.setDocument(doc);
         for (int i = 0; i < valuesCount; i++) {
-            stats.collect(doc, values.nextValue());
+            sums[owningBucketOrdinal] += values.nextValue();
         }
     }
 
@@ -74,37 +77,32 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
     }
 
     @Override
-    public NumericAggregation buildAggregation(int owningBucketOrdinal) {
-        return stats;
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+        if (valuesSource == null) {
+            return new InternalSum(name, 0);
+        }
+        return new InternalSum(name, sums[owningBucketOrdinal]);
     }
 
+    public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
 
-    //============================================== Factory ===============================================//
-
-    public static class Factory<A extends NumericAggregation> extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
-
-        private final NumericAggregation.Factory<A> aggregationFactory;
-
-        public Factory(String name, ValuesSourceConfig<NumericValuesSource> valuesSourceConfig, NumericAggregation.Factory<A> aggregationFactory) {
-            super(name, aggregationFactory.type(), valuesSourceConfig);
-            this.aggregationFactory = aggregationFactory;
-        }
-
-        @Override
-        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
-            return new NumericAggregator<A>(name, null, aggregationFactory, aggregationContext, parent);
+        public Factory(String name, ValuesSourceConfig<NumericValuesSource> valuesSourceConfig) {
+            super(name, InternalSum.TYPE.name(), valuesSourceConfig);
         }
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
+        }
+
+        @Override
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+            return new SumAggregator(name, 0, null, aggregationContext, parent);
         }
 
         @Override
         protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
-            return new NumericAggregator<A>(name, valuesSource, aggregationFactory, aggregationContext, parent);
+            return new SumAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
-
     }
-
 }

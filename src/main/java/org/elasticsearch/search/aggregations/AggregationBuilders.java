@@ -15,7 +15,7 @@ import org.elasticsearch.search.aggregations.calc.bytes.count.CountBuilder;
 import org.elasticsearch.search.aggregations.calc.numeric.avg.AvgBuilder;
 import org.elasticsearch.search.aggregations.calc.numeric.max.MaxBuilder;
 import org.elasticsearch.search.aggregations.calc.numeric.min.MinBuilder;
-import org.elasticsearch.search.aggregations.calc.numeric.stats.ExtendedStatsBuilder;
+import org.elasticsearch.search.aggregations.calc.numeric.stats.extended.ExtendedStatsBuilder;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.StatsBuilder;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.SumBuilder;
 

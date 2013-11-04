@@ -54,8 +54,9 @@ public class InternalSum extends NumericAggregation.SingleValue implements Sum {
 
     InternalSum() {} // for serialization
 
-    InternalSum(String name) {
+    InternalSum(String name, double sum) {
         super(name);
+        this.sum = sum;
     }
 
     @Override
@@ -70,11 +71,6 @@ public class InternalSum extends NumericAggregation.SingleValue implements Sum {
     @Override
     public Type type() {
         return TYPE;
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        sum += value;
     }
 
     @Override
@@ -120,24 +116,6 @@ public class InternalSum extends NumericAggregation.SingleValue implements Sum {
         }
         builder.endObject();
         return builder;
-    }
-
-    public static class Factory implements NumericAggregation.Factory<InternalSum> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalSum create(String name) {
-            return new InternalSum(name);
-        }
-
-        @Override
-        public InternalSum createUnmapped(String name) {
-            return new InternalSum(name);
-        }
     }
 
 }

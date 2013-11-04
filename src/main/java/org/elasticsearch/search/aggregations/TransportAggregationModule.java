@@ -38,7 +38,7 @@ import org.elasticsearch.search.aggregations.calc.bytes.count.InternalCount;
 import org.elasticsearch.search.aggregations.calc.numeric.avg.InternalAvg;
 import org.elasticsearch.search.aggregations.calc.numeric.max.InternalMax;
 import org.elasticsearch.search.aggregations.calc.numeric.min.InternalMin;
-import org.elasticsearch.search.aggregations.calc.numeric.stats.InternalExtendedStats;
+import org.elasticsearch.search.aggregations.calc.numeric.stats.extended.InternalExtendedStats;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.InternalStats;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.InternalSum;
 

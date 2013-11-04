@@ -56,12 +56,14 @@ public class InternalStats extends NumericAggregation.MultiValue implements Stat
     protected double max;
     protected double sum;
 
-    InternalStats() {} // for serialization
+    protected InternalStats() {} // for serialization
 
-    public InternalStats(String name) {
+    public InternalStats(String name, long count, double sum, double min, double max) {
         super(name);
-        this.min = Double.POSITIVE_INFINITY;
-        this.max = Double.NEGATIVE_INFINITY;
+        this.count = count;
+        this.sum = sum;
+        this.min = min;
+        this.max = max;
     }
 
     @Override
@@ -109,14 +111,6 @@ public class InternalStats extends NumericAggregation.MultiValue implements Stat
         } else {
             throw new IllegalArgumentException("Unknown value [" + name + "] in common stats aggregation");
         }
-    }
-
-    @Override
-    public void collect(int doc, double value) {
-        count++;
-        min = Math.min(value, min);
-        max = Math.max(value, max);
-        sum += value;
     }
 
     @Override
@@ -212,23 +206,4 @@ public class InternalStats extends NumericAggregation.MultiValue implements Stat
     protected XContentBuilder otherStatsToXCotent(XContentBuilder builder, Params params) throws IOException {
         return builder;
     }
-
-    public static class Factory implements NumericAggregation.Factory<InternalStats> {
-
-        @Override
-        public String type() {
-            return TYPE.name();
-        }
-
-        @Override
-        public InternalStats create(String name) {
-            return new InternalStats(name);
-        }
-
-        @Override
-        public InternalStats createUnmapped(String name) {
-            return new InternalStats(name);
-        }
-    }
-
 }

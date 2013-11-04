@@ -49,7 +49,7 @@ public class CountAggregator extends Aggregator {
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
             // expectedBucketsCount == 0 means it's a top level bucket
-            this.counts = expectedBucketsCount == 0 ? new long[1] : new long[expectedBucketsCount];
+            this.counts = expectedBucketsCount < 2 ? new long[1] : new long[expectedBucketsCount];
         }
     }
 
