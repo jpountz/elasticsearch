@@ -25,7 +25,6 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -95,7 +94,7 @@ public class RangeAggregator extends Aggregator {
                            AggregationContext aggregationContext,
                            Aggregator parent) {
 
-        super(name, factories, ranges.size(), aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, factories, ranges.size(), aggregationContext, parent);
         this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
@@ -105,7 +104,7 @@ public class RangeAggregator extends Aggregator {
             final Range range = this.ranges[i];
             ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
             range.process(parser, aggregationContext);
-            bucketCollectors[i] = new BucketCollector(i, range, factories.createAggregators(this), ordsAggregators);
+            bucketCollectors[i] = new BucketCollector(i, range, factories.createBucketAggregators(this, multiBucketAggregators, ranges.size()));
         }
         collector = valuesSource == null ? null : new Collector();
     }
@@ -116,17 +115,17 @@ public class RangeAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         collector.collect(doc);
     }
 
     @Override
-    public void postCollection() {
+    protected void doPostCollection() {
         collector.postCollection();
     }
 
     @Override
-    public InternalAggregation buildAggregation() {
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
         for (int i = 0; i < bucketCollectors.length; i++) {
             Range range = bucketCollectors[i].range;
@@ -198,8 +197,8 @@ public class RangeAggregator extends Aggregator {
 
         private final Range range;
 
-        BucketCollector(int ord, Range range, Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(ord, aggregators, ordsAggregators);
+        BucketCollector(int ord, Range range, Aggregator[] aggregators) {
+            super(ord, aggregators);
             this.range = range;
         }
 
@@ -225,7 +224,7 @@ public class RangeAggregator extends Aggregator {
                         Aggregator parent,
                         AbstractRangeBase.Factory factory) {
 
-            super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
+            super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
             this.ranges = ranges;
             this.keyed = keyed;
             this.formatter = formatter;
@@ -239,15 +238,16 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        public void collect(int doc) throws IOException {
+        public void collect(int doc, int owningBucketOrdinal) throws IOException {
         }
 
         @Override
-        public void postCollection() {
+        protected void doPostCollection() {
         }
 
+
         @Override
-        public AbstractRangeBase buildAggregation() {
+        public AbstractRangeBase buildAggregation(int owningBucketOrdinal) {
             List<RangeBase.Bucket> buckets = new ArrayList<RangeBase.Bucket>(ranges.size());
             for (RangeAggregator.Range range : ranges) {
                 range.process(parser, context) ;
@@ -257,7 +257,7 @@ public class RangeAggregator extends Aggregator {
         }
     }
 
-    public static class Factory extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
+    public static class Factory extends ValueSourceAggregatorFactory<NumericValuesSource> {
 
         private final AbstractRangeBase.Factory rangeFactory;
         private final List<Range> ranges;
@@ -268,6 +268,11 @@ public class RangeAggregator extends Aggregator {
             this.rangeFactory = rangeFactory;
             this.ranges = ranges;
             this.keyed = keyed;
+        }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
         @Override

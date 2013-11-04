@@ -130,7 +130,7 @@ public class AggregationPhase implements SearchPhase {
 
         List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length);
         for (Aggregator aggregator : context.aggregations().aggregators()) {
-            aggregations.add(aggregator.buildAggregation());
+            aggregations.add(aggregator.buildAggregation(0));
         }
         context.queryResult().aggregations(new InternalAggregations(aggregations));
 
@@ -155,7 +155,7 @@ public class AggregationPhase implements SearchPhase {
         @Override
         public void collect(int doc) throws IOException {
             for (int i = 0; i < collectors.size(); i++) {
-                collectors.get(i).collect(doc);
+                collectors.get(i).collect(doc, 0);
             }
         }
 

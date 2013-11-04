@@ -45,7 +45,7 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
                              AggregationContext aggregationContext,
                              Aggregator parent) {
 
-        super(name, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.aggregationFactory = aggregationFactory;
         this.valuesSource = valuesSource;
         this.stats = valuesSource == null ? aggregationFactory.createUnmapped(name) : aggregationFactory.create(name);
@@ -57,7 +57,7 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
     }
 
     @Override
-    public void collect(int doc) throws IOException {
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
         DoubleValues values = valuesSource.doubleValues();
         if (values == null) {
             return;
@@ -70,19 +70,18 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
     }
 
     @Override
-    public void postCollection() {
-        //To change body of implemented methods use File | Settings | File Templates.
+    protected void doPostCollection() {
     }
 
     @Override
-    public NumericAggregation buildAggregation() {
+    public NumericAggregation buildAggregation(int owningBucketOrdinal) {
         return stats;
     }
 
 
     //============================================== Factory ===============================================//
 
-    public static class Factory<A extends NumericAggregation> extends ValueSourceAggregatorFactory.Normal<NumericValuesSource> {
+    public static class Factory<A extends NumericAggregation> extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
 
         private final NumericAggregation.Factory<A> aggregationFactory;
 
@@ -94,6 +93,11 @@ public class NumericAggregator<A extends NumericAggregation> extends Aggregator 
         @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new NumericAggregator<A>(name, null, aggregationFactory, aggregationContext, parent);
+        }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
         @Override

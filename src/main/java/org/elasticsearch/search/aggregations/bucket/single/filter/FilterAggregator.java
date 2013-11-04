@@ -53,8 +53,8 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        return new Collector(aggregators, ordsAggregators);
+    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
+        return new Collector(aggregators);
     }
 
 
@@ -74,8 +74,8 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
     class Collector extends BucketCollector {
 
-        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsAggregators);
+        Collector(Aggregator[] aggregators) {
+            super(aggregators);
         }
 
         @Override
@@ -94,7 +94,12 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public Aggregator create(AggregationContext context, Aggregator parent) {
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
+        }
+
+        @Override
+        public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
             FilterAggregator aggregator = new FilterAggregator(name, filter, factories, context, parent);
             context.registerReaderContextAware(aggregator);
             return aggregator;

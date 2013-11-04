@@ -23,7 +23,6 @@ import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.OrdsAggregator;
 import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
@@ -48,8 +47,8 @@ public class MissingAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        return new Collector(aggregators, ordsAggregators);
+    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
+        return new Collector(aggregators);
     }
 
     @Override
@@ -59,8 +58,8 @@ public class MissingAggregator extends SingleBucketAggregator {
 
     class Collector extends BucketCollector {
 
-        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsAggregators);
+        Collector(Aggregator[] aggregators) {
+            super(aggregators);
         }
 
         @Override
@@ -76,10 +75,15 @@ public class MissingAggregator extends SingleBucketAggregator {
         }
     }
 
-    public static class Factory extends ValueSourceAggregatorFactory.Normal {
+    public static class Factory extends ValueSourceAggregatorFactory {
 
         public Factory(String name, ValuesSourceConfig valueSourceConfig) {
             super(name, InternalMissing.TYPE.name(), valueSourceConfig);
+        }
+
+        @Override
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
         @Override

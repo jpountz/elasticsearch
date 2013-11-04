@@ -29,7 +29,10 @@ import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
-import org.elasticsearch.search.aggregations.*;
+import org.elasticsearch.search.aggregations.AggregationExecutionException;
+import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
@@ -69,8 +72,8 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    protected BucketCollector collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-        return new Collector(aggregators, ordsAggregators);
+    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
+        return new Collector(aggregators);
     }
 
     @Override
@@ -96,12 +99,16 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
     class Collector extends BucketCollector {
 
-        Collector(Aggregator[] aggregators, OrdsAggregator[] ordsAggregators) {
-            super(aggregators, ordsAggregators);
+        Collector(Aggregator[] aggregators) {
+            super(aggregators);
         }
 
         @Override
         public void collect(int parentDoc) throws IOException {
+
+            // here we translate the parent doc to a list of its nested docs, and then call super.collect for evey one of them
+            // so they'll be collected
+
             if (parentDoc == 0 || parentDocs == null) {
                 return;
             }
@@ -131,9 +138,13 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public Aggregator create(AggregationContext context, Aggregator parent) {
-            return new NestedAggregator(name, factories, path, context, parent);
+        public BucketAggregationMode bucketMode() {
+            return BucketAggregationMode.PER_BUCKET;
         }
 
+        @Override
+        public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
+            return new NestedAggregator(name, factories, path, context, parent);
+        }
     }
 }
