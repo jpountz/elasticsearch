@@ -218,7 +218,7 @@ public class HistogramAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new HistogramAggregator(name, factories, rounding, order, keyed, computeEmptyBuckets, valuesSource, histogramFactory, aggregationContext, parent);
         }
 

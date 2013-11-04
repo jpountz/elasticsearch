@@ -207,7 +207,7 @@ public class GeoDistanceAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(GeoPointValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(GeoPointValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new GeoDistanceAggregator(name, valuesSource, factories, ranges, aggregationContext, parent);
         }
 
