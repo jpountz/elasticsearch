@@ -28,45 +28,39 @@ import java.util.Arrays;
  * Int array abstraction able to support more than 2B values. This implementation slices data into fixed-sized blocks of
  * configurable length.
  */
-final class BigIntArray extends AbstractBigArray implements IntArray {
+final class BigObjectArray<T> extends AbstractBigArray implements ObjectArray<T> {
 
     /**
      * Page size, 16KB of memory per page.
      */
-    public static final int PAGE_SIZE = (1 << 14) / RamUsageEstimator.NUM_BYTES_INT;
+    public static final int PAGE_SIZE = (1 << 14) / RamUsageEstimator.NUM_BYTES_OBJECT_REF;
     
 
-    private int[][] pages;
+    private Object[][] pages;
 
     /** Constructor. */
-    public BigIntArray(long size) {
+    public BigObjectArray(long size) {
         super(PAGE_SIZE);
         this.size = size;
-        pages = new int[numPages(size)][];
+        pages = new Object[numPages(size)][];
         for (int i = 0; i < pages.length; ++i) {
-            pages[i] = new int[pageSize()];
+            pages[i] = new Object[pageSize()];
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public int get(long index) {
+    public T get(long index) {
         final int pageIndex = pageIndex(index);
         final int indexInPage = indexInPage(index);
-        return pages[pageIndex][indexInPage];
+        return (T) pages[pageIndex][indexInPage];
     }
 
     @Override
-    public void set(long index, int value) {
+    public void set(long index, T value) {
         final int pageIndex = pageIndex(index);
         final int indexInPage = indexInPage(index);
         pages[pageIndex][indexInPage] = value;
-    }
-
-    @Override
-    public int increment(long index, int inc) {
-        final int pageIndex = pageIndex(index);
-        final int indexInPage = indexInPage(index);
-        return pages[pageIndex][indexInPage] += inc;
     }
 
     @Override
@@ -81,7 +75,7 @@ final class BigIntArray extends AbstractBigArray implements IntArray {
             pages = Arrays.copyOf(pages, ArrayUtil.oversize(numPages, RamUsageEstimator.NUM_BYTES_OBJECT_REF));
         }
         for (int i = numPages - 1; i >= 0 && pages[i] == null; --i) {
-            pages[i] = new int[pageSize()];
+            pages[i] = new Object[pageSize()];
         }
         for (int i = numPages; i < pages.length && pages[i] != null; ++i) {
             pages[i] = null;

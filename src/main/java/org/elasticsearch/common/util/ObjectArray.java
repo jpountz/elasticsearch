@@ -20,23 +20,18 @@
 package org.elasticsearch.common.util;
 
 /**
- * Abstraction of an array of integer values.
+ * Abstraction of an array of long values.
  */
-public interface IntArray extends BigArray {
+public interface ObjectArray<T> extends BigArray {
 
     /**
      * Get an element given its index.
      */
-    public abstract int get(long index);
+    public abstract T get(long index);
 
     /**
      * Set a value at the given index.
      */
-    public abstract void set(long index, int value);
-
-    /**
-     * Increment value at the given index by <code>inc</code> and return the value.
-     */
-    public abstract int increment(long index, int inc);
+    public abstract void set(long index, T value);
 
 }
