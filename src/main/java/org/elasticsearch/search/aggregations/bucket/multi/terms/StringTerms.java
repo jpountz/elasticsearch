@@ -72,7 +72,8 @@ public class StringTerms extends InternalTerms {
 
         @Override
         public Number getTermAsNumber() {
-            throw new UnsupportedOperationException("This term is not a number");
+            // this method is needed for scripted numeric faceting
+            return Double.parseDouble(termBytes.utf8ToString());
         }
 
         @Override
