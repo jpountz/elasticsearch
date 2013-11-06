@@ -19,9 +19,10 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
-import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -87,7 +88,7 @@ public class StringTermsAggregator extends Aggregator {
     public StringTerms buildAggregation(int owningBucketOrdinal) {
 
         final BytesRefHash bytes = collector.bucketOrds;
-        final long[] counts = collector.counts;
+        final LongArray counts = collector.counts;
         final int size = Math.min(bytes.size(), requiredSize);
 
         BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
@@ -97,7 +98,7 @@ public class StringTermsAggregator extends Aggregator {
                 spare = new OrdinalBucket();
             }
             bytes.get(i, spare.termBytes);
-            spare.docCount = counts[i];
+            spare.docCount = counts.get(i);
             spare.bucketOrd = i;
             spare = (OrdinalBucket) ordered.insertWithOverflow(spare);
         }
@@ -118,11 +119,11 @@ public class StringTermsAggregator extends Aggregator {
     class Collector {
 
         private final BytesRefHash bucketOrds;
-        private long[] counts;
+        private LongArray counts;
 
         Collector() {
             bucketOrds = new BytesRefHash();
-            counts = new long[INITIAL_CAPACITY];
+            counts = BigArrays.newLongArray(INITIAL_CAPACITY);
         }
 
         public void collect(int doc) throws IOException {
@@ -135,10 +136,10 @@ public class StringTermsAggregator extends Aggregator {
                 int bucketOrdinal = bucketOrds.add(bytes, hash);
                 if (bucketOrdinal < 0) { // already seen
                     bucketOrdinal = - 1 - bucketOrdinal;
-                } else if (bucketOrdinal >= counts.length) { // new bucket, maybe grow
-                    counts = ArrayUtil.grow(counts, bucketOrdinal + 1);
+                } else if (bucketOrdinal >= counts.size()) { // new bucket, maybe grow
+                    counts = BigArrays.grow(counts, bucketOrdinal + 1);
                 }
-                ++counts[bucketOrdinal];
+                counts.increment(bucketOrdinal, 1);
                 for (Aggregator subAggregator : subAggregators) {
                     subAggregator.collect(doc, bucketOrdinal);
                 }

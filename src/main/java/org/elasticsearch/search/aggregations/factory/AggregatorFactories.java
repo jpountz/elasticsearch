@@ -19,8 +19,8 @@
 
 package org.elasticsearch.search.aggregations.factory;
 
-import org.apache.lucene.util.ArrayUtil;
-import org.apache.lucene.util.RamUsageEstimator;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.ObjectArray;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.Aggregator.BucketAggregationMode;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -28,7 +28,6 @@ import org.elasticsearch.search.aggregations.context.AggregationContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -70,11 +69,11 @@ public class AggregatorFactories {
             final Aggregator first = factory.create(parent.context(), parent, estimatedBucketsCount);
             aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, this, 1, first.context(), first.parent()) {
 
-                Aggregator[] aggregators;
+                ObjectArray<Aggregator> aggregators;
 
                 {
-                    aggregators = new Aggregator[estimatedBucketsCount];
-                    aggregators[0] = first;
+                    aggregators = BigArrays.newObjectArray(estimatedBucketsCount);
+                    aggregators.set(0, first);
                 }
 
                 @Override
@@ -84,30 +83,32 @@ public class AggregatorFactories {
 
                 @Override
                 protected void doPostCollection() {
-                    for (int i = 0; i < aggregators.length; ++i) {
-                        if (aggregators[i] != null) {
-                            aggregators[i].postCollection();
+                    for (long i = 0; i < aggregators.size(); ++i) {
+                        final Aggregator aggregator = aggregators.get(i);
+                        if (aggregator != null) {
+                            aggregator.postCollection();
                         }
                     }
                 }
 
                 @Override
                 public void collect(int doc, int owningBucketOrdinal) throws IOException {
-                    if (aggregators.length <= owningBucketOrdinal) {
-                        aggregators = Arrays.copyOf(aggregators, ArrayUtil.oversize(owningBucketOrdinal + 1, RamUsageEstimator.NUM_BYTES_OBJECT_REF));
+                    aggregators = BigArrays.grow(aggregators, owningBucketOrdinal + 1);
+                    Aggregator aggregator = aggregators.get(owningBucketOrdinal);
+                    if (aggregator == null) {
+                        aggregator = factory.create(parent.context(), parent, estimatedBucketsCount);
+                        aggregators.set(owningBucketOrdinal, aggregator);
                     }
-                    if (aggregators[owningBucketOrdinal] == null) {
-                        aggregators[owningBucketOrdinal] = factory.create(parent.context(), parent, estimatedBucketsCount);
-                    }
-                    aggregators[owningBucketOrdinal].collect(doc, 0);
+                    aggregator.collect(doc, 0);
                 }
 
                 @Override
                 public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-                    if (aggregators[owningBucketOrdinal] != null) {
-                        return aggregators[owningBucketOrdinal].buildAggregation(0);
-                    } else {
+                    if (owningBucketOrdinal >= aggregators.size() || aggregators.get(owningBucketOrdinal) == null) {
+                        // nocommit: should we have an Aggregator.buildEmptyAggregation instead? or maybe return null and expect callers to deal with it?
                         return first.buildAggregation(1); // we know 1 is unused since we used 0
+                    } else {
+                        return aggregators.get(owningBucketOrdinal).buildAggregation(owningBucketOrdinal);
                     }
                 }
             };
