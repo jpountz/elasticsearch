@@ -132,7 +132,7 @@ public abstract class Aggregator {
     /**
      * Called after collection of all document is done.
      */
-    public final void postCollection() {
+    public void postCollection() {
         // we "post collect" the multi bucket aggregators once here... then we delegate to doPostCollect to enable the different
         // aggregators to "post collect" all the buckets.
         for (int i = 0; i < multiBucketAggregators.length; i++) {

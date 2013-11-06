@@ -66,7 +66,8 @@ public class AggregatorFactories {
     public Aggregator[] createBucketAggregatorsAsMulti(Aggregator parent, final int estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[count()];
         for (int i = 0; i < perBucket.length; i++) {
-            final Aggregator first = perBucket[i].create(parent.context(), parent, estimatedBucketsCount);
+            final AggregatorFactory factory = perBucket[i];
+            final Aggregator first = factory.create(parent.context(), parent, estimatedBucketsCount);
             aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, this, 1, first.context(), first.parent()) {
 
                 Aggregator[] aggregators;
@@ -96,7 +97,7 @@ public class AggregatorFactories {
                         aggregators = Arrays.copyOf(aggregators, ArrayUtil.oversize(owningBucketOrdinal + 1, RamUsageEstimator.NUM_BYTES_OBJECT_REF));
                     }
                     if (aggregators[owningBucketOrdinal] == null) {
-                        aggregators[owningBucketOrdinal] = perBucket[owningBucketOrdinal].create(parent.context(), parent, estimatedBucketsCount);
+                        aggregators[owningBucketOrdinal] = factory.create(parent.context(), parent, estimatedBucketsCount);
                     }
                     aggregators[owningBucketOrdinal].collect(doc, 0);
                 }
@@ -112,7 +113,7 @@ public class AggregatorFactories {
             };
         }
         for (int i = 0; i < ordinals.length; i++) {
-            aggregators[i] = ordinals[i].create(parent.context(), parent, estimatedBucketsCount);
+            aggregators[i+perBucket.length] = ordinals[i].create(parent.context(), parent, estimatedBucketsCount);
         }
         return aggregators;
     }

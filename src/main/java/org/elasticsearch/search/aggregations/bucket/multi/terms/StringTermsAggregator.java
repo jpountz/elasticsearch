@@ -107,7 +107,7 @@ public class StringTermsAggregator extends Aggregator {
             final OrdinalBucket bucket = (OrdinalBucket) ordered.pop();
             final InternalAggregation[] aggregations = new InternalAggregation[subAggregators.length];
             for (int j = 0; j < subAggregators.length; ++j) {
-                aggregations[j] = subAggregators[j].buildAggregation(i);
+                aggregations[j] = subAggregators[j].buildAggregation(bucket.bucketOrd);
             }
             bucket.aggregations = new InternalAggregations(Arrays.asList(aggregations));
             list[i] = bucket;

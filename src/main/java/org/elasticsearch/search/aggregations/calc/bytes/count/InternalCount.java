@@ -103,4 +103,8 @@ public class InternalCount extends InternalAggregation implements Count {
                 .endObject();
     }
 
+    @Override
+    public String toString() {
+        return "count[" + value + "]";
+    }
 }

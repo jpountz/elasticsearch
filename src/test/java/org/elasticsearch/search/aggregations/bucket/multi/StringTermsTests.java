@@ -306,12 +306,12 @@ public class StringTermsTests extends AbstractIntegrationTest {
     [foo_val4, foo_val5]
 
 
-    foo_val0 - doc_count: 1 - val_count: 1
-    foo_val1 - doc_count: 2 - val_count: 2
-    foo_val2 - doc_count: 2 - val_count: 2
-    foo_val3 - doc_count: 2 - val_count: 2
-    foo_val4 - doc_count: 2 - val_count: 2
-    foo_val5 - doc_count: 1 - val_count: 1
+    foo_val0 - doc_count: 1 - val_count: 2
+    foo_val1 - doc_count: 2 - val_count: 4
+    foo_val2 - doc_count: 2 - val_count: 4
+    foo_val3 - doc_count: 2 - val_count: 4
+    foo_val4 - doc_count: 2 - val_count: 4
+    foo_val5 - doc_count: 1 - val_count: 2
 
     */
 
@@ -344,7 +344,7 @@ public class StringTermsTests extends AbstractIntegrationTest {
                 assertThat(bucket.getDocCount(), equalTo(2l));
                 Count count = bucket.getAggregations().get("count");
                 assertThat(count, notNullValue());
-                assertThat(count.getValue(), equalTo(4l));
+                assertThat("term[" + bucket.getTerm().string() + "]", count.getValue(), equalTo(4l));
             }
         }
     }
