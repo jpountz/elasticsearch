@@ -61,12 +61,7 @@ public class DoubleTerms extends InternalTerms {
 
     static class Bucket extends InternalTerms.Bucket {
 
-        private double term;
-
-        public Bucket(double term, long docCount, List<InternalAggregation> aggregations) {
-            super(docCount, aggregations);
-            this.term = term;
-        }
+        double term;
 
         public Bucket(double term, long docCount, InternalAggregations aggregations) {
             super(docCount, aggregations);

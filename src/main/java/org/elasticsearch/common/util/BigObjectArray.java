@@ -57,10 +57,14 @@ final class BigObjectArray<T> extends AbstractBigArray implements ObjectArray<T>
     }
 
     @Override
-    public void set(long index, T value) {
+    public T set(long index, T value) {
         final int pageIndex = pageIndex(index);
         final int indexInPage = indexInPage(index);
-        pages[pageIndex][indexInPage] = value;
+        final Object[] page = pages[pageIndex];
+        @SuppressWarnings("unchecked")
+        final T ret = (T) page[indexInPage];
+        page[indexInPage] = value;
+        return ret;
     }
 
     @Override

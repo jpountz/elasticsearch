@@ -86,7 +86,6 @@ public class StringTermsAggregator extends Aggregator {
 
     @Override
     public StringTerms buildAggregation(int owningBucketOrdinal) {
-
         final BytesRefHash bytes = collector.bucketOrds;
         final LongArray counts = collector.counts;
         final int size = Math.min(bytes.size(), requiredSize);

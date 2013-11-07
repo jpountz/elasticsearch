@@ -20,7 +20,7 @@
 package org.elasticsearch.common.util;
 
 /**
- * Abstraction of an array of long values.
+ * Abstraction of an array of object values.
  */
 public interface ObjectArray<T> extends BigArray {
 
@@ -30,8 +30,8 @@ public interface ObjectArray<T> extends BigArray {
     public abstract T get(long index);
 
     /**
-     * Set a value at the given index.
+     * Set a value at the given index and return the previous value.
      */
-    public abstract void set(long index, T value);
+    public abstract T set(long index, T value);
 
 }

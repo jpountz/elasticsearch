@@ -62,12 +62,7 @@ public class LongTerms extends InternalTerms {
 
     static class Bucket extends InternalTerms.Bucket {
 
-        private long term;
-
-        public Bucket(long term, long docCount, List<InternalAggregation> aggregations) {
-            super(docCount, aggregations);
-            this.term = term;
-        }
+        long term;
 
         public Bucket(long term, long docCount, InternalAggregations aggregations) {
             super(docCount, aggregations);

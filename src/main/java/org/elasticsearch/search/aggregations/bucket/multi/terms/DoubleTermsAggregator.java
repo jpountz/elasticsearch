@@ -19,16 +19,15 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
-import com.carrotsearch.hppc.DoubleObjectOpenHashMap;
-import com.google.common.collect.ImmutableList;
-import org.elasticsearch.common.collect.BoundedTreeSet;
-import org.elasticsearch.common.recycler.Recycler;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
-import org.elasticsearch.search.facet.terms.support.EntryPriorityQueue;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -38,22 +37,22 @@ import java.util.Arrays;
  */
 public class DoubleTermsAggregator extends Aggregator {
 
+    private static final int INITIAL_CAPACITY = 50; // TODO sizing
+
     private final InternalOrder order;
     private final int requiredSize;
     private final NumericValuesSource valuesSource;
     private final Collector collector;
-    private final Recycler.V<DoubleObjectOpenHashMap<BucketCollector>> bucketCollectors;
-
-    private int ordCounter;
+    private final Aggregator[] subAggregators;
 
     public DoubleTermsAggregator(String name, AggregatorFactories factories, NumericValuesSource valuesSource,
-                                 InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
+                               InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.PER_BUCKET, factories, 50, aggregationContext, parent);
         this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
-        this.bucketCollectors = aggregationContext.cacheRecycler().doubleObjectMap(-1);
-        this.collector = new Collector(bucketCollectors.v());
+        this.collector = new Collector();
+        subAggregators = factories.createBucketAggregatorsAsMulti(this, INITIAL_CAPACITY);
     }
 
     @Override
@@ -71,95 +70,90 @@ public class DoubleTermsAggregator extends Aggregator {
         collector.postCollection();
     }
 
+    // private impl that stores a bucket ord. This allows for computing the aggregations lazily.
+    static class OrdinalBucket extends DoubleTerms.Bucket {
+
+        long bucketOrd;
+
+        public OrdinalBucket() {
+            super(0, 0, (InternalAggregations) null);
+        }
+
+    }
+
     @Override
     public DoubleTerms buildAggregation(int owningBucketOrdinal) {
+        final LongHash values = collector.bucketOrds;
+        final LongArray counts = collector.counts;
+        final int size = (int) Math.min(values.size(), requiredSize);
 
-        if (bucketCollectors.v().isEmpty()) {
-            return new DoubleTerms(name, order, requiredSize, ImmutableList.<InternalTerms.Bucket>of());
+        BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
+        OrdinalBucket spare = null;
+        for (long i = 0; i < values.capacity(); ++i) {
+            final long id = values.id(i);
+            if (id < 0) {
+                // slot is not allocated
+                continue;
+            }
+
+            if (spare == null) {
+                spare = new OrdinalBucket();
+            }
+            spare.term = Double.longBitsToDouble(values.key(i));
+            spare.docCount = counts.get(id);
+            spare.bucketOrd = id;
+            spare = (OrdinalBucket) ordered.insertWithOverflow(spare);
         }
 
-        if (requiredSize < EntryPriorityQueue.LIMIT) {
-            BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
-            Object[] collectors = bucketCollectors.v().values;
-            boolean[] states = bucketCollectors.v().allocated;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    BucketCollector collector = (BucketCollector) collectors[i];
-                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
-                    ordered.insertWithOverflow(bucket);
-                }
+        final InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
+        for (int i = ordered.size() - 1; i >= 0; --i) {
+            final OrdinalBucket bucket = (OrdinalBucket) ordered.pop();
+            final InternalAggregation[] aggregations = new InternalAggregation[subAggregators.length];
+            for (int j = 0; j < subAggregators.length; ++j) {
+                aggregations[j] = subAggregators[j].buildAggregation((int) bucket.bucketOrd); // nocommit bucket ord should be a long
             }
-            bucketCollectors.release();
-            InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
-            for (int i = ordered.size() - 1; i >= 0; i--) {
-                list[i] = (DoubleTerms.Bucket) ordered.pop();
-            }
-            return new DoubleTerms(name, order, requiredSize, Arrays.asList(list));
-        } else {
-            BoundedTreeSet<InternalTerms.Bucket> ordered = new BoundedTreeSet<InternalTerms.Bucket>(order.comparator(), requiredSize);
-            Object[] collectors = bucketCollectors.v().values;
-            boolean[] states = bucketCollectors.v().allocated;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    BucketCollector collector = (BucketCollector) collectors[i];
-                    DoubleTerms.Bucket bucket = new DoubleTerms.Bucket(collector.term, collector.docCount(), collector.buildAggregations());
-                    ordered.add(bucket);
-                }
-            }
-            bucketCollectors.release();
-            return new DoubleTerms(name, order, requiredSize, ordered);
+            bucket.aggregations = new InternalAggregations(Arrays.asList(aggregations));
+            list[i] = bucket;
         }
+        return new DoubleTerms(name, order, valuesSource.formatter(), requiredSize, Arrays.asList(list));
     }
 
     class Collector {
 
-        DoubleObjectOpenHashMap<BucketCollector> bucketCollectors;
+        private final LongHash bucketOrds;
+        private LongArray counts;
 
-        Collector(DoubleObjectOpenHashMap<BucketCollector> bucketCollectors) {
-            this.bucketCollectors = bucketCollectors;
+        Collector() {
+            bucketOrds = new LongHash(INITIAL_CAPACITY);
+            counts = BigArrays.newLongArray(INITIAL_CAPACITY);
         }
 
         public void collect(int doc) throws IOException {
-
-            DoubleValues values = valuesSource.doubleValues();
-            int valuesCount = values.setDocument(doc);
+            final DoubleValues values = valuesSource.doubleValues();
+            final int valuesCount = values.setDocument(doc);
 
             for (int i = 0; i < valuesCount; ++i) {
-                double term = values.nextValue();
-                BucketCollector bucket = bucketCollectors.get(term);
-                if (bucket == null) {
-                    bucket = new BucketCollector(ordCounter++, term, factories.createBucketAggregators(DoubleTermsAggregator.this, multiBucketAggregators, Math.max(50, bucketCollectors.size())));
-                    bucketCollectors.put(term, bucket);
+                final double val = values.nextValue();
+                final long bits = Double.doubleToRawLongBits(val);
+                long bucketOrdinal = bucketOrds.add(bits);
+                if (bucketOrdinal < 0) { // already seen
+                    bucketOrdinal = - 1 - bucketOrdinal;
+                } else if (bucketOrdinal >= counts.size()) { // new bucket, maybe grow
+                    counts = BigArrays.grow(counts, bucketOrdinal + 1);
                 }
-                bucket.collect(doc);
+                counts.increment(bucketOrdinal, 1);
+                for (Aggregator subAggregator : subAggregators) {
+                    subAggregator.collect(doc, (int) bucketOrdinal); // nocommit bucket ord should be a long
+                }
             }
-
         }
 
         public void postCollection() {
-            Object[] collectors = bucketCollectors.values;
-            boolean[] states = bucketCollectors.allocated;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    ((BucketCollector) collectors[i]).postCollection();
-                }
+            for (Aggregator subAggregator : subAggregators) {
+                subAggregator.postCollection();
             }
         }
-    }
 
-    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
-
-        final double term;
-
-        BucketCollector(int ord, double term, Aggregator[] aggregators) {
-            super(ord, aggregators);
-            this.term = term;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            return true;
-        }
     }
 
 }

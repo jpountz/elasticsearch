@@ -56,10 +56,13 @@ final class BigDoubleArray extends AbstractBigArray implements DoubleArray {
     }
 
     @Override
-    public void set(long index, double value) {
+    public double set(long index, double value) {
         final int pageIndex = pageIndex(index);
         final int indexInPage = indexInPage(index);
-        pages[pageIndex][indexInPage] = value;
+        final double[] page = pages[pageIndex];
+        final double ret = page[indexInPage];
+        page[indexInPage] = value;
+        return ret;
     }
 
     @Override

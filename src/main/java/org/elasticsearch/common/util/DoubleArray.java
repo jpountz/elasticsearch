@@ -30,9 +30,9 @@ public interface DoubleArray extends BigArray {
     public abstract double get(long index);
 
     /**
-     * Set a value at the given index.
+     * Set a value at the given index and return the previous value.
      */
-    public abstract void set(long index, double value);
+    public abstract double set(long index, double value);
 
     /**
      * Increment value at the given index by <code>inc</code> and return the value.

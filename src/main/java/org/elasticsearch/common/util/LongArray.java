@@ -30,9 +30,9 @@ public interface LongArray extends BigArray {
     public abstract long get(long index);
 
     /**
-     * Set a value at the given index.
+     * Set a value at the given index and return the previous value.
      */
-    public abstract void set(long index, long value);
+    public abstract long set(long index, long value);
 
     /**
      * Increment value at the given index by <code>inc</code> and return the value.
