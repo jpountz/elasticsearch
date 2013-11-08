@@ -49,25 +49,13 @@ public class AggregatorFactories {
         this.ordinals = ordinals;
     }
 
-    /** Create all aggregators so that they can be consumed with a single bucket. */
-    public Aggregator[] createBucketAggregators(Aggregator parent, Aggregator[] multiBucketAggregators, int estimatedBucketsCount) {
-        Aggregator[] aggregators = new Aggregator[perBucket.length + multiBucketAggregators.length];
-        for (int i = 0; i < perBucket.length; i++) {
-            aggregators[i] = perBucket[i].create(parent.context(), parent, estimatedBucketsCount);
-        }
-        for (int i = 0; i < multiBucketAggregators.length; i++) {
-            aggregators[i+perBucket.length] = multiBucketAggregators[i];
-        }
-        return aggregators;
-    }
-
     /** Create all aggregators so that they can be consumed with multiple buckets. */
-    public Aggregator[] createBucketAggregatorsAsMulti(Aggregator parent, final int estimatedBucketsCount) {
+    public Aggregator[] createSubAggregators(Aggregator parent, final int estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[count()];
         for (int i = 0; i < perBucket.length; i++) {
             final AggregatorFactory factory = perBucket[i];
             final Aggregator first = factory.create(parent.context(), parent, estimatedBucketsCount);
-            aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, this, 1, first.context(), first.parent()) {
+            aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, 1, first.context(), first.parent()) {
 
                 ObjectArray<Aggregator> aggregators;
 
@@ -119,24 +107,6 @@ public class AggregatorFactories {
         return aggregators;
     }
 
-    /** Only create the single-bucket aggregators. */
-    public Aggregator[] createSingleBucketAggregators(Aggregator parent) {
-        Aggregator[] aggregators = new Aggregator[perBucket.length];
-        for (int i = 0; i < perBucket.length; i++) {
-            aggregators[i] = perBucket[i].create(parent.context(), parent, 1);
-        }
-        return aggregators;
-    }
-
-    /** Only create the multi-bucket aggregators */
-    public Aggregator[] createMultiBucketAggregators(Aggregator parent, int estimatedBucketsCount) {
-        Aggregator[] aggregators = new Aggregator[ordinals.length];
-        for (int i = 0; i < ordinals.length; i++) {
-            aggregators[i] = ordinals[i].create(parent.context(), parent, estimatedBucketsCount);
-        }
-        return aggregators;
-    }
-
     public Aggregator[] createTopLevelAggregators(AggregationContext ctx) {
         Aggregator[] aggregators = new Aggregator[perBucket.length + ordinals.length];
         for (int i = 0; i < perBucket.length; i++) {
@@ -150,10 +120,6 @@ public class AggregatorFactories {
 
     public int count() {
         return perBucket.length + ordinals.length;
-    }
-
-    public int perBucketCount() {
-        return perBucket.length;
     }
 
     void setParent(AggregatorFactory parent) {
@@ -184,13 +150,13 @@ public class AggregatorFactories {
         }
 
         @Override
-        public Aggregator[] createMultiBucketAggregators(Aggregator parent, int estimatedBucketsCount) {
-            return EMPTY_AGGREGATORS;
+        public int count() {
+            return 0;
         }
 
         @Override
-        public int count() {
-            return 0;
+        public Aggregator[] createSubAggregators(Aggregator parent, int estimatedBucketsCount) {
+            return EMPTY_AGGREGATORS;
         }
 
         @Override

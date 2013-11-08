@@ -50,10 +50,6 @@ public class UnmappedTermsAggregator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         return new UnmappedTerms(name, order, requiredSize);
     }

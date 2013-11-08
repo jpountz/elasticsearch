@@ -73,10 +73,6 @@ public class SumAggregator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         if (valuesSource == null) {
             return new InternalSum(name, 0);

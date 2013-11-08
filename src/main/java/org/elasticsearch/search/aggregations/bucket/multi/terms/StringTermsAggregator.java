@@ -45,17 +45,15 @@ public class StringTermsAggregator extends Aggregator {
     private final InternalOrder order;
     private final int requiredSize;
     private final Collector collector;
-    private final Aggregator[] subAggregators;
 
     public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
 
-        super(name, BucketAggregationMode.PER_BUCKET, factories, 50, aggregationContext, parent);
+        super(name, BucketAggregationMode.PER_BUCKET, factories, INITIAL_CAPACITY, aggregationContext, parent);
         this.valuesSource = valuesSource;
         this.order = order;
         this.requiredSize = requiredSize;
         this.collector = new Collector();
-        subAggregators = factories.createBucketAggregatorsAsMulti(this, INITIAL_CAPACITY);
     }
 
     @Override
@@ -66,11 +64,6 @@ public class StringTermsAggregator extends Aggregator {
     @Override
     public void collect(int doc, int owningBucketOrdinal) throws IOException {
         collector.collect(doc);
-    }
-
-    @Override
-    protected void doPostCollection() {
-        collector.postCollection();
     }
 
     // private impl that stores a bucket ord. This allows for computing the aggregations lazily.
@@ -142,12 +135,6 @@ public class StringTermsAggregator extends Aggregator {
                 for (Aggregator subAggregator : subAggregators) {
                     subAggregator.collect(doc, bucketOrdinal);
                 }
-            }
-        }
-
-        public void postCollection() {
-            for (Aggregator subAggregator : subAggregators) {
-                subAggregator.postCollection();
             }
         }
     }

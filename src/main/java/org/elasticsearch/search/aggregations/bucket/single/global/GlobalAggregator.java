@@ -22,7 +22,6 @@ package org.elasticsearch.search.aggregations.bucket.single.global;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -40,25 +39,13 @@ public class GlobalAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
-    }
-
-    @Override
     public InternalGlobal buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalGlobal(name, docCount, aggregations);
     }
 
-    class Collector extends BucketCollector {
-
-        Collector(Aggregator[] aggregators) {
-            super(aggregators);
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            return true;
-        }
+    @Override
+    protected boolean onDoc(int doc) throws IOException {
+        return true;
     }
 
     public static class Factory extends AggregatorFactory {

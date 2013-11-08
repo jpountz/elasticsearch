@@ -23,7 +23,6 @@ import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -47,32 +46,20 @@ public class MissingAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
-    }
-
-    @Override
     protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
         return new InternalMissing(name, docCount, aggregations);
     }
 
-    class Collector extends BucketCollector {
-
-        Collector(Aggregator[] aggregators) {
-            super(aggregators);
+    @Override
+    protected boolean onDoc(int doc) throws IOException {
+        if (valuesSource == null) {
+            return true;
         }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            if (valuesSource == null) {
-                return true;
-            }
-            BytesValues values = valuesSource.bytesValues();
-            if (values.setDocument(doc) == 0) {
-                return true;
-            }
-            return false;
+        BytesValues values = valuesSource.bytesValues();
+        if (values.setDocument(doc) == 0) {
+            return true;
         }
+        return false;
     }
 
     public static class Factory extends ValueSourceAggregatorFactory {

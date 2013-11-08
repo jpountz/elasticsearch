@@ -71,10 +71,6 @@ public class CountAggregator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         if (valuesSource == null) {
             return new InternalCount(name, 0);

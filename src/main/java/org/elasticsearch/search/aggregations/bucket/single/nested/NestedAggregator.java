@@ -33,7 +33,6 @@ import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketCollector;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -67,13 +66,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
         parentFilter = aggregationContext.searchContext().filterCache().cache(NonNestedDocsFilter.INSTANCE);
         childFilter = aggregationContext.searchContext().filterCache().cache(objectMapper.nestedTypeFilter());
-
-        aggregationContext.registerReaderContextAware(this);
-    }
-
-    @Override
-    protected BucketCollector bucketCollector(Aggregator[] aggregators) {
-        return new Collector(aggregators);
     }
 
     @Override
@@ -97,35 +89,28 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
     }
 
-    class Collector extends BucketCollector {
+    @Override
+    public void collect(int parentDoc, int bucketOrd) throws IOException {
 
-        Collector(Aggregator[] aggregators) {
-            super(aggregators);
+        // here we translate the parent doc to a list of its nested docs, and then call super.collect for evey one of them
+        // so they'll be collected
+
+        if (parentDoc == 0 || parentDocs == null) {
+            return;
         }
-
-        @Override
-        public void collect(int parentDoc) throws IOException {
-
-            // here we translate the parent doc to a list of its nested docs, and then call super.collect for evey one of them
-            // so they'll be collected
-
-            if (parentDoc == 0 || parentDocs == null) {
-                return;
-            }
-            int prevParentDoc = parentDocs.prevSetBit(parentDoc - 1);
-            for (int i = (parentDoc - 1); i > prevParentDoc; i--) {
-                if (childDocs.get(i)) {
-                    super.collect(i);
-                }
+        int prevParentDoc = parentDocs.prevSetBit(parentDoc - 1);
+        for (int i = (parentDoc - 1); i > prevParentDoc; i--) {
+            if (childDocs.get(i)) {
+                super.collect(i, bucketOrd);
             }
         }
+    }
 
 
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            // this will always be called for every nested (we make sure of that in the #collect method above)
-            return true;
-        }
+    @Override
+    protected boolean onDoc(int doc) throws IOException {
+        // this will always be called for every nested (we make sure of that in the #collect method above)
+        return true;
     }
 
     public static class Factory extends AggregatorFactory {
@@ -144,7 +129,9 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
         @Override
         public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
-            return new NestedAggregator(name, factories, path, context, parent);
+            NestedAggregator aggregator = new NestedAggregator(name, factories, path, context, parent);
+            context.registerReaderContextAware(aggregator);
+            return aggregator;
         }
     }
 }

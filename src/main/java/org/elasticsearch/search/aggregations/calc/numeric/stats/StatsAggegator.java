@@ -102,10 +102,6 @@ public class StatsAggegator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         if (valuesSource == null || owningBucketOrdinal >= counts.length) {
             return new InternalStats(name, 0, 0, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);

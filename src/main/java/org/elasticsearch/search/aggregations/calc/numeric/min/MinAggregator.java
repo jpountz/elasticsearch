@@ -82,10 +82,6 @@ public class MinAggregator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         if (valuesSource == null || owningBucketOrdinal >= mins.length) {
             return new InternalMin(name, Double.POSITIVE_INFINITY);

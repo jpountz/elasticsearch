@@ -22,7 +22,7 @@ package org.elasticsearch.search.aggregations.bucket.single;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketCollector;
+import org.elasticsearch.search.aggregations.bucket.BucketsCollector;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
@@ -33,25 +33,18 @@ import java.io.IOException;
  */
 public abstract class SingleBucketAggregator extends Aggregator {
 
-    protected BucketCollector collector;
+    protected BucketsCollector collector;
 
     protected SingleBucketAggregator(String name, AggregatorFactories factories,
                                      AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.PER_BUCKET, factories, 1, aggregationContext, parent);
-        collector = bucketCollector(factories.createBucketAggregators(this, multiBucketAggregators, 1));
-        assert collector != null : "A single bucket collector must have a non-null collector (created by the #bucketCollector(Aggregator[]) callback method";
+        collector = new BucketsCollector(subAggregators, 1) {
+            @Override
+            protected boolean onDoc(int doc, int bucketOrd) throws IOException {
+                return SingleBucketAggregator.this.onDoc(doc);
+            }
+        };
     }
-
-    /**
-     * Constructs and returns a non-null bucket collector that will be responsible for the aggregation of the single bucket this aggregator
-     * represents.
-     *
-     * This method is called during initialization, meaning, sub-classes cannot rely on class internal class state for deciding which
-     * collector should be returned (it could be that this callback is called before other internal state is initialized)
-     *
-     * As mentioned above. The returned value <strong>must not be {@code null}</strong>
-     */
-    protected abstract BucketCollector bucketCollector(Aggregator[] aggregators);
 
     @Override
     public boolean shouldCollect() {
@@ -60,23 +53,21 @@ public abstract class SingleBucketAggregator extends Aggregator {
 
     @Override
     public void collect(int doc, int owningBucketOrdinal) throws IOException {
-        collector.collect(doc);
-    }
-
-    @Override
-    protected void doPostCollection() {
-        collector.postCollection();
+        collector.collect(doc, 0);
     }
 
     @Override
     public final InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        return buildAggregation(collector.buildAggregations(), collector.docCount());
+        return buildAggregation(collector.buildAggregations(0), collector.docCount(0));
     }
+
+    protected abstract boolean onDoc(int doc) throws IOException;
 
     /**
      * Convenient method to implement... given the aggregations of the single bucket and the number of documents that "fell in" it
      * during the collection time, this method builds the aggregation of this aggregator.
      */
     protected abstract InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount);
+
 
 }

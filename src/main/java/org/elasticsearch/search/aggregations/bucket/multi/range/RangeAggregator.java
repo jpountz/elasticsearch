@@ -65,7 +65,7 @@ public class RangeAggregator extends Aggregator {
 
         @Override
         public String toString() {
-            return "(" + from + " to " + to + "]";
+            return "[" + from + " to " + to + ")";
         }
 
         public void process(ValueParser parser, AggregationContext aggregationContext) {
@@ -79,11 +79,13 @@ public class RangeAggregator extends Aggregator {
     }
 
     private final NumericValuesSource valuesSource;
-    private final Range[] ranges;
     private final boolean keyed;
     private final AbstractRangeBase.Factory rangeFactory;
-    private final Collector collector;
-    private final BucketCollector[] bucketCollectors;
+
+    private final BucketsCollector bucketsCollector;
+    final boolean[] matched;
+    final double[] maxTo;
+    final IntArrayList matchedList;
 
     public RangeAggregator(String name,
                            AggregatorFactories factories,
@@ -98,19 +100,138 @@ public class RangeAggregator extends Aggregator {
         this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
-        bucketCollectors = new BucketCollector[ranges.size()];
-        this.ranges = ranges.toArray(new Range[ranges.size()]);
-        sortRanges();
-        for (int i = 0; i < this.ranges.length; ++i) {
-            final Range range = this.ranges[i];
-            ValueParser parser = valuesSource != null ? valuesSource.parser() : null;
-            range.process(parser, aggregationContext);
-            bucketCollectors[i] = new BucketCollector(i, range, factories.createBucketAggregators(this, multiBucketAggregators, ranges.size()));
+
+        bucketsCollector = new BucketsCollector(subAggregators, ranges.toArray(new Range[ranges.size()]));
+        matched = new boolean[ranges.size()];
+        maxTo = new double[matched.length];
+        maxTo[0] = bucketsCollector.ranges[0].to;
+        for (int i = 1; i < bucketsCollector.ranges.length; ++i) {
+            maxTo[i] = Math.max(bucketsCollector.ranges[i].to,maxTo[i-1]);
         }
-        collector = valuesSource == null ? null : new Collector();
+        matchedList = new IntArrayList();
+
     }
 
-    private void sortRanges() {
+    @Override
+    public boolean shouldCollect() {
+        return valuesSource != null;
+    }
+
+    @Override
+    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+        final DoubleValues values = valuesSource.doubleValues();
+        final int valuesCount = values.setDocument(doc);
+        assert noMatchYet();
+        for (int i = 0; i < valuesCount; ++i) {
+            final double value = values.nextValue();
+            collect(doc, value);
+        }
+        resetMatches();
+    }
+
+    @Override
+    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+        // value source can be null in the case of unmapped fields
+        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
+        return rangeFactory.create(name, bucketsCollector.buildBuckets(), formatter, keyed);
+    }
+
+    private boolean noMatchYet() {
+        for (int i = 0; i < matched.length; ++i) {
+            if (matched[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void resetMatches() {
+        for (int i = 0; i < matchedList.size(); ++i) {
+            matched[matchedList.get(i)] = false;
+        }
+        matchedList.clear();
+    }
+
+    private void collect(int doc, double value) throws IOException {
+        int lo = 0, hi = bucketsCollector.ranges.length - 1; // all candidates are between these indexes
+        int mid = (lo + hi) >>> 1;
+        while (lo <= hi) {
+            if (value < bucketsCollector.ranges[mid].from) {
+                hi = mid - 1;
+            } else if (value >= maxTo[mid]) {
+                lo = mid + 1;
+            } else {
+                break;
+            }
+            mid = (lo + hi) >>> 1;
+        }
+
+        // binary search the lower bound
+        int startLo = lo, startHi = mid;
+        while (startLo <= startHi) {
+            final int startMid = (startLo + startHi) >>> 1;
+            if (value >= maxTo[startMid]) {
+                startLo = startMid + 1;
+            } else {
+                startHi = startMid - 1;
+            }
+        }
+
+        // binary search the upper bound
+        int endLo = mid, endHi = hi;
+        while (endLo <= endHi) {
+            final int endMid = (endLo + endHi) >>> 1;
+            if (value < bucketsCollector.ranges[endMid].from) {
+                endHi = endMid - 1;
+            } else {
+                endLo = endMid + 1;
+            }
+        }
+
+        assert startLo == 0 || value >= maxTo[startLo - 1];
+        assert endHi == bucketsCollector.ranges.length - 1 || value < bucketsCollector.ranges[endHi + 1].from;
+
+        for (int i = startLo; i <= endHi; ++i) {
+            if (!matched[i] && bucketsCollector.ranges[i].matches(value)) {
+                matched[i] = true;
+                matchedList.add(i);
+                bucketsCollector.collect(doc, i);
+            }
+        }
+    }
+
+    class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
+
+        private final Range[] ranges;
+
+        BucketsCollector(Aggregator[] aggregators, Range[] ranges) {
+            super(aggregators, ranges.length);
+            this.ranges = ranges;
+            for (int i = 0; i < ranges.length; i++) {
+                ranges[i].process(valuesSource.parser(), context);
+            }
+            sortRanges(this.ranges);
+        }
+
+        @Override
+        protected boolean onDoc(int doc, int bucketOrd) throws IOException {
+            return true;
+        }
+
+        List<RangeBase.Bucket> buildBuckets() {
+            List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+            for (int i = 0; i < ranges.length; i++) {
+                Range range = ranges[i];
+                RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, docCounts[i],
+                        buildAggregations(i), valuesSource.formatter());
+                buckets.add(bucket);
+            }
+            return buckets;
+        }
+
+    }
+
+    private static final void sortRanges(final Range[] ranges) {
         new InPlaceMergeSorter() {
 
             @Override
@@ -131,150 +252,8 @@ public class RangeAggregator extends Aggregator {
         };
     }
 
-    @Override
-    public boolean shouldCollect() {
-        return collector != null;
-    }
-
-    @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
-        collector.collect(doc);
-    }
-
-    @Override
-    protected void doPostCollection() {
-        collector.postCollection();
-    }
-
-    @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
-        for (int i = 0; i < bucketCollectors.length; i++) {
-            Range range = bucketCollectors[i].range;
-            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketCollectors[i].docCount(),
-                    bucketCollectors[i].buildAggregations(), valuesSource.formatter());
-            buckets.add(bucket);
-        }
-
-        // value source can be null in the case of unmapped fields
-        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-        return rangeFactory.create(name, buckets, formatter, keyed);
-    }
-
-    class Collector {
-
-        final boolean[] matched;
-        final double[] maxTo;
-        final IntArrayList matchedList;
-
-        Collector() {
-            matched = new boolean[ranges.length];
-            maxTo = new double[ranges.length];
-            maxTo[0] = ranges[0].to;
-            for (int i = 1; i < ranges.length; ++i) {
-                maxTo[i] = Math.max(ranges[i].to,maxTo[i-1]);
-            }
-            matchedList = new IntArrayList();
-        }
-
-        public void collect(int doc) throws IOException {
-            final DoubleValues values = valuesSource.doubleValues();
-            final int valuesCount = values.setDocument(doc);
-            assert noMatchYet();
-            for (int i = 0; i < valuesCount; ++i) {
-                final double value = values.nextValue();
-                collect(doc, value);
-            }
-            resetMatches();
-        }
-
-        private boolean noMatchYet() {
-            for (int i = 0; i < ranges.length; ++i) {
-                if (matched[i]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private void resetMatches() {
-            for (int i = 0; i < matchedList.size(); ++i) {
-                matched[matchedList.get(i)] = false;
-            }
-            matchedList.clear();
-        }
-
-        private void collect(int doc, double value) throws IOException {
-            int lo = 0, hi = ranges.length - 1; // all candidates are between these indexes
-            int mid = (lo + hi) >>> 1;
-            while (lo <= hi) {
-                if (value < ranges[mid].from) {
-                    hi = mid - 1;
-                } else if (value >= maxTo[mid]) {
-                    lo = mid + 1;
-                } else {
-                    break;
-                }
-                mid = (lo + hi) >>> 1;
-            }
-
-            // binary search the lower bound
-            int startLo = lo, startHi = mid;
-            while (startLo <= startHi) {
-                final int startMid = (startLo + startHi) >>> 1;
-                if (value >= maxTo[startMid]) {
-                    startLo = startMid + 1;
-                } else {
-                    startHi = startMid - 1;
-                }
-            }
-
-            // binary search the upper bound
-            int endLo = mid, endHi = hi;
-            while (endLo <= endHi) {
-                final int endMid = (endLo + endHi) >>> 1;
-                if (value < ranges[endMid].from) {
-                    endHi = endMid - 1;
-                } else {
-                    endLo = endMid + 1;
-                }
-            }
-
-            assert startLo == 0 || value >= maxTo[startLo - 1];
-            assert endHi == ranges.length - 1 || value < ranges[endHi + 1].from;
-
-            for (int i = startLo; i <= endHi; ++i) {
-                if (!matched[i] && ranges[i].matches(value)) {
-                    matched[i] = true;
-                    matchedList.add(i);
-                    bucketCollectors[i].collect(doc);
-                }
-            }
-        }
-
-        public void postCollection() {
-            for (int i = 0; i < bucketCollectors.length; i++) {
-                bucketCollectors[i].postCollection();
-            }
-        }
-    }
-
-    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
-
-        private final Range range;
-
-        BucketCollector(int ord, Range range, Aggregator[] aggregators) {
-            super(ord, aggregators);
-            this.range = range;
-        }
-
-        @Override
-        protected boolean onDoc(int doc) throws IOException {
-            return true;
-        }
-    }
-
     public static class Unmapped extends Aggregator {
+
         private final List<RangeAggregator.Range> ranges;
         private final boolean keyed;
         private final AbstractRangeBase.Factory factory;
@@ -292,6 +271,9 @@ public class RangeAggregator extends Aggregator {
 
             super(name, BucketAggregationMode.PER_BUCKET, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
             this.ranges = ranges;
+            for (Range range : this.ranges) {
+                range.process(parser, context);
+            }
             this.keyed = keyed;
             this.formatter = formatter;
             this.parser = parser;
@@ -308,15 +290,9 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        protected void doPostCollection() {
-        }
-
-
-        @Override
         public AbstractRangeBase buildAggregation(int owningBucketOrdinal) {
             List<RangeBase.Bucket> buckets = new ArrayList<RangeBase.Bucket>(ranges.size());
             for (RangeAggregator.Range range : ranges) {
-                range.process(parser, context) ;
                 buckets.add(factory.createBucket(range.key, range.from, range.to, 0, InternalAggregations.EMPTY, formatter));
             }
             return factory.create(name, buckets, formatter, keyed);

@@ -49,7 +49,7 @@ public abstract class Aggregator {
 
     protected final BucketAggregationMode bucketAggregationMode;
     protected final AggregatorFactories factories;
-    protected final Aggregator[] multiBucketAggregators;
+    protected final Aggregator[] subAggregators;
 
     /**
      * Constructs a new Aggregator.
@@ -67,9 +67,9 @@ public abstract class Aggregator {
         this.context = context;
         this.depth = parent == null ? 0 : 1 + parent.depth();
         this.bucketAggregationMode = bucketAggregationMode;
-        this.factories = factories;
         assert factories != null : "sub-factories provided to BucketAggregator must not be null, use AggragatorFactories.EMPTY instead";
-        this.multiBucketAggregators = factories.createMultiBucketAggregators(this, estimatedBucketsCount);
+        this.factories = factories;
+        this.subAggregators = factories.createSubAggregators(this, estimatedBucketsCount);
     }
 
     /**
@@ -132,23 +132,21 @@ public abstract class Aggregator {
     /**
      * Called after collection of all document is done.
      */
-    public void postCollection() {
-        // we "post collect" the multi bucket aggregators once here... then we delegate to doPostCollect to enable the different
-        // aggregators to "post collect" all the buckets.
-        for (int i = 0; i < multiBucketAggregators.length; i++) {
-            multiBucketAggregators[i].postCollection();
+    public final void postCollection() {
+        for (int i = 0; i < subAggregators.length; i++) {
+            subAggregators[i].postCollection();
         }
         doPostCollection();
     }
 
     /**
-     * Should be implemented by aggregators to "finalize" the collection process. "Bucketing" aggregators will typically use this callback
-     * to call {@link #postCollection()} on the "per_bucket" aggregators in each of their buckets.
+     * Can be overriden by aggregator implementation to be called back when the collection phase ends.
      */
-    protected abstract void doPostCollection();
+    protected void doPostCollection() {
+    }
 
     /**
-     * @return  The aggregated & built get.
+     * @return  The aggregated & built aggregation
      */
     public abstract InternalAggregation buildAggregation(int owningBucketOrdinal);
 

@@ -73,117 +73,92 @@ public class GeoDistanceAggregator extends Aggregator {
         }
     }
 
-    private final BucketCollector[] bucketCollectors;
-
     private final GeoPointValuesSource valuesSource;
 
-    private final Collector collector;
+    private final BucketsCollector bucketsCollector;
+    final boolean[] matched;
+    final IntArrayList matchedList;
+
 
     public GeoDistanceAggregator(String name, GeoPointValuesSource valuesSource, AggregatorFactories factories,
                                  List<DistanceRange> ranges, AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.PER_BUCKET, factories, ranges.size(), aggregationContext, parent);
         this.valuesSource = valuesSource;
-        bucketCollectors = new BucketCollector[ranges.size()];
-        int i = 0;
-        for (DistanceRange range : ranges) {
-            bucketCollectors[i++] = new BucketCollector(i, range, factories.createBucketAggregators(this, multiBucketAggregators, ranges.size()));
-        }
-        collector = valuesSource == null ? null : new Collector();
+        bucketsCollector = new BucketsCollector(subAggregators, ranges);
+        matched = new boolean[ranges.size()];
+        matchedList = new IntArrayList(matched.length);
     }
 
     @Override
     public boolean shouldCollect() {
-        return collector != null;
+        return valuesSource != null;
     }
 
     @Override
     public void collect(int doc, int owningBucketOrdinal) throws IOException {
-        collector.collect(doc);
+        final GeoPointValues values = valuesSource.values();
+        final int valuesCount = values.setDocument(doc);
+        assert noMatchYet();
+        for (int i = 0; i < valuesCount; ++i) {
+            final GeoPoint value = values.nextValue();
+            collect(doc, value);
+        }
+        resetMatches();
     }
 
-    @Override
-    protected void doPostCollection() {
-        collector.postCollection();
+    private boolean noMatchYet() {
+        for (int i = 0; i < matched.length; ++i) {
+            if (matched[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void resetMatches() {
+        for (int i = 0; i < matchedList.size(); ++i) {
+            matched[matchedList.get(i)] = false;
+        }
+        matchedList.clear();
+    }
+
+    private void collect(int doc, GeoPoint value) throws IOException {
+        for (int i = 0; i < bucketsCollector.ranges.length; i++) {
+            if (!matched[i] && bucketsCollector.ranges[i].matches(value)) {
+                matched[i] = bucketsCollector.collect(doc, i);
+                matchedList.add(i);
+            }
+        }
     }
 
     @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(bucketCollectors.length);
-        for (BucketCollector collector : bucketCollectors) {
-            InternalAggregations aggregations = collector.buildAggregations();
-            DistanceRange range = collector.range;
-            InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, collector.docCount(), aggregations);
-            buckets.add(bucket);
-        }
-        return new InternalGeoDistance(name, buckets);
+        return new InternalGeoDistance(name, bucketsCollector.buildBuckets());
     }
 
-    class Collector {
+    private static class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
 
-        final boolean[] matched;
-        final IntArrayList matchedList;
+        private DistanceRange[] ranges;
 
-        Collector() {
-            matched = new boolean[bucketCollectors.length];
-            matchedList = new IntArrayList(matched.length);
-        }
-
-        public void collect(int doc) throws IOException {
-            final GeoPointValues values = valuesSource.values();
-            final int valuesCount = values.setDocument(doc);
-            assert noMatchYet();
-            for (int i = 0; i < valuesCount; ++i) {
-                final GeoPoint value = values.nextValue();
-                collect(doc, value);
-            }
-            resetMatches();
-        }
-
-        private boolean noMatchYet() {
-            for (int i = 0; i < matched.length; ++i) {
-                if (matched[i]) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private void resetMatches() {
-            for (int i = 0; i < matchedList.size(); ++i) {
-                matched[matchedList.get(i)] = false;
-            }
-            matchedList.clear();
-        }
-
-        private void collect(int doc, GeoPoint value) throws IOException {
-            for (int i = 0; i < bucketCollectors.length; ++i) {
-                if (!matched[i] && bucketCollectors[i].range.matches(value)) {
-                    matched[i] = true;
-                    matchedList.add(i);
-                    bucketCollectors[i].collect(doc);
-                }
-            }
-        }
-
-        public void postCollection() {
-            for (BucketCollector collector : bucketCollectors) {
-                collector.postCollection();
-            }
-        }
-    }
-
-    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
-
-        private final DistanceRange range;
-
-        BucketCollector(int ord, DistanceRange range, Aggregator[] aggregators) {
-            super(ord, aggregators);
-            this.range = range;
+        BucketsCollector(Aggregator[] aggregators, List<DistanceRange> ranges) {
+            super(aggregators, ranges.size());
+            this.ranges = ranges.toArray(new DistanceRange[ranges.size()]);
         }
 
         @Override
-        protected boolean onDoc(int doc) throws IOException {
+        protected boolean onDoc(int doc, int bucketOrd) throws IOException {
             return true;
+        }
+
+        List<GeoDistance.Bucket> buildBuckets() {
+            List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+            for (int i = 0; i < ranges.length; i++) {
+                InternalAggregations aggregations = buildAggregations(i);
+                DistanceRange range = ranges[i];
+                InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCounts[i], aggregations);
+                buckets.add(bucket);
+            }
+            return buckets;
         }
     }
 

@@ -36,6 +36,7 @@ import java.util.List;
  *     <li>perform any aggregation that is associated with this bucket</li>
  * </ol>
  */
+@Deprecated
 public abstract class BucketCollector {
 
     // the ordinal of the bucket
@@ -70,28 +71,17 @@ public abstract class BucketCollector {
      * propagate the doc to all the aggregators in the bucket.
      *
      * @param doc   The doc to collect
+     * @return      Whether the doc "fell in"/"belongs to" the bucket or not
      */
-    public void collect(int doc) throws IOException {
+    public boolean collect(int doc) throws IOException {
         if (onDoc(doc)) {
             docCount++;
             for (int i = 0; i < aggregators.length; i++) {
                 aggregators[i].collect(doc, ord);
             }
+            return true;
         }
-    }
-
-    /**
-     * Called after all documents where collected.
-     */
-    public void postCollection() {
-        // we only need to call postCollection on the per_bucket aggregators. The ordinals aggregators are
-        // shared among all buckets and therefore they are "post collected" at the aggregator level (see Aggregator#postCollection())
-        for (int i = 0; i < aggregators.length; i++) {
-            if (aggregators[i].bucketAggregationMode() == Aggregator.BucketAggregationMode.PER_BUCKET && aggregators[i].shouldCollect()) {
-                aggregators[i].postCollection();
-            }
-        }
-
+        return false;
     }
 
     /**
@@ -113,7 +103,7 @@ public abstract class BucketCollector {
     }
 
     /**
-     * @return The number of documents in the bucket - should only be called after {@link #postCollection()} is called.
+     * @return The number of documents in the bucket.
      */
     public long docCount() {
         return docCount;

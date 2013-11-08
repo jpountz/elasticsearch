@@ -40,7 +40,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
+ * nocommit change this aggregator to be based on {@link org.elasticsearch.search.aggregations.bucket.BucketsCollector}
+ * so we can get rid of the (now deprecated) {@link org.elasticsearch.search.aggregations.bucket.BucketCollector} class
  */
 public class HistogramAggregator extends Aggregator {
 
@@ -87,11 +88,6 @@ public class HistogramAggregator extends Aggregator {
     }
 
     @Override
-    protected void doPostCollection() {
-        collector.postCollection();
-    }
-
-    @Override
     public InternalAggregation buildAggregation(int owningBucketOrdinal) {
         List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(bucketCollectors.v().size());
         boolean[] allocated = bucketCollectors.v().allocated;
@@ -123,15 +119,6 @@ public class HistogramAggregator extends Aggregator {
         // a reusable list of matched buckets which is used when dealing with multi-valued fields. see #populateMatchedBuckets method
         private final ReusableGrowableArray<BucketCollector> matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
 
-        public void postCollection() {
-            Object[] values = bucketCollectors.values;
-            for (int i = 0; i < bucketCollectors.allocated.length; i++) {
-                if (bucketCollectors.allocated[i]) {
-                    ((BucketCollector) values[i]).postCollection();
-                }
-            }
-        }
-
         public void collect(int doc) throws IOException {
 
             LongValues values = valuesSource.longValues();
@@ -145,7 +132,7 @@ public class HistogramAggregator extends Aggregator {
                 long key = rounding.round(value);
                 BucketCollector bucketCollector = bucketCollectors.get(key);
                 if (bucketCollector == null) {
-                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, factories.createBucketAggregators(HistogramAggregator.this, multiBucketAggregators, Math.max(50, bucketCollectors.size())));
+                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, subAggregators);
                     bucketCollectors.put(key, bucketCollector);
                 } else if (bucketCollector.matched) {
                     continue;
