@@ -53,7 +53,7 @@ public class TermsAggregatorFactory extends ValueSourceAggregatorFactory {
     }
 
     @Override
-    protected Aggregator create(ValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+    protected Aggregator create(ValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
         if (valuesSource instanceof BytesValuesSource) {
             return new StringTermsAggregator(name, factories, valuesSource, order, requiredSize, aggregationContext, parent);
         }

@@ -19,7 +19,9 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.avg;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.DoubleArray;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -38,21 +40,17 @@ public class AvgAggregator extends Aggregator {
 
     private final NumericValuesSource valuesSource;
 
-    private long[] counts;
-    private double[] sums;
+    private LongArray counts;
+    private DoubleArray sums;
 
 
-    public AvgAggregator(String name, int estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
+    public AvgAggregator(String name, long estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, estimatedBucketsCount, context, parent);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
-            if (estimatedBucketsCount < 2) {
-                counts = new long[1];
-                sums = new double[1];
-            } else {
-                counts = new long[estimatedBucketsCount];
-                sums = new double[estimatedBucketsCount];
-            }
+            final long initialSize = estimatedBucketsCount < 2 ? 1 : estimatedBucketsCount;
+            counts = BigArrays.newLongArray(initialSize);
+            sums = BigArrays.newDoubleArray(initialSize);
         }
     }
 
@@ -62,7 +60,7 @@ public class AvgAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         assert valuesSource != null : "if value source is null, collect should never be called";
 
         DoubleValues values = valuesSource.doubleValues();
@@ -70,25 +68,24 @@ public class AvgAggregator extends Aggregator {
             return;
         }
 
-        if (owningBucketOrdinal >= counts.length) {
-            counts = ArrayUtil.grow(counts, owningBucketOrdinal + 1);
-            sums = ArrayUtil.grow(sums, owningBucketOrdinal + 1);
-        }
+        counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
+        sums = BigArrays.grow(sums, owningBucketOrdinal + 1);
 
-        int valueCount = values.setDocument(doc);
-        counts[owningBucketOrdinal] += valueCount;
+        final int valueCount = values.setDocument(doc);
+        counts.increment(owningBucketOrdinal, valueCount);
+        double sum = 0;
         for (int i = 0; i < valueCount; i++) {
-            sums[owningBucketOrdinal] += values.nextValue();
+            sum += values.nextValue();
         }
-
+        sums.increment(owningBucketOrdinal, sum);
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= counts.length) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        if (valuesSource == null || owningBucketOrdinal >= counts.size()) {
             return new InternalAvg(name, 0l, 0);
         }
-        return new InternalAvg(name, sums[owningBucketOrdinal], counts[owningBucketOrdinal]);
+        return new InternalAvg(name, sums.get(owningBucketOrdinal), counts.get(owningBucketOrdinal));
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
@@ -108,7 +105,7 @@ public class AvgAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new AvgAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
     }

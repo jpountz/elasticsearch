@@ -88,7 +88,7 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
+        public Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount) {
             FilterAggregator aggregator = new FilterAggregator(name, filter, factories, context, parent);
             context.registerReaderContextAware(aggregator);
             return aggregator;

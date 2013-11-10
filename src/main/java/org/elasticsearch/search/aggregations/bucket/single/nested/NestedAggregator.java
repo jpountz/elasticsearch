@@ -90,7 +90,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    public void collect(int parentDoc, int bucketOrd) throws IOException {
+    public void collect(int parentDoc, long bucketOrd) throws IOException {
 
         // here we translate the parent doc to a list of its nested docs, and then call super.collect for evey one of them
         // so they'll be collected
@@ -128,7 +128,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
+        public Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount) {
             NestedAggregator aggregator = new NestedAggregator(name, factories, path, context, parent);
             context.registerReaderContextAware(aggregator);
             return aggregator;

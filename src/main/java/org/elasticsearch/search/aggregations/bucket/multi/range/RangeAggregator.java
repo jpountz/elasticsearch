@@ -118,7 +118,7 @@ public class RangeAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         final DoubleValues values = valuesSource.doubleValues();
         final int valuesCount = values.setDocument(doc);
         assert noMatchYet();
@@ -130,7 +130,7 @@ public class RangeAggregator extends Aggregator {
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         // value source can be null in the case of unmapped fields
         ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
         return rangeFactory.create(name, bucketsCollector.buildBuckets(), formatter, keyed);
@@ -286,11 +286,11 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        public void collect(int doc, int owningBucketOrdinal) throws IOException {
+        public void collect(int doc, long owningBucketOrdinal) throws IOException {
         }
 
         @Override
-        public AbstractRangeBase buildAggregation(int owningBucketOrdinal) {
+        public AbstractRangeBase buildAggregation(long owningBucketOrdinal) {
             List<RangeBase.Bucket> buckets = new ArrayList<RangeBase.Bucket>(ranges.size());
             for (RangeAggregator.Range range : ranges) {
                 buckets.add(factory.createBucket(range.key, range.from, range.to, 0, InternalAggregations.EMPTY, formatter));
@@ -323,7 +323,7 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new RangeAggregator(name, factories, valuesSource, rangeFactory, ranges, keyed, aggregationContext, parent);
         }
     }

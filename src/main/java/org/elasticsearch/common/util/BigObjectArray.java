@@ -33,7 +33,7 @@ final class BigObjectArray<T> extends AbstractBigArray implements ObjectArray<T>
     /**
      * Page size, 16KB of memory per page.
      */
-    public static final int PAGE_SIZE = (1 << 14) / RamUsageEstimator.NUM_BYTES_OBJECT_REF;
+    public static final int PAGE_SIZE = BigArrays.PAGE_SIZE_IN_BYTES / RamUsageEstimator.NUM_BYTES_OBJECT_REF;
     
 
     private Object[][] pages;

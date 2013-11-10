@@ -19,7 +19,8 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.sum;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -38,13 +39,14 @@ public class SumAggregator extends Aggregator {
 
     private final NumericValuesSource valuesSource;
 
-    private double[] sums;
+    private DoubleArray sums;
 
-    public SumAggregator(String name, int estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
+    public SumAggregator(String name, long estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, estimatedBucketsCount, context, parent);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
-            sums = estimatedBucketsCount < 2 ? new double[1] : new double[estimatedBucketsCount];
+            final long initialSize = estimatedBucketsCount < 2 ? 1 : estimatedBucketsCount;
+            sums = BigArrays.newDoubleArray(initialSize);
         }
     }
 
@@ -54,7 +56,7 @@ public class SumAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         assert valuesSource != null : "collect must only be called after #shouldCollect returns true";
 
         DoubleValues values = valuesSource.doubleValues();
@@ -62,22 +64,22 @@ public class SumAggregator extends Aggregator {
             return;
         }
 
-        if (owningBucketOrdinal >= sums.length) {
-            sums = ArrayUtil.grow(sums, owningBucketOrdinal + 1);
-        }
+        sums = BigArrays.grow(sums, owningBucketOrdinal + 1);
 
-        int valuesCount = values.setDocument(doc);
+        final int valuesCount = values.setDocument(doc);
+        double sum = 0;
         for (int i = 0; i < valuesCount; i++) {
-            sums[owningBucketOrdinal] += values.nextValue();
+            sum += values.nextValue();
         }
+        sums.increment(owningBucketOrdinal, sum);
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         if (valuesSource == null) {
             return new InternalSum(name, 0);
         }
-        return new InternalSum(name, sums[owningBucketOrdinal]);
+        return new InternalSum(name, sums.get(owningBucketOrdinal));
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
@@ -97,7 +99,7 @@ public class SumAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new SumAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
     }

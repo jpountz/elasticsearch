@@ -57,7 +57,7 @@ public abstract class ValueSourceAggregatorFactory<VS extends ValuesSource> exte
     }
 
     @Override
-    public Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount) {
+    public Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount) {
         if (valuesSourceConfig.unmapped()) {
             return createUnmapped(context, parent);
         }
@@ -74,7 +74,7 @@ public abstract class ValueSourceAggregatorFactory<VS extends ValuesSource> exte
 
     protected abstract Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent);
 
-    protected abstract Aggregator create(VS valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent);
+    protected abstract Aggregator create(VS valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent);
 
     private static <VS extends ValuesSource> ValuesSourceConfig<VS> resolveValuesSourceConfigFromAncestors(String aggName, AggregatorFactory parent, Class<VS> requiredValuesSourceType) {
         ValuesSourceConfig config;

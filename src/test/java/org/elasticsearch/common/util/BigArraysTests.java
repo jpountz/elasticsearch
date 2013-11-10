@@ -21,6 +21,8 @@ package org.elasticsearch.common.util;
 
 import org.elasticsearch.test.ElasticsearchTestCase;
 
+import java.util.Arrays;
+
 public class BigArraysTests extends ElasticsearchTestCase {
 
     public void testIntArrayGrowth() {
@@ -84,6 +86,26 @@ public class BigArraysTests extends ElasticsearchTestCase {
         }
         for (int i = 0; i < totalLen; ++i) {
             assertSame(ref[i], array.get(i));
+        }
+    }
+
+    public void testDoubleArrayFill() {
+        final int len = randomIntBetween(1, 100000);
+        final int fromIndex = randomIntBetween(0, len - 1);
+        final int toIndex = randomBoolean()
+            ? Math.min(fromIndex + randomInt(100), len) // single page
+            : randomIntBetween(fromIndex, len); // likely multiple pages
+        final DoubleArray array2 = BigArrays.newDoubleArray(len);
+        final double[] array1 = new double[len];
+        for (int i = 0; i < len; ++i) {
+            array1[i] = randomDouble();
+            array2.set(i, array1[i]);
+        }
+        final double rand = randomDouble();
+        Arrays.fill(array1, fromIndex, toIndex, rand);
+        array2.fill(fromIndex, toIndex, rand);
+        for (int i = 0; i < len; ++i) {
+            assertEquals(array1[i], array2.get(i), 0.001d);
         }
     }
 

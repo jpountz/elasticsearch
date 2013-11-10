@@ -19,7 +19,8 @@
 
 package org.elasticsearch.search.aggregations.calc.bytes.count;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -42,14 +43,15 @@ public class CountAggregator extends Aggregator {
     private final BytesValuesSource valuesSource;
 
     // a count per bucket
-    long[] counts;
+    LongArray counts;
 
-    public CountAggregator(String name, int expectedBucketsCount, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
+    public CountAggregator(String name, long expectedBucketsCount, BytesValuesSource valuesSource, AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, 0, aggregationContext, parent);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
             // expectedBucketsCount == 0 means it's a top level bucket
-            this.counts = expectedBucketsCount < 2 ? new long[1] : new long[expectedBucketsCount];
+            final long initialSize = expectedBucketsCount < 2 ? 1 : expectedBucketsCount;
+            counts = BigArrays.newLongArray(initialSize);
         }
     }
 
@@ -59,26 +61,21 @@ public class CountAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         BytesValues values = valuesSource.bytesValues();
         if (values == null) {
             return;
         }
-        if (owningBucketOrdinal >= counts.length) {
-            counts = ArrayUtil.grow(counts, owningBucketOrdinal+1);
-        }
-        counts[owningBucketOrdinal] += values.setDocument(doc);
+        counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
+        counts.increment(owningBucketOrdinal, values.setDocument(doc));
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        if (valuesSource == null) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        if (valuesSource == null || owningBucketOrdinal >= counts.size()) {
             return new InternalCount(name, 0);
         }
-        if (owningBucketOrdinal >= counts.length) {
-            return new InternalCount(name, 0);
-        }
-        return new InternalCount(name, counts[owningBucketOrdinal]);
+        return new InternalCount(name, counts.get(owningBucketOrdinal));
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<BytesValuesSource> {
@@ -93,7 +90,7 @@ public class CountAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(BytesValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(BytesValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new CountAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
 

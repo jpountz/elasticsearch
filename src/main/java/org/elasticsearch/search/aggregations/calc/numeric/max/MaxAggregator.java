@@ -19,7 +19,8 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.max;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -30,7 +31,6 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 /**
  *
@@ -39,19 +39,15 @@ public class MaxAggregator extends Aggregator {
 
     private final NumericValuesSource valuesSource;
 
-    private double[] maxes;
+    private DoubleArray maxes;
 
-    public MaxAggregator(String name, int estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
+    public MaxAggregator(String name, long estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, estimatedBucketsCount, context, parent);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
-            if (estimatedBucketsCount < 2) {
-                maxes =  new double[1];
-                maxes[0] = Double.NEGATIVE_INFINITY;
-            } else {
-                maxes = new double[estimatedBucketsCount];
-                Arrays.fill(maxes, Double.NEGATIVE_INFINITY);
-            }
+            final long initialSize = estimatedBucketsCount < 2 ? 1 : estimatedBucketsCount;
+            maxes = BigArrays.newDoubleArray(initialSize);
+            maxes.fill(0, maxes.size(), Double.NEGATIVE_INFINITY);
         }
     }
 
@@ -61,7 +57,7 @@ public class MaxAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         assert valuesSource != null : "collect should only be called when value source is not null";
 
         DoubleValues values = valuesSource.doubleValues();
@@ -69,24 +65,26 @@ public class MaxAggregator extends Aggregator {
             return;
         }
 
-        if (owningBucketOrdinal >= maxes.length) {
-            int from = maxes.length;
-            maxes = ArrayUtil.grow(maxes, owningBucketOrdinal + 1);
-            Arrays.fill(maxes, from, maxes.length, Double.NEGATIVE_INFINITY);
+        if (owningBucketOrdinal >= maxes.size()) {
+            long from = maxes.size();
+            maxes = BigArrays.grow(maxes, owningBucketOrdinal + 1);
+            maxes.fill(from, maxes.size(), Double.NEGATIVE_INFINITY);
         }
 
-        int valueCount = values.setDocument(doc);
+        final int valueCount = values.setDocument(doc);
+        double max = maxes.get(owningBucketOrdinal);
         for (int i = 0; i < valueCount; i++) {
-            maxes[owningBucketOrdinal] = Math.max(maxes[owningBucketOrdinal], values.nextValue());
+            max = Math.max(max, values.nextValue());
         }
+        maxes.set(owningBucketOrdinal, max);
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= maxes.length) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        if (valuesSource == null || owningBucketOrdinal >= maxes.size()) {
             return new InternalMax(name, Double.NEGATIVE_INFINITY);
         }
-        return new InternalMax(name, maxes[owningBucketOrdinal]);
+        return new InternalMax(name, maxes.get(owningBucketOrdinal));
     }
 
 
@@ -107,7 +105,7 @@ public class MaxAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new MaxAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
     }

@@ -33,7 +33,7 @@ final class BigLongArray extends AbstractBigArray implements LongArray {
     /**
      * Page size, 16KB of memory per page.
      */
-    public static final int PAGE_SIZE = (1 << 14) / RamUsageEstimator.NUM_BYTES_LONG;
+    public static final int PAGE_SIZE = BigArrays.PAGE_SIZE_IN_BYTES / RamUsageEstimator.NUM_BYTES_LONG;
     
 
     private long[][] pages;

@@ -107,7 +107,7 @@ public abstract class AggregatorFactory {
      *
      * @return                      The created aggregator
      */
-    public abstract Aggregator create(AggregationContext context, Aggregator parent, int expectedBucketsCount);
+    public abstract Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount);
 
     public void doValidate() {
     }

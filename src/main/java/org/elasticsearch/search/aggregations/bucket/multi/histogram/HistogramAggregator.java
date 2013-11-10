@@ -83,12 +83,12 @@ public class HistogramAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         collector.collect(doc);
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(bucketCollectors.v().size());
         boolean[] allocated = bucketCollectors.v().allocated;
         Object[] collectors = this.bucketCollectors.v().values;
@@ -205,7 +205,7 @@ public class HistogramAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new HistogramAggregator(name, factories, rounding, order, keyed, computeEmptyBuckets, valuesSource, histogramFactory, aggregationContext, parent);
         }
 

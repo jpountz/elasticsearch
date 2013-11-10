@@ -46,11 +46,11 @@ public class UnmappedTermsAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         return new UnmappedTerms(name, order, requiredSize);
     }
 

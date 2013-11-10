@@ -50,7 +50,7 @@ public class AggregatorFactories {
     }
 
     /** Create all aggregators so that they can be consumed with multiple buckets. */
-    public Aggregator[] createSubAggregators(Aggregator parent, final int estimatedBucketsCount) {
+    public Aggregator[] createSubAggregators(Aggregator parent, final long estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[count()];
         for (int i = 0; i < perBucket.length; i++) {
             final AggregatorFactory factory = perBucket[i];
@@ -80,7 +80,7 @@ public class AggregatorFactories {
                 }
 
                 @Override
-                public void collect(int doc, int owningBucketOrdinal) throws IOException {
+                public void collect(int doc, long owningBucketOrdinal) throws IOException {
                     aggregators = BigArrays.grow(aggregators, owningBucketOrdinal + 1);
                     Aggregator aggregator = aggregators.get(owningBucketOrdinal);
                     if (aggregator == null) {
@@ -91,7 +91,7 @@ public class AggregatorFactories {
                 }
 
                 @Override
-                public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+                public InternalAggregation buildAggregation(long owningBucketOrdinal) {
                     if (owningBucketOrdinal >= aggregators.size() || aggregators.get(owningBucketOrdinal) == null) {
                         // nocommit: should we have an Aggregator.buildEmptyAggregation instead? or maybe return null and expect callers to deal with it?
                         return first.buildAggregation(1); // we know 1 is unused since we used 0
@@ -155,7 +155,7 @@ public class AggregatorFactories {
         }
 
         @Override
-        public Aggregator[] createSubAggregators(Aggregator parent, int estimatedBucketsCount) {
+        public Aggregator[] createSubAggregators(Aggregator parent, long estimatedBucketsCount) {
             return EMPTY_AGGREGATORS;
         }
 

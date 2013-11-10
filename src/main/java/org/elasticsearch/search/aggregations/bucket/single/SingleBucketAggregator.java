@@ -52,12 +52,12 @@ public abstract class SingleBucketAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         collector.collect(doc, 0);
     }
 
     @Override
-    public final InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public final InternalAggregation buildAggregation(long owningBucketOrdinal) {
         return buildAggregation(collector.buildAggregations(0), collector.docCount(0));
     }
 

@@ -61,7 +61,7 @@ public abstract class Aggregator {
      * @param context               The aggregation context
      * @param parent                The parent aggregator (may be {@code null} for top level aggregators)
      */
-    protected Aggregator(String name, BucketAggregationMode bucketAggregationMode, AggregatorFactories factories, int estimatedBucketsCount, AggregationContext context, Aggregator parent) {
+    protected Aggregator(String name, BucketAggregationMode bucketAggregationMode, AggregatorFactories factories, long estimatedBucketsCount, AggregationContext context, Aggregator parent) {
         this.name = name;
         this.parent = parent;
         this.context = context;
@@ -127,7 +127,7 @@ public abstract class Aggregator {
      *                              equal to 0.
      * @throws IOException
      */
-    public abstract void collect(int doc, int owningBucketOrdinal) throws IOException;
+    public abstract void collect(int doc, long owningBucketOrdinal) throws IOException;
 
     /**
      * Called after collection of all document is done.
@@ -148,7 +148,7 @@ public abstract class Aggregator {
     /**
      * @return  The aggregated & built aggregation
      */
-    public abstract InternalAggregation buildAggregation(int owningBucketOrdinal);
+    public abstract InternalAggregation buildAggregation(long owningBucketOrdinal);
 
 
 }

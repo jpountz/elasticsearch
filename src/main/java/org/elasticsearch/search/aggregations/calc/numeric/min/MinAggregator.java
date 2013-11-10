@@ -19,7 +19,8 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.min;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -30,7 +31,6 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 /**
  *
@@ -39,18 +39,16 @@ public class MinAggregator extends Aggregator {
 
     private final NumericValuesSource valuesSource;
 
-    private double[] mins;
+    private DoubleArray mins;
 
-    public MinAggregator(String name, int estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
+    public MinAggregator(String name, long estimatedBucketsCount, NumericValuesSource valuesSource, AggregationContext context, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, estimatedBucketsCount, context, parent);
         this.valuesSource = valuesSource;
         if (valuesSource != null) {
-            if (estimatedBucketsCount < 2) {
-                mins =  new double[1];
-                mins[0] = Double.POSITIVE_INFINITY;
-            } else {
-                mins = new double[estimatedBucketsCount];
-                Arrays.fill(mins, Double.POSITIVE_INFINITY);
+            if (valuesSource != null) {
+                final long initialSize = estimatedBucketsCount < 2 ? 1 : estimatedBucketsCount;
+                mins = BigArrays.newDoubleArray(initialSize);
+                mins.fill(0, mins.size(), Double.POSITIVE_INFINITY);
             }
         }
     }
@@ -61,7 +59,7 @@ public class MinAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         assert valuesSource != null : "collect must only be called if #shouldCollect returns true";
 
         DoubleValues values = valuesSource.doubleValues();
@@ -69,24 +67,26 @@ public class MinAggregator extends Aggregator {
             return;
         }
 
-        if (owningBucketOrdinal >= mins.length) {
-            int from = mins.length;
-            mins = ArrayUtil.grow(mins, owningBucketOrdinal + 1);
-            Arrays.fill(mins, from, mins.length, Double.POSITIVE_INFINITY);
+        if (owningBucketOrdinal >= mins.size()) {
+            long from = mins.size();
+            mins = BigArrays.grow(mins, owningBucketOrdinal + 1);
+            mins.fill(from, mins.size(), Double.POSITIVE_INFINITY);
         }
 
-        int valuesCount = values.setDocument(doc);
-        for (int i = 0; i < valuesCount; i++) {
-            mins[owningBucketOrdinal] = Math.min(mins[owningBucketOrdinal], values.nextValue());
+        final int valueCount = values.setDocument(doc);
+        double min = mins.get(owningBucketOrdinal);
+        for (int i = 0; i < valueCount; i++) {
+            min = Math.min(min, values.nextValue());
         }
+        mins.set(owningBucketOrdinal, min);
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= mins.length) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        if (valuesSource == null || owningBucketOrdinal >= mins.size()) {
             return new InternalMin(name, Double.POSITIVE_INFINITY);
         }
-        return new InternalMin(name, mins[owningBucketOrdinal]);
+        return new InternalMin(name, mins.get(owningBucketOrdinal));
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
@@ -106,7 +106,7 @@ public class MinAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(NumericValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(NumericValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new MinAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
     }

@@ -95,7 +95,7 @@ public class GeoDistanceAggregator extends Aggregator {
     }
 
     @Override
-    public void collect(int doc, int owningBucketOrdinal) throws IOException {
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
         final GeoPointValues values = valuesSource.values();
         final int valuesCount = values.setDocument(doc);
         assert noMatchYet();
@@ -132,7 +132,7 @@ public class GeoDistanceAggregator extends Aggregator {
     }
 
     @Override
-    public InternalAggregation buildAggregation(int owningBucketOrdinal) {
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         return new InternalGeoDistance(name, bucketsCollector.buildBuckets());
     }
 
@@ -182,7 +182,7 @@ public class GeoDistanceAggregator extends Aggregator {
         }
 
         @Override
-        protected Aggregator create(GeoPointValuesSource valuesSource, int expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+        protected Aggregator create(GeoPointValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
             return new GeoDistanceAggregator(name, valuesSource, factories, ranges, aggregationContext, parent);
         }
 

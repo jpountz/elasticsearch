@@ -23,9 +23,19 @@ import com.google.common.base.Preconditions;
 import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.RamUsageEstimator;
 
+import java.util.Arrays;
+
 /** Utility class to work with arrays. */
 public enum BigArrays {
     ;
+
+    /** Page size in bytes: 16KB */
+    public static final int PAGE_SIZE_IN_BYTES = 1 << 14;
+
+    /** Returns the next size to grow when working with parallel arrays that may have different page sizes or number of bytes per element. */
+    public static long overSize(long minTargetSize) {
+        return overSize(minTargetSize, PAGE_SIZE_IN_BYTES / 8, 1);
+    }
 
     /** Return the next size to grow to that is &gt;= <code>minTargetSize</code>.
      *  Inspired from {@link ArrayUtil#oversize(int, int)} and adapted to play nicely with paging. */
@@ -154,6 +164,13 @@ public enum BigArrays {
         public double increment(long index, double inc) {
             assert indexIsInt(index);
             return array[(int) index] += inc;
+        }
+
+        @Override
+        public void fill(long fromIndex, long toIndex, double value) {
+            assert indexIsInt(fromIndex);
+            assert indexIsInt(toIndex);
+            Arrays.fill(array, (int) fromIndex, (int) toIndex, value);
         }
 
     }
