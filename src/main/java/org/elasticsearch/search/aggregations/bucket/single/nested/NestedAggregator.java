@@ -26,14 +26,14 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
@@ -43,16 +43,17 @@ import java.io.IOException;
 /**
  *
  */
-public class NestedAggregator extends SingleBucketAggregator implements ReaderContextAware {
+public class NestedAggregator extends Aggregator implements ReaderContextAware {
 
     private final Filter parentFilter;
     private final Filter childFilter;
+    private LongArray counts;
 
     private Bits childDocs;
     private FixedBitSet parentDocs;
 
     public NestedAggregator(String name, AggregatorFactories factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, factories, aggregationContext, parent);
+        super(name, BucketAggregationMode.MULTI_BUCKETS, factories, parent == null ? 1 : parent.estimatedBucketCount(), aggregationContext, parent);
         MapperService.SmartNameObjectMapper mapper = aggregationContext.searchContext().smartNameObjectMapper(nestedPath);
         if (mapper == null) {
             throw new AggregationExecutionException("facet nested path [" + nestedPath + "] not found");
@@ -66,18 +67,24 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
         parentFilter = aggregationContext.searchContext().filterCache().cache(NonNestedDocsFilter.INSTANCE);
         childFilter = aggregationContext.searchContext().filterCache().cache(objectMapper.nestedTypeFilter());
+        counts = BigArrays.newLongArray(parent == null ? 1 : parent.estimatedBucketCount());
     }
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
-        return new InternalNested(name, docCount, aggregations);
+    public boolean shouldCollect() {
+        return true;
+    }
+
+    @Override
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalNested(name, counts.get(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
     }
 
     @Override
     public void setNextReader(AtomicReaderContext reader) {
         try {
             DocIdSet docIdSet = parentFilter.getDocIdSet(reader, null);
-            // Im ES if parent is deleted, then also the children are deleted. Therefore acceptedDocs can also null here.
+            // In ES if parent is deleted, then also the children are deleted. Therefore acceptedDocs can also null here.
             childDocs = DocIdSets.toSafeBits(reader.reader(), childFilter.getDocIdSet(reader, null));
             if (DocIdSets.isEmpty(docIdSet)) {
                 parentDocs = null;
@@ -99,18 +106,15 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
             return;
         }
         int prevParentDoc = parentDocs.prevSetBit(parentDoc - 1);
+        int numChildren = 0;
         for (int i = (parentDoc - 1); i > prevParentDoc; i--) {
             if (childDocs.get(i)) {
-                super.collect(i, bucketOrd);
+                ++numChildren;
+                collectSubAggregators(i, bucketOrd);
             }
         }
-    }
-
-
-    @Override
-    protected boolean onDoc(int doc) throws IOException {
-        // this will always be called for every nested (we make sure of that in the #collect method above)
-        return true;
+        counts = BigArrays.grow(counts, bucketOrd + 1);
+        counts.increment(bucketOrd, numChildren);
     }
 
     public static class Factory extends AggregatorFactory {
@@ -124,7 +128,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
         }
 
         @Override

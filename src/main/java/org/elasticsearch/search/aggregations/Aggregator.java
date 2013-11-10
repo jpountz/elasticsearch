@@ -47,6 +47,7 @@ public abstract class Aggregator {
     protected final Aggregator parent;
     protected final AggregationContext context;
     protected final int depth;
+    protected final long estimatedBucketCount;
 
     protected final BucketAggregationMode bucketAggregationMode;
     protected final AggregatorFactories factories;
@@ -65,6 +66,7 @@ public abstract class Aggregator {
     protected Aggregator(String name, BucketAggregationMode bucketAggregationMode, AggregatorFactories factories, long estimatedBucketsCount, AggregationContext context, Aggregator parent) {
         this.name = name;
         this.parent = parent;
+        this.estimatedBucketCount = estimatedBucketsCount;
         this.context = context;
         this.depth = parent == null ? 0 : 1 + parent.depth();
         this.bucketAggregationMode = bucketAggregationMode;
@@ -78,6 +80,11 @@ public abstract class Aggregator {
      */
     public String name() {
         return name;
+    }
+
+    /** Return the estimated number of buckets. */
+    public final long estimatedBucketCount() {
+        return estimatedBucketCount;
     }
 
     /** Return the depth of this aggregator in the aggregation tree. */
