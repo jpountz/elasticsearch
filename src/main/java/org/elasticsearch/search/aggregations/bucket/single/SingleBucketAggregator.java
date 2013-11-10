@@ -58,7 +58,7 @@ public abstract class SingleBucketAggregator extends Aggregator {
 
     @Override
     public final InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return buildAggregation(collector.buildAggregations(0), collector.docCount(0));
+        return buildAggregation(buildSubAggregations(0), collector.docCount(0));
     }
 
     protected abstract boolean onDoc(int doc) throws IOException;

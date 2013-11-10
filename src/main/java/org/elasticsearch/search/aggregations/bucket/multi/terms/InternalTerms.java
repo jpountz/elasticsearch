@@ -42,10 +42,6 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
         protected long docCount;
         protected InternalAggregations aggregations;
 
-        protected Bucket(long docCount, List<InternalAggregation> aggregations) {
-            this(docCount, new InternalAggregations(aggregations));
-        }
-
         protected Bucket(long docCount, InternalAggregations aggregations) {
             this.docCount = docCount;
             this.aggregations = aggregations;

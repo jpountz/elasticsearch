@@ -22,12 +22,8 @@ package org.elasticsearch.search.aggregations.bucket;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
 public abstract class BucketsCollector {
 
@@ -53,14 +49,6 @@ public abstract class BucketsCollector {
 
     public long bucketsCount() {
         return docCounts.size();
-    }
-
-    public InternalAggregations buildAggregations(long bucketOrd) {
-        List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length);
-        for (int i = 0; i < aggregators.length; i++) {
-            aggregations.add(aggregators[i].buildAggregation(bucketOrd));
-        }
-        return new InternalAggregations(aggregations);
     }
 
     /**

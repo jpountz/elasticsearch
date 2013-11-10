@@ -136,7 +136,7 @@ public class GeoDistanceAggregator extends Aggregator {
         return new InternalGeoDistance(name, bucketsCollector.buildBuckets());
     }
 
-    private static class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
+    private class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
 
         private DistanceRange[] ranges;
 
@@ -153,7 +153,7 @@ public class GeoDistanceAggregator extends Aggregator {
         List<GeoDistance.Bucket> buildBuckets() {
             List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
             for (int i = 0; i < ranges.length; i++) {
-                InternalAggregations aggregations = buildAggregations(i);
+                InternalAggregations aggregations = buildSubAggregations(i);
                 DistanceRange range = ranges[i];
                 InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCount(i), aggregations);
                 buckets.add(bucket);

@@ -223,7 +223,7 @@ public class RangeAggregator extends Aggregator {
             for (int i = 0; i < ranges.length; i++) {
                 Range range = ranges[i];
                 RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, docCount(i),
-                        buildAggregations(i), valuesSource.formatter());
+                        buildSubAggregations(i), valuesSource.formatter());
                 buckets.add(bucket);
             }
             return buckets;
