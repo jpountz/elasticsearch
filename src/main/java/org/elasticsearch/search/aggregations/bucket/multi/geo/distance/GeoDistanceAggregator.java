@@ -146,7 +146,7 @@ public class GeoDistanceAggregator extends Aggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, int bucketOrd) throws IOException {
+        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
             return true;
         }
 
@@ -155,7 +155,7 @@ public class GeoDistanceAggregator extends Aggregator {
             for (int i = 0; i < ranges.length; i++) {
                 InternalAggregations aggregations = buildAggregations(i);
                 DistanceRange range = ranges[i];
-                InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCounts[i], aggregations);
+                InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCount(i), aggregations);
                 buckets.add(bucket);
             }
             return buckets;

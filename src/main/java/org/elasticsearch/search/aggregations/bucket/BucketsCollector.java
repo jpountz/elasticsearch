@@ -19,7 +19,8 @@
 
 package org.elasticsearch.search.aggregations.bucket;
 
-import org.apache.lucene.util.ArrayUtil;
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
@@ -31,19 +32,17 @@ import java.util.List;
 public abstract class BucketsCollector {
 
     protected final Aggregator[] aggregators;
-    protected long[] docCounts;
+    protected LongArray docCounts;
 
-    public BucketsCollector(Aggregator[] aggregators, int expectedBucketsCount) {
+    public BucketsCollector(Aggregator[] aggregators, long expectedBucketsCount) {
         this.aggregators = aggregators;
-        this.docCounts = new long[expectedBucketsCount];
+        this.docCounts = BigArrays.newLongArray(expectedBucketsCount);
     }
 
-    public boolean collect(int doc, int bucketOrd) throws IOException {
+    public boolean collect(int doc, long bucketOrd) throws IOException {
         if (onDoc(doc, bucketOrd)) {
-            if (bucketOrd >= docCounts.length) {
-                docCounts = ArrayUtil.grow(docCounts, bucketOrd + 1);
-            }
-            docCounts[bucketOrd]++;
+            docCounts = BigArrays.grow(docCounts, bucketOrd + 1);
+            docCounts.increment(bucketOrd, 1);
             for (int i = 0; i < aggregators.length; i++) {
                 aggregators[i].collect(doc, bucketOrd);
             }
@@ -52,11 +51,11 @@ public abstract class BucketsCollector {
         return false;
     }
 
-    public int bucketsCount() {
-        return docCounts.length;
+    public long bucketsCount() {
+        return docCounts.size();
     }
 
-    public InternalAggregations buildAggregations(int bucketOrd) {
+    public InternalAggregations buildAggregations(long bucketOrd) {
         List<InternalAggregation> aggregations = new ArrayList<InternalAggregation>(aggregators.length);
         for (int i = 0; i < aggregators.length; i++) {
             aggregations.add(aggregators[i].buildAggregation(bucketOrd));
@@ -67,13 +66,13 @@ public abstract class BucketsCollector {
     /**
      * @return The number of documents in the bucket.
      */
-    public long docCount(int bucketOrd) {
-        if (bucketOrd >= docCounts.length) {
+    public long docCount(long bucketOrd) {
+        if (bucketOrd >= docCounts.size()) {
             return 0;
         }
-        return docCounts[bucketOrd];
+        return docCounts.get(bucketOrd);
     }
 
-    protected abstract boolean onDoc(int doc, int bucketOrd) throws IOException;
+    protected abstract boolean onDoc(int doc, long bucketOrd) throws IOException;
 
 }

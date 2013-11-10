@@ -214,7 +214,7 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        protected boolean onDoc(int doc, int bucketOrd) throws IOException {
+        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
             return true;
         }
 
@@ -222,7 +222,7 @@ public class RangeAggregator extends Aggregator {
             List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
             for (int i = 0; i < ranges.length; i++) {
                 Range range = ranges[i];
-                RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, docCounts[i],
+                RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, docCount(i),
                         buildAggregations(i), valuesSource.formatter());
                 buckets.add(bucket);
             }

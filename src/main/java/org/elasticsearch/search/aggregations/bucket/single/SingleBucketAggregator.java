@@ -40,7 +40,7 @@ public abstract class SingleBucketAggregator extends Aggregator {
         super(name, BucketAggregationMode.PER_BUCKET, factories, 1, aggregationContext, parent);
         collector = new BucketsCollector(subAggregators, 1) {
             @Override
-            protected boolean onDoc(int doc, int bucketOrd) throws IOException {
+            protected boolean onDoc(int doc, long bucketOrd) throws IOException {
                 return SingleBucketAggregator.this.onDoc(doc);
             }
         };
