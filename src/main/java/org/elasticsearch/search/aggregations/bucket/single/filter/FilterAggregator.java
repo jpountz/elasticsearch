@@ -24,10 +24,10 @@ import org.apache.lucene.search.Filter;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
+import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -42,26 +42,29 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
     private final Filter filter;
 
-    Bits bits;
+    private Bits bits;
 
     public FilterAggregator(String name,
                             org.apache.lucene.search.Filter filter,
                             AggregatorFactories factories,
                             AggregationContext aggregationContext,
                             Aggregator parent) {
-
         super(name, factories, aggregationContext, parent);
         this.filter = filter;
     }
 
     @Override
-    protected boolean onDoc(int doc) throws IOException {
-        return bits.get(doc);
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalFilter(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
     }
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
-        return new InternalFilter(name, docCount, aggregations);
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        if (bits.get(doc)) {
+            collectSubAggregators(doc, owningBucketOrdinal);
+            counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
+            counts.increment(owningBucketOrdinal, 1);
+        }
     }
 
     @Override
@@ -84,7 +87,7 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
         }
 
         @Override

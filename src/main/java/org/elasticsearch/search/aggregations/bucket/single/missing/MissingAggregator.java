@@ -19,10 +19,9 @@
 
 package org.elasticsearch.search.aggregations.bucket.single.missing;
 
-import org.elasticsearch.index.fielddata.BytesValues;
+import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -46,20 +45,17 @@ public class MissingAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    protected InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount) {
-        return new InternalMissing(name, docCount, aggregations);
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalMissing(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
     }
 
     @Override
-    protected boolean onDoc(int doc) throws IOException {
-        if (valuesSource == null) {
-            return true;
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        if (valuesSource == null || valuesSource.bytesValues().setDocument(doc) == 0) {
+            collectSubAggregators(doc, owningBucketOrdinal);
+            counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
+            counts.increment(owningBucketOrdinal, 1);
         }
-        BytesValues values = valuesSource.bytesValues();
-        if (values.setDocument(doc) == 0) {
-            return true;
-        }
-        return false;
     }
 
     public static class Factory extends ValueSourceAggregatorFactory {
@@ -70,7 +66,7 @@ public class MissingAggregator extends SingleBucketAggregator {
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
         }
 
         @Override

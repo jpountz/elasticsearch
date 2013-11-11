@@ -27,13 +27,13 @@ import org.apache.lucene.util.FixedBitSet;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
@@ -43,17 +43,16 @@ import java.io.IOException;
 /**
  *
  */
-public class NestedAggregator extends Aggregator implements ReaderContextAware {
+public class NestedAggregator extends SingleBucketAggregator implements ReaderContextAware {
 
     private final Filter parentFilter;
     private final Filter childFilter;
-    private LongArray counts;
 
     private Bits childDocs;
     private FixedBitSet parentDocs;
 
     public NestedAggregator(String name, AggregatorFactories factories, String nestedPath, AggregationContext aggregationContext, Aggregator parent) {
-        super(name, BucketAggregationMode.MULTI_BUCKETS, factories, parent == null ? 1 : parent.estimatedBucketCount(), aggregationContext, parent);
+        super(name, factories, aggregationContext, parent);
         MapperService.SmartNameObjectMapper mapper = aggregationContext.searchContext().smartNameObjectMapper(nestedPath);
         if (mapper == null) {
             throw new AggregationExecutionException("facet nested path [" + nestedPath + "] not found");
@@ -67,17 +66,11 @@ public class NestedAggregator extends Aggregator implements ReaderContextAware {
         }
         parentFilter = aggregationContext.searchContext().filterCache().cache(NonNestedDocsFilter.INSTANCE);
         childFilter = aggregationContext.searchContext().filterCache().cache(objectMapper.nestedTypeFilter());
-        counts = BigArrays.newLongArray(parent == null ? 1 : parent.estimatedBucketCount());
-    }
-
-    @Override
-    public boolean shouldCollect() {
-        return true;
     }
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalNested(name, counts.get(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
+        return new InternalNested(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
     }
 
     @Override

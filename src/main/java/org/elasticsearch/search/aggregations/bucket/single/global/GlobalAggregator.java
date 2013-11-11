@@ -19,9 +19,10 @@
 
 package org.elasticsearch.search.aggregations.bucket.single.global;
 
+import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -39,13 +40,15 @@ public class GlobalAggregator extends SingleBucketAggregator {
     }
 
     @Override
-    public InternalGlobal buildAggregation(InternalAggregations aggregations, long docCount) {
-        return new InternalGlobal(name, docCount, aggregations);
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalGlobal(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
     }
 
     @Override
-    protected boolean onDoc(int doc) throws IOException {
-        return true;
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        collectSubAggregators(doc, owningBucketOrdinal);
+        counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
+        counts.increment(owningBucketOrdinal, 1);
     }
 
     public static class Factory extends AggregatorFactory {
@@ -56,7 +59,7 @@ public class GlobalAggregator extends SingleBucketAggregator {
 
         @Override
         public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
+            return BucketAggregationMode.MULTI_BUCKETS;
         }
 
         @Override

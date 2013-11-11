@@ -19,31 +19,23 @@
 
 package org.elasticsearch.search.aggregations.bucket.single;
 
+import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
-import org.elasticsearch.search.aggregations.bucket.BucketsCollector;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
-import java.io.IOException;
-
 /**
- * A bucket aggregator that creates a single bucket
+ * A bucket aggregator that doesn't create new buckets.
  */
 public abstract class SingleBucketAggregator extends Aggregator {
 
-    protected BucketsCollector collector;
+    protected LongArray counts;
 
     protected SingleBucketAggregator(String name, AggregatorFactories factories,
                                      AggregationContext aggregationContext, Aggregator parent) {
-        super(name, BucketAggregationMode.PER_BUCKET, factories, 1, aggregationContext, parent);
-        collector = new BucketsCollector(subAggregators, 1) {
-            @Override
-            protected boolean onDoc(int doc, long bucketOrd) throws IOException {
-                return SingleBucketAggregator.this.onDoc(doc);
-            }
-        };
+        super(name, BucketAggregationMode.MULTI_BUCKETS, factories, parent == null ? 1 : parent.estimatedBucketCount(), aggregationContext, parent);
+        counts = BigArrays.newLongArray(parent == null ? 1 : parent.estimatedBucketCount());
     }
 
     @Override
@@ -51,23 +43,12 @@ public abstract class SingleBucketAggregator extends Aggregator {
         return true;
     }
 
-    @Override
-    public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        collector.collect(doc, 0);
+    protected final long docCount(long bucketOrdinal) {
+        if (bucketOrdinal >= counts.size()) {
+            return 0;
+        } else {
+            return counts.get(bucketOrdinal);
+        }
     }
-
-    @Override
-    public final InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return buildAggregation(buildSubAggregations(0), collector.docCount(0));
-    }
-
-    protected abstract boolean onDoc(int doc) throws IOException;
-
-    /**
-     * Convenient method to implement... given the aggregations of the single bucket and the number of documents that "fell in" it
-     * during the collection time, this method builds the aggregation of this aggregator.
-     */
-    protected abstract InternalAggregation buildAggregation(InternalAggregations aggregations, long docCount);
-
 
 }
