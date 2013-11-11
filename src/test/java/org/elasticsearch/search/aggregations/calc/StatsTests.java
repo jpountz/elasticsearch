@@ -35,6 +35,8 @@ public class StatsTests extends AbstractNumericTests {
 
     @Test
     public void testUnmapped() throws Exception {
+        client().admin().cluster().prepareHealth("idx2").setWaitForGreenStatus().execute().actionGet();
+
         SearchResponse searchResponse = client().prepareSearch("idx2")
                 .setQuery(matchAllQuery())
                 .addAggregation(stats("stats").field("value"))

@@ -47,7 +47,9 @@ public class AggregatorFactories {
         this.factories = factories;
     }
 
-    /** Create all aggregators so that they can be consumed with multiple buckets. */
+    /**
+     * Create all aggregators so that they can be consumed with multiple buckets.
+     */
     public Aggregator[] createSubAggregators(Aggregator parent, final long estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[count()];
         for (int i = 0; i < factories.length; ++i) {
