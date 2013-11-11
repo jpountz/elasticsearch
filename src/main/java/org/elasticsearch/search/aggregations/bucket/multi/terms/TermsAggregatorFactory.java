@@ -43,11 +43,6 @@ public class TermsAggregatorFactory extends ValueSourceAggregatorFactory {
     }
 
     @Override
-    public Aggregator.BucketAggregationMode bucketMode() {
-        return Aggregator.BucketAggregationMode.PER_BUCKET;
-    }
-
-    @Override
     protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
         return new UnmappedTermsAggregator(name, order, requiredSize, aggregationContext, parent);
     }

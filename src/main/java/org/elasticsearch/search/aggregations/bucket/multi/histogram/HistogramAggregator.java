@@ -195,11 +195,6 @@ public class HistogramAggregator extends Aggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
-        }
-
-        @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new HistogramAggregator(name, factories, rounding, order, keyed, computeEmptyBuckets, null, histogramFactory, aggregationContext, parent);
         }

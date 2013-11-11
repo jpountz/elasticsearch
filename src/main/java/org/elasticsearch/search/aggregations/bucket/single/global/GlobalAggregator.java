@@ -58,11 +58,6 @@ public class GlobalAggregator extends SingleBucketAggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         public Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount) {
             if (parent != null) {
                 throw new AggregationExecutionException("Aggregation [" + parent.name() + "] cannot have a global " +

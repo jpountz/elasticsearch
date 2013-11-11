@@ -37,24 +37,28 @@ public class AggregatorFactories {
 
     public static final AggregatorFactories EMPTY = new Empty();
 
-    private final AggregatorFactory[] perBucket;
-    private final AggregatorFactory[] ordinals;
+    private final AggregatorFactory[] factories;
 
     public static Builder builder() {
         return new Builder();
     }
 
-    private AggregatorFactories(AggregatorFactory[] perBucket, AggregatorFactory[] ordinals) {
-        this.perBucket = perBucket;
-        this.ordinals = ordinals;
+    private AggregatorFactories(AggregatorFactory[] factories) {
+        this.factories = factories;
     }
 
     /** Create all aggregators so that they can be consumed with multiple buckets. */
     public Aggregator[] createSubAggregators(Aggregator parent, final long estimatedBucketsCount) {
         Aggregator[] aggregators = new Aggregator[count()];
-        for (int i = 0; i < perBucket.length; i++) {
-            final AggregatorFactory factory = perBucket[i];
+        for (int i = 0; i < factories.length; ++i) {
+            final AggregatorFactory factory = factories[i];
             final Aggregator first = factory.create(parent.context(), parent, estimatedBucketsCount);
+            if (first.bucketAggregationMode() == BucketAggregationMode.MULTI_BUCKETS) {
+                // This aggregator already supports multiple bucket ordinals, can be used directly
+                aggregators[i] = first;
+                continue;
+            }
+            // the aggregator doesn't support multiple ordinals, let's wrap it so that it does.
             aggregators[i] = new Aggregator(first.name(), BucketAggregationMode.MULTI_BUCKETS, AggregatorFactories.EMPTY, 1, first.context(), first.parent()) {
 
                 ObjectArray<Aggregator> aggregators;
@@ -101,42 +105,31 @@ public class AggregatorFactories {
                 }
             };
         }
-        for (int i = 0; i < ordinals.length; i++) {
-            aggregators[i+perBucket.length] = ordinals[i].create(parent.context(), parent, estimatedBucketsCount);
-        }
         return aggregators;
     }
 
     public Aggregator[] createTopLevelAggregators(AggregationContext ctx) {
-        Aggregator[] aggregators = new Aggregator[perBucket.length + ordinals.length];
-        for (int i = 0; i < perBucket.length; i++) {
-            aggregators[i] = perBucket[i].create(ctx, null, 0);
-        }
-        for (int i = 0; i < ordinals.length; i++) {
-            aggregators[i+perBucket.length] = ordinals[i].create(ctx, null, 0);
+        // These aggregators are going to be used with a single bucket ordinal, no need to wrap the PER_BUCKET ones
+        Aggregator[] aggregators = new Aggregator[factories.length];
+        for (int i = 0; i < factories.length; i++) {
+            aggregators[i] = factories[i].create(ctx, null, 0);
         }
         return aggregators;
     }
 
     public int count() {
-        return perBucket.length + ordinals.length;
+        return factories.length;
     }
 
     void setParent(AggregatorFactory parent) {
-        for (int i = 0; i < perBucket.length; i++) {
-            perBucket[i].parent = parent;
-        }
-        for (int i = 0; i < ordinals.length; i++) {
-            ordinals[i].parent = parent;
+        for (AggregatorFactory factory : factories) {
+            factory.parent = parent;
         }
     }
 
     public void validate() {
-        for (int i = 0; i < perBucket.length; i++) {
-            perBucket[i].validate();
-        }
-        for (int i = 0; i < ordinals.length; i++) {
-            ordinals[i].validate();
+        for (AggregatorFactory factory : factories) {
+            factory.validate();
         }
     }
 
@@ -146,12 +139,7 @@ public class AggregatorFactories {
         private static final Aggregator[] EMPTY_AGGREGATORS = new Aggregator[0];
 
         private Empty() {
-            super(EMPTY_FACTORIES, EMPTY_FACTORIES);
-        }
-
-        @Override
-        public int count() {
-            return 0;
+            super(EMPTY_FACTORIES);
         }
 
         @Override
@@ -164,36 +152,22 @@ public class AggregatorFactories {
             return EMPTY_AGGREGATORS;
         }
 
-        @Override
-        public void validate() {
-        }
-
-        @Override
-        void setParent(AggregatorFactory parent) {
-        }
     }
 
     public static class Builder {
 
-        private List<AggregatorFactory> perBucket = new ArrayList<AggregatorFactory>();
-        private List<AggregatorFactory> ordinals = new ArrayList<AggregatorFactory>();
+        private List<AggregatorFactory> factories = new ArrayList<AggregatorFactory>();
 
         public Builder add(AggregatorFactory factory) {
-            switch (factory.bucketMode()) {
-                case PER_BUCKET:
-                    perBucket.add(factory);
-                    break;
-                case MULTI_BUCKETS:
-                    ordinals.add(factory);
-                    break;
-                default:
-                    assert false : "there can only be two bucket modes [ PER_BUCKET, ORDINALS ]";
-            }
+            factories.add(factory);
             return this;
         }
 
         public AggregatorFactories build() {
-            return new AggregatorFactories(perBucket.toArray(new AggregatorFactory[perBucket.size()]), ordinals.toArray(new AggregatorFactory[ordinals.size()]));
+            if (factories.isEmpty()) {
+                return EMPTY;
+            }
+            return new AggregatorFactories(factories.toArray(new AggregatorFactory[factories.size()]));
         }
     }
 }

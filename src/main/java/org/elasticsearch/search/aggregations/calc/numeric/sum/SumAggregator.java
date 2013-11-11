@@ -89,11 +89,6 @@ public class SumAggregator extends Aggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new SumAggregator(name, 0, null, aggregationContext, parent);
         }

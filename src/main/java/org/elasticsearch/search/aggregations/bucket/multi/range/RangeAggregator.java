@@ -313,11 +313,6 @@ public class RangeAggregator extends Aggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.PER_BUCKET;
-        }
-
-        @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new Unmapped(name, ranges, keyed, valuesSourceConfig.formatter(), valuesSourceConfig.parser(), aggregationContext, parent, rangeFactory);
         }

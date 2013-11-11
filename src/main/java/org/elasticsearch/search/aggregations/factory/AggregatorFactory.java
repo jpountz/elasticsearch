@@ -90,14 +90,6 @@ public abstract class AggregatorFactory {
     }
 
     /**
-     * @return  The bucket aggregation mode of the aggregation this factory creates
-     * @see     Aggregator.BucketAggregationMode
-     *
-     * @todo    right now, this method means a factory can only create one type of aggregation... we might want to change that in the future
-     */
-    public abstract Aggregator.BucketAggregationMode bucketMode();
-
-    /**
      * Creates the aggregator
      *
      * @param context               The aggregation context

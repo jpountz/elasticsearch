@@ -95,11 +95,6 @@ public class MaxAggregator extends Aggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new MaxAggregator(name, 0, null, aggregationContext, parent);
         }

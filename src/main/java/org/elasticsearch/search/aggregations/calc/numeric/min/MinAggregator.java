@@ -96,11 +96,6 @@ public class MinAggregator extends Aggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new MinAggregator(name, 0, null, aggregationContext, parent);
         }

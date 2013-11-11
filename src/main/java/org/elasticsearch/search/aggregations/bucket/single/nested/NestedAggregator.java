@@ -120,11 +120,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         public Aggregator create(AggregationContext context, Aggregator parent, long expectedBucketsCount) {
             NestedAggregator aggregator = new NestedAggregator(name, factories, path, context, parent);
             context.registerReaderContextAware(aggregator);

@@ -94,11 +94,6 @@ public class CountAggregator extends Aggregator {
             return new CountAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
 
-        @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
     }
 
 }

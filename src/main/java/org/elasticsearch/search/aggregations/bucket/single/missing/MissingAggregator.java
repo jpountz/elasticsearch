@@ -65,11 +65,6 @@ public class MissingAggregator extends SingleBucketAggregator {
         }
 
         @Override
-        public BucketAggregationMode bucketMode() {
-            return BucketAggregationMode.MULTI_BUCKETS;
-        }
-
-        @Override
         protected MissingAggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
             return new MissingAggregator(name, factories, null, aggregationContext, parent);
         }
