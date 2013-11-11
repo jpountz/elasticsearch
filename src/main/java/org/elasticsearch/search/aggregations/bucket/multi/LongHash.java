@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.bucket.multi.terms;
+package org.elasticsearch.search.aggregations.bucket.multi;
 
 import com.carrotsearch.hppc.hash.MurmurHash3;
 import org.elasticsearch.common.util.BigArrays;
@@ -28,7 +28,7 @@ import org.elasticsearch.common.util.LongArray;
  *  probing, growth is smooth thanks to {@link BigArrays} and capacity is always
  *  a multiple of 2 for faster identification of buckets. */
 // IDs are internally stored as id + 1 so that 0 encodes for an empty slot
-final class LongHash {
+public final class LongHash {
 
     /** Open addressing typically requires having smaller load factors compared to linked lists because collisions may result into worse lookup performance. */
     private static final float MAX_LOAD_FACTOR = 0.6f;

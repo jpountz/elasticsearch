@@ -19,15 +19,15 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
-import com.carrotsearch.hppc.LongObjectOpenHashMap;
+import com.carrotsearch.hppc.LongArrayList;
 import org.apache.lucene.util.CollectionUtil;
-import org.elasticsearch.common.collect.ReusableGrowableArray;
+import org.apache.lucene.util.OpenBitSet;
 import org.elasticsearch.common.inject.internal.Nullable;
-import org.elasticsearch.common.recycler.Recycler;
 import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.bucket.multi.LongHash;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -41,9 +41,10 @@ import java.util.List;
 
 /**
  * nocommit change this aggregator to be based on {@link org.elasticsearch.search.aggregations.bucket.BucketsCollector}
- * so we can get rid of the (now deprecated) {@link org.elasticsearch.search.aggregations.bucket.BucketCollector} class
  */
 public class HistogramAggregator extends Aggregator {
+
+    private final static int INITIAL_CAPACITY = 50; // TODO sizing
 
     private final NumericValuesSource valuesSource;
     private final Rounding rounding;
@@ -51,9 +52,11 @@ public class HistogramAggregator extends Aggregator {
     private final boolean keyed;
     private final boolean computeEmptyBuckets;
     private final AbstractHistogramBase.Factory histogramFactory;
-    private final Collector collector;
 
-    private final Recycler.V<LongObjectOpenHashMap<BucketCollector>> bucketCollectors;
+    private final LongHash bucketOrds;
+    private final BucketsCollector bucketsCollector;
+    private OpenBitSet matched = new OpenBitSet();
+    private final LongArrayList matchedList;
 
     public HistogramAggregator(String name,
                                AggregatorFactories factories,
@@ -73,107 +76,86 @@ public class HistogramAggregator extends Aggregator {
         this.keyed = keyed;
         this.computeEmptyBuckets = computeEmptyBuckets;
         this.histogramFactory = histogramFactory;
-        this.bucketCollectors = aggregationContext.cacheRecycler().longObjectMap(-1);
-        this.collector = valuesSource == null ? null : new Collector();
+
+        bucketOrds = new LongHash(INITIAL_CAPACITY);
+        bucketsCollector = new BucketsCollector(subAggregators, INITIAL_CAPACITY);
+        matched = new OpenBitSet(INITIAL_CAPACITY);
+        matchedList = new LongArrayList();
     }
 
     @Override
     public boolean shouldCollect() {
-        return collector != null;
+        return valuesSource != null;
     }
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        collector.collect(doc);
+        assert owningBucketOrdinal == 0;
+        final LongValues values = valuesSource.longValues();
+        final int valuesCount = values.setDocument(doc);
+
+        // nocommit the matched logic could be more efficient if we knew the values are in order
+        assert matched.cardinality() == 0;
+        for (int i = 0; i < valuesCount; ++i) {
+            long value = values.nextValue();
+            long key = rounding.round(value);
+            long bucketOrd = bucketOrds.add(key);
+            if (bucketOrd < 0) { // already seen
+                bucketOrd = -1 - bucketOrd;
+            }
+            if (!matched.get(bucketOrd)) {
+                matched.set(bucketOrd);
+                matchedList.add(bucketOrd);
+                bucketsCollector.collect(doc, bucketOrd);
+            }
+        }
+        resetMatches();
+    }
+
+    private void resetMatches() {
+        for (int i = 0; i < matchedList.size(); ++i) {
+            matched.clear(matchedList.get(i));
+        }
+        matchedList.clear();
     }
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>(bucketCollectors.v().size());
-        boolean[] allocated = bucketCollectors.v().allocated;
-        Object[] collectors = this.bucketCollectors.v().values;
-        for (int i = 0; i < allocated.length; i++) {
-            if (!allocated[i]) {
-                continue;
-            }
-            BucketCollector collector = (BucketCollector) collectors[i];
-            buckets.add(histogramFactory.createBucket(collector.key, collector.docCount(), collector.buildAggregations()));
-        }
+        List<HistogramBase.Bucket> buckets = bucketsCollector.buildBuckets();
         CollectionUtil.introSort(buckets, order.comparator());
 
         // value source will be null for unmapped fields
         ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-
         return histogramFactory.create(name, buckets, order, computeEmptyBuckets ? rounding : null, formatter, keyed);
     }
 
-    class Collector {
+    class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
 
-        int ordCounter;
-        LongObjectOpenHashMap<BucketCollector> bucketCollectors;
+        BucketsCollector(Aggregator[] aggregators, long expectedBucketsCount) {
+            super(aggregators, expectedBucketsCount);
 
-        Collector() {
-             bucketCollectors = HistogramAggregator.this.bucketCollectors.v();
-        }
-
-        // a reusable list of matched buckets which is used when dealing with multi-valued fields. see #populateMatchedBuckets method
-        private final ReusableGrowableArray<BucketCollector> matchedBuckets = new ReusableGrowableArray<BucketCollector>(BucketCollector.class);
-
-        public void collect(int doc) throws IOException {
-
-            LongValues values = valuesSource.longValues();
-
-            int valuesCount = values.setDocument(doc);
-
-            // nocommit the matched logic could be more efficient if we knew the values are in order
-            matchedBuckets.reset();
-            for (int i = 0; i < valuesCount; ++i) {
-                long value = values.nextValue();
-                long key = rounding.round(value);
-                BucketCollector bucketCollector = bucketCollectors.get(key);
-                if (bucketCollector == null) {
-                    bucketCollector = new BucketCollector(ordCounter++, key, rounding, subAggregators);
-                    bucketCollectors.put(key, bucketCollector);
-                } else if (bucketCollector.matched) {
-                    continue;
-                }
-                bucketCollector.collect(doc);
-                bucketCollector.matched = true;
-                matchedBuckets.add(bucketCollector);
-            }
-            for (int i = 0; i < matchedBuckets.size(); ++i) {
-                matchedBuckets.innerValues()[i].matched = false;
-            }
-        }
-
-
-    }
-
-    /**
-     * A collector for a histogram bucket. This collector counts the number of documents that fall into it,
-     * but also serves as the get context for all the sub addAggregation it contains.
-     */
-    static class BucketCollector extends org.elasticsearch.search.aggregations.bucket.BucketCollector {
-
-        // hacky, but needed for performance. We use this in the #findMatchedBuckets method, to keep track of the buckets
-        // we already matched (we don't want to pick up the same bucket twice). An alternative for this hack would have
-        // been to use a set in that method instead of a list, but that comes with performance costs (every time
-        // a bucket is added to the set it's being hashed and compared to other buckets)
-        boolean matched = false;
-
-        final long key;
-        final Rounding rounding;
-
-        BucketCollector(int ord, long key, Rounding rounding, Aggregator[] subAggregators) {
-            super(ord, subAggregators);
-            this.key = key;
-            this.rounding = rounding;
         }
 
         @Override
-        protected boolean onDoc(int doc) throws IOException {
+        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
             return true;
         }
+
+        List<HistogramBase.Bucket> buildBuckets() {
+            List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>((int) bucketOrds.size());
+            for (long i = 0; i < bucketOrds.capacity(); ++i) {
+                final long ord = bucketOrds.id(i);
+                if (ord < 0) {
+                    // slot is not allocated
+                    continue;
+                }
+
+                buckets.add(histogramFactory.createBucket(bucketOrds.key(i), docCounts.get(ord), buildSubAggregations(ord)));
+            }
+            return buckets;
+        }
+
+
     }
 
     public static class Factory extends ValueSourceAggregatorFactory<NumericValuesSource> {

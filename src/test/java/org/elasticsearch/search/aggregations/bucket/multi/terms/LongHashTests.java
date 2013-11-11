@@ -22,6 +22,7 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 import com.carrotsearch.hppc.LongLongMap;
 import com.carrotsearch.hppc.LongLongOpenHashMap;
 import com.carrotsearch.hppc.cursors.LongLongCursor;
+import org.elasticsearch.search.aggregations.bucket.multi.LongHash;
 import org.elasticsearch.test.ElasticsearchTestCase;
 
 import java.util.Iterator;
