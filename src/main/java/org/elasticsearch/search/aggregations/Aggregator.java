@@ -23,7 +23,6 @@ import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 import java.io.IOException;
-import java.util.Arrays;
 
 public abstract class Aggregator {
 
@@ -157,25 +156,5 @@ public abstract class Aggregator {
      * @return  The aggregated & built aggregation
      */
     public abstract InternalAggregation buildAggregation(long owningBucketOrdinal);
-
-    /**
-     * Utility method to collect sub aggregators with the provided bucket ordinal.
-     */
-    protected final void collectSubAggregators(int doc, long bucketOrd) throws IOException {
-        for (Aggregator aggregator : subAggregators) {
-            aggregator.collect(doc, bucketOrd);
-        }
-    }
-
-    /**
-     * Utility method to build the aggregations of the sub aggregators.
-     */
-    protected final InternalAggregations buildSubAggregations(long bucketOrd) {
-        InternalAggregation[] aggregations = new InternalAggregation[subAggregators.length];
-        for (int i = 0; i < subAggregators.length; i++) {
-            aggregations[i] = subAggregators[i].buildAggregation(bucketOrd);
-        }
-        return new InternalAggregations(Arrays.asList(aggregations));
-    }
 
 }

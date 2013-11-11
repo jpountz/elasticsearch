@@ -26,7 +26,7 @@ import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
@@ -39,7 +39,7 @@ import java.util.List;
 /**
  *
  */
-public class GeoDistanceAggregator extends Aggregator {
+public class GeoDistanceAggregator extends BucketsAggregator {
 
     static class DistanceRange {
 
@@ -74,8 +74,8 @@ public class GeoDistanceAggregator extends Aggregator {
     }
 
     private final GeoPointValuesSource valuesSource;
+    private final DistanceRange[] ranges;
 
-    private final BucketsCollector bucketsCollector;
     final boolean[] matched;
     final IntArrayList matchedList;
 
@@ -84,7 +84,8 @@ public class GeoDistanceAggregator extends Aggregator {
                                  List<DistanceRange> ranges, AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.PER_BUCKET, factories, ranges.size(), aggregationContext, parent);
         this.valuesSource = valuesSource;
-        bucketsCollector = new BucketsCollector(subAggregators, ranges);
+        this.ranges = ranges.toArray(new DistanceRange[ranges.size()]);
+
         matched = new boolean[ranges.size()];
         matchedList = new IntArrayList(matched.length);
     }
@@ -123,9 +124,10 @@ public class GeoDistanceAggregator extends Aggregator {
     }
 
     private void collect(int doc, GeoPoint value) throws IOException {
-        for (int i = 0; i < bucketsCollector.ranges.length; i++) {
-            if (!matched[i] && bucketsCollector.ranges[i].matches(value)) {
-                matched[i] = bucketsCollector.collect(doc, i);
+        for (int i = 0; i < ranges.length; i++) {
+            if (!matched[i] && ranges[i].matches(value)) {
+                collectBucket(doc, i);
+                matched[i] = true;
                 matchedList.add(i);
             }
         }
@@ -133,34 +135,16 @@ public class GeoDistanceAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalGeoDistance(name, bucketsCollector.buildBuckets());
+        List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+        for (int i = 0; i < ranges.length; i++) {
+            DistanceRange range = ranges[i];
+            InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, bucketDocCount(i), bucketAggregations(i));
+            buckets.add(bucket);
+        }
+        return new InternalGeoDistance(name, buckets);
     }
 
-    private class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
 
-        private DistanceRange[] ranges;
-
-        BucketsCollector(Aggregator[] aggregators, List<DistanceRange> ranges) {
-            super(aggregators, ranges.size());
-            this.ranges = ranges.toArray(new DistanceRange[ranges.size()]);
-        }
-
-        @Override
-        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
-            return true;
-        }
-
-        List<GeoDistance.Bucket> buildBuckets() {
-            List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
-            for (int i = 0; i < ranges.length; i++) {
-                InternalAggregations aggregations = buildSubAggregations(i);
-                DistanceRange range = ranges[i];
-                InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, docCount(i), aggregations);
-                buckets.add(bucket);
-            }
-            return buckets;
-        }
-    }
 
     public static class Factory extends ValueSourceAggregatorFactory<GeoPointValuesSource> {
 

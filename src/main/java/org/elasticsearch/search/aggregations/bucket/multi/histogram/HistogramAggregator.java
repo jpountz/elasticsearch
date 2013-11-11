@@ -27,6 +27,7 @@ import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.index.fielddata.LongValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.bucket.multi.LongHash;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
@@ -39,10 +40,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * nocommit change this aggregator to be based on {@link org.elasticsearch.search.aggregations.bucket.BucketsCollector}
- */
-public class HistogramAggregator extends Aggregator {
+public class HistogramAggregator extends BucketsAggregator {
 
     private final static int INITIAL_CAPACITY = 50; // TODO sizing
 
@@ -54,7 +52,6 @@ public class HistogramAggregator extends Aggregator {
     private final AbstractHistogramBase.Factory histogramFactory;
 
     private final LongHash bucketOrds;
-    private final BucketsCollector bucketsCollector;
     private OpenBitSet matched = new OpenBitSet();
     private final LongArrayList matchedList;
 
@@ -78,7 +75,6 @@ public class HistogramAggregator extends Aggregator {
         this.histogramFactory = histogramFactory;
 
         bucketOrds = new LongHash(INITIAL_CAPACITY);
-        bucketsCollector = new BucketsCollector(subAggregators, INITIAL_CAPACITY);
         matched = new OpenBitSet(INITIAL_CAPACITY);
         matchedList = new LongArrayList();
     }
@@ -106,7 +102,7 @@ public class HistogramAggregator extends Aggregator {
             if (!matched.get(bucketOrd)) {
                 matched.set(bucketOrd);
                 matchedList.add(bucketOrd);
-                bucketsCollector.collect(doc, bucketOrd);
+                collectBucket(doc, bucketOrd);
             }
         }
         resetMatches();
@@ -121,7 +117,14 @@ public class HistogramAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        List<HistogramBase.Bucket> buckets = bucketsCollector.buildBuckets();
+        List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>((int) bucketOrds.size());
+        for (long i = 0; i < bucketOrds.capacity(); ++i) {
+            final long ord = bucketOrds.id(i);
+            if (ord < 0) {
+                continue; // slot is not allocated
+            }
+            buckets.add(histogramFactory.createBucket(bucketOrds.key(i), bucketDocCount(ord), bucketAggregations(ord)));
+        }
         CollectionUtil.introSort(buckets, order.comparator());
 
         // value source will be null for unmapped fields
@@ -129,34 +132,6 @@ public class HistogramAggregator extends Aggregator {
         return histogramFactory.create(name, buckets, order, computeEmptyBuckets ? rounding : null, formatter, keyed);
     }
 
-    class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
-
-        BucketsCollector(Aggregator[] aggregators, long expectedBucketsCount) {
-            super(aggregators, expectedBucketsCount);
-
-        }
-
-        @Override
-        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
-            return true;
-        }
-
-        List<HistogramBase.Bucket> buildBuckets() {
-            List<HistogramBase.Bucket> buckets = new ArrayList<HistogramBase.Bucket>((int) bucketOrds.size());
-            for (long i = 0; i < bucketOrds.capacity(); ++i) {
-                final long ord = bucketOrds.id(i);
-                if (ord < 0) {
-                    // slot is not allocated
-                    continue;
-                }
-
-                buckets.add(histogramFactory.createBucket(bucketOrds.key(i), docCounts.get(ord), buildSubAggregations(ord)));
-            }
-            return buckets;
-        }
-
-
-    }
 
     public static class Factory extends ValueSourceAggregatorFactory<NumericValuesSource> {
 

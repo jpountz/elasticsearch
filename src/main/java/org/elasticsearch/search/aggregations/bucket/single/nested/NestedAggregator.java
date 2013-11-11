@@ -26,7 +26,6 @@ import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.FixedBitSet;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
@@ -70,7 +69,7 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalNested(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
+        return new InternalNested(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
@@ -103,11 +102,10 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
         for (int i = (parentDoc - 1); i > prevParentDoc; i--) {
             if (childDocs.get(i)) {
                 ++numChildren;
-                collectSubAggregators(i, bucketOrd);
+                collectBucketNoCounts(i, bucketOrd);
             }
         }
-        counts = BigArrays.grow(counts, bucketOrd + 1);
-        counts.increment(bucketOrd, numChildren);
+        incrementBucketDocCount(numChildren, bucketOrd);
     }
 
     public static class Factory extends AggregatorFactory {

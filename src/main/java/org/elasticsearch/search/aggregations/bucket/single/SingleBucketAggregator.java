@@ -19,36 +19,24 @@
 
 package org.elasticsearch.search.aggregations.bucket.single;
 
-import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 /**
  * A bucket aggregator that doesn't create new buckets.
  */
-public abstract class SingleBucketAggregator extends Aggregator {
-
-    protected LongArray counts;
+public abstract class SingleBucketAggregator extends BucketsAggregator {
 
     protected SingleBucketAggregator(String name, AggregatorFactories factories,
                                      AggregationContext aggregationContext, Aggregator parent) {
         super(name, BucketAggregationMode.MULTI_BUCKETS, factories, parent == null ? 1 : parent.estimatedBucketCount(), aggregationContext, parent);
-        counts = BigArrays.newLongArray(parent == null ? 1 : parent.estimatedBucketCount());
     }
 
     @Override
     public boolean shouldCollect() {
         return true;
-    }
-
-    protected final long docCount(long bucketOrdinal) {
-        if (bucketOrdinal >= counts.size()) {
-            return 0;
-        } else {
-            return counts.get(bucketOrdinal);
-        }
     }
 
 }

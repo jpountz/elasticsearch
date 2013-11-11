@@ -24,7 +24,6 @@ import org.apache.lucene.search.Filter;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.docset.DocIdSets;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -55,15 +54,13 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalFilter(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
+        return new InternalFilter(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
         if (bits.get(doc)) {
-            collectSubAggregators(doc, owningBucketOrdinal);
-            counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
-            counts.increment(owningBucketOrdinal, 1);
+            collectBucket(doc, owningBucketOrdinal);
         }
     }
 

@@ -26,6 +26,7 @@ import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -41,7 +42,7 @@ import java.util.List;
 /**
  *
  */
-public class RangeAggregator extends Aggregator {
+public class RangeAggregator extends BucketsAggregator {
 
     public static class Range {
 
@@ -79,10 +80,10 @@ public class RangeAggregator extends Aggregator {
     }
 
     private final NumericValuesSource valuesSource;
+    private final Range[] ranges;
     private final boolean keyed;
     private final AbstractRangeBase.Factory rangeFactory;
 
-    private final BucketsCollector bucketsCollector;
     final boolean[] matched;
     final double[] maxTo;
     final IntArrayList matchedList;
@@ -100,13 +101,17 @@ public class RangeAggregator extends Aggregator {
         this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
+        this.ranges = ranges.toArray(new Range[ranges.size()]);
+        for (int i = 0; i < this.ranges.length; i++) {
+            this.ranges[i].process(valuesSource.parser(), context);
+        }
+        sortRanges(this.ranges);
 
-        bucketsCollector = new BucketsCollector(subAggregators, ranges.toArray(new Range[ranges.size()]));
         matched = new boolean[ranges.size()];
         maxTo = new double[matched.length];
-        maxTo[0] = bucketsCollector.ranges[0].to;
-        for (int i = 1; i < bucketsCollector.ranges.length; ++i) {
-            maxTo[i] = Math.max(bucketsCollector.ranges[i].to,maxTo[i-1]);
+        maxTo[0] = this.ranges[0].to;
+        for (int i = 1; i < this.ranges.length; ++i) {
+            maxTo[i] = Math.max(this.ranges[i].to,maxTo[i-1]);
         }
         matchedList = new IntArrayList();
 
@@ -131,9 +136,16 @@ public class RangeAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+        for (int i = 0; i < ranges.length; i++) {
+            Range range = ranges[i];
+            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketDocCount(i),
+                    bucketAggregations(i), valuesSource.formatter());
+            buckets.add(bucket);
+        }
         // value source can be null in the case of unmapped fields
         ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-        return rangeFactory.create(name, bucketsCollector.buildBuckets(), formatter, keyed);
+        return rangeFactory.create(name, buckets, formatter, keyed);
     }
 
     private boolean noMatchYet() {
@@ -153,10 +165,10 @@ public class RangeAggregator extends Aggregator {
     }
 
     private void collect(int doc, double value) throws IOException {
-        int lo = 0, hi = bucketsCollector.ranges.length - 1; // all candidates are between these indexes
+        int lo = 0, hi = ranges.length - 1; // all candidates are between these indexes
         int mid = (lo + hi) >>> 1;
         while (lo < hi) { // not <= because we want hi to remain >= 0 for the next binary searches
-            if (value < bucketsCollector.ranges[mid].from) {
+            if (value < ranges[mid].from) {
                 hi = mid - 1;
             } else if (value >= maxTo[mid]) {
                 lo = mid + 1;
@@ -181,7 +193,7 @@ public class RangeAggregator extends Aggregator {
         int endLo = mid, endHi = hi;
         while (endLo <= endHi) {
             final int endMid = (endLo + endHi) >>> 1;
-            if (value < bucketsCollector.ranges[endMid].from) {
+            if (value < ranges[endMid].from) {
                 endHi = endMid - 1;
             } else {
                 endLo = endMid + 1;
@@ -189,46 +201,15 @@ public class RangeAggregator extends Aggregator {
         }
 
         assert startLo == 0 || value >= maxTo[startLo - 1];
-        assert endHi == bucketsCollector.ranges.length - 1 || value < bucketsCollector.ranges[endHi + 1].from;
+        assert endHi == ranges.length - 1 || value < ranges[endHi + 1].from;
 
         for (int i = startLo; i <= endHi; ++i) {
-            if (!matched[i] && bucketsCollector.ranges[i].matches(value)) {
+            if (!matched[i] && ranges[i].matches(value)) {
                 matched[i] = true;
                 matchedList.add(i);
-                bucketsCollector.collect(doc, i);
+                collectBucket(doc, i);
             }
         }
-    }
-
-    class BucketsCollector extends org.elasticsearch.search.aggregations.bucket.BucketsCollector {
-
-        private final Range[] ranges;
-
-        BucketsCollector(Aggregator[] aggregators, Range[] ranges) {
-            super(aggregators, ranges.length);
-            this.ranges = ranges;
-            for (int i = 0; i < ranges.length; i++) {
-                ranges[i].process(valuesSource.parser(), context);
-            }
-            sortRanges(this.ranges);
-        }
-
-        @Override
-        protected boolean onDoc(int doc, long bucketOrd) throws IOException {
-            return true;
-        }
-
-        List<RangeBase.Bucket> buildBuckets() {
-            List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
-            for (int i = 0; i < ranges.length; i++) {
-                Range range = ranges[i];
-                RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, docCount(i),
-                        buildSubAggregations(i), valuesSource.formatter());
-                buckets.add(bucket);
-            }
-            return buckets;
-        }
-
     }
 
     private static final void sortRanges(final Range[] ranges) {

@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.bucket.single.global;
 
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -41,14 +40,14 @@ public class GlobalAggregator extends SingleBucketAggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalGlobal(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
+        assert owningBucketOrdinal == 0 : "global aggregator can only be a top level aggregator";
+        return new InternalGlobal(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        collectSubAggregators(doc, owningBucketOrdinal);
-        counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
-        counts.increment(owningBucketOrdinal, 1);
+        assert owningBucketOrdinal == 0 : "global aggregator can only be a top level aggregator";
+        collectBucket(doc, owningBucketOrdinal);
     }
 
     public static class Factory extends AggregatorFactory {

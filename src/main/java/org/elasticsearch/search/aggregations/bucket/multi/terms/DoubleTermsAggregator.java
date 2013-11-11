@@ -19,11 +19,10 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
-import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregations;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.bucket.multi.LongHash;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -35,7 +34,7 @@ import java.util.Arrays;
 /**
  *
  */
-public class DoubleTermsAggregator extends Aggregator {
+public class DoubleTermsAggregator extends BucketsAggregator {
 
     private static final int INITIAL_CAPACITY = 50; // TODO sizing
 
@@ -43,7 +42,6 @@ public class DoubleTermsAggregator extends Aggregator {
     private final int requiredSize;
     private final NumericValuesSource valuesSource;
     private final LongHash bucketOrds;
-    private LongArray counts;
 
     public DoubleTermsAggregator(String name, AggregatorFactories factories, NumericValuesSource valuesSource,
                                InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
@@ -52,7 +50,6 @@ public class DoubleTermsAggregator extends Aggregator {
         this.order = order;
         this.requiredSize = requiredSize;
         bucketOrds = new LongHash(INITIAL_CAPACITY);
-        counts = BigArrays.newLongArray(INITIAL_CAPACITY);
     }
 
     @Override
@@ -72,13 +69,8 @@ public class DoubleTermsAggregator extends Aggregator {
             long bucketOrdinal = bucketOrds.add(bits);
             if (bucketOrdinal < 0) { // already seen
                 bucketOrdinal = - 1 - bucketOrdinal;
-            } else if (bucketOrdinal >= counts.size()) { // new bucket, maybe grow
-                counts = BigArrays.grow(counts, bucketOrdinal + 1);
             }
-            counts.increment(bucketOrdinal, 1);
-            for (Aggregator subAggregator : subAggregators) {
-                subAggregator.collect(doc, bucketOrdinal);
-            }
+            collectBucket(doc, bucketOrdinal);
         }
     }
 
@@ -100,8 +92,8 @@ public class DoubleTermsAggregator extends Aggregator {
         BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
         OrdinalBucket spare = null;
         for (long i = 0; i < bucketOrds.capacity(); ++i) {
-            final long id = bucketOrds.id(i);
-            if (id < 0) {
+            final long ord = bucketOrds.id(i);
+            if (ord < 0) {
                 // slot is not allocated
                 continue;
             }
@@ -110,15 +102,15 @@ public class DoubleTermsAggregator extends Aggregator {
                 spare = new OrdinalBucket();
             }
             spare.term = Double.longBitsToDouble(bucketOrds.key(i));
-            spare.docCount = counts.get(id);
-            spare.bucketOrd = id;
+            spare.docCount = bucketDocCount(ord);
+            spare.bucketOrd = ord;
             spare = (OrdinalBucket) ordered.insertWithOverflow(spare);
         }
 
         final InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
         for (int i = ordered.size() - 1; i >= 0; --i) {
             final OrdinalBucket bucket = (OrdinalBucket) ordered.pop();
-            bucket.aggregations = buildSubAggregations(bucket.bucketOrd);
+            bucket.aggregations = bucketAggregations(bucket.bucketOrd);
             list[i] = bucket;
         }
         return new DoubleTerms(name, order, valuesSource.formatter(), requiredSize, Arrays.asList(list));

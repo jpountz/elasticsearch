@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.calc.numeric.min;
 
-import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregation;
 import org.elasticsearch.search.aggregations.calc.numeric.NumericAggregatorParser;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;

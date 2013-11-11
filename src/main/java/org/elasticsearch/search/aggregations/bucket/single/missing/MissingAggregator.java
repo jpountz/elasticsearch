@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.bucket.single.missing;
 
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
@@ -46,15 +45,13 @@ public class MissingAggregator extends SingleBucketAggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalMissing(name, docCount(owningBucketOrdinal), buildSubAggregations(owningBucketOrdinal));
+        return new InternalMissing(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
         if (valuesSource == null || valuesSource.bytesValues().setDocument(doc) == 0) {
-            collectSubAggregators(doc, owningBucketOrdinal);
-            counts = BigArrays.grow(counts, owningBucketOrdinal + 1);
-            counts.increment(owningBucketOrdinal, 1);
+            collectBucket(doc, owningBucketOrdinal);
         }
     }
 

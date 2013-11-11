@@ -21,10 +21,9 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
-import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -35,7 +34,7 @@ import java.util.Arrays;
 /**
  * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
  */
-public class StringTermsAggregator extends Aggregator {
+public class StringTermsAggregator extends BucketsAggregator {
 
     private static final int INITIAL_CAPACITY = 50; // TODO sizing
 
@@ -43,7 +42,6 @@ public class StringTermsAggregator extends Aggregator {
     private final InternalOrder order;
     private final int requiredSize;
     private final BytesRefHash bucketOrds;
-    private LongArray counts;
 
     public StringTermsAggregator(String name, AggregatorFactories factories, ValuesSource valuesSource,
                                  InternalOrder order, int requiredSize, AggregationContext aggregationContext, Aggregator parent) {
@@ -53,7 +51,6 @@ public class StringTermsAggregator extends Aggregator {
         this.order = order;
         this.requiredSize = requiredSize;
         bucketOrds = new BytesRefHash();
-        counts = BigArrays.newLongArray(INITIAL_CAPACITY);
     }
 
     @Override
@@ -73,11 +70,8 @@ public class StringTermsAggregator extends Aggregator {
             int bucketOrdinal = bucketOrds.add(bytes, hash);
             if (bucketOrdinal < 0) { // already seen
                 bucketOrdinal = - 1 - bucketOrdinal;
-            } else if (bucketOrdinal >= counts.size()) { // new bucket, maybe grow
-                counts = BigArrays.grow(counts, bucketOrdinal + 1);
             }
-            counts.increment(bucketOrdinal, 1);
-            collectSubAggregators(doc, bucketOrdinal);
+            collectBucket(doc, bucketOrdinal);
         }
     }
 
@@ -103,7 +97,7 @@ public class StringTermsAggregator extends Aggregator {
                 spare = new OrdinalBucket();
             }
             bucketOrds.get(i, spare.termBytes);
-            spare.docCount = counts.get(i);
+            spare.docCount = bucketDocCount(i);
             spare.bucketOrd = i;
             spare = (OrdinalBucket) ordered.insertWithOverflow(spare);
         }
@@ -111,7 +105,7 @@ public class StringTermsAggregator extends Aggregator {
         final InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
         for (int i = ordered.size() - 1; i >= 0; --i) {
             final OrdinalBucket bucket = (OrdinalBucket) ordered.pop();
-            bucket.aggregations = buildSubAggregations(bucket.bucketOrd);
+            bucket.aggregations = bucketAggregations(bucket.bucketOrd);
             list[i] = bucket;
         }
         return new StringTerms(name, order, requiredSize, Arrays.asList(list));
