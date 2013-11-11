@@ -155,7 +155,7 @@ public class RangeAggregator extends Aggregator {
     private void collect(int doc, double value) throws IOException {
         int lo = 0, hi = bucketsCollector.ranges.length - 1; // all candidates are between these indexes
         int mid = (lo + hi) >>> 1;
-        while (lo <= hi) {
+        while (lo < hi) { // not <= because we want hi to remain >= 0 for the next binary searches
             if (value < bucketsCollector.ranges[mid].from) {
                 hi = mid - 1;
             } else if (value >= maxTo[mid]) {
@@ -249,7 +249,7 @@ public class RangeAggregator extends Aggregator {
                 }
                 return cmp;
             }
-        };
+        }.sort(0, ranges.length);
     }
 
     public static class Unmapped extends Aggregator {

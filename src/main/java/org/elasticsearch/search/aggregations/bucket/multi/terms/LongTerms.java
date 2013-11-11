@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import com.carrotsearch.hppc.LongObjectOpenHashMap;
-import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.recycler.Recycler;
@@ -140,37 +139,22 @@ public class LongTerms extends InternalTerms {
 
         //nocommit we can just sort the backing array buffer of LongObjectOpenHashMap and use arraycopy instead of using prio-queue/treeset
 
-        if (requiredSize < BucketPriorityQueue.LIMIT) {
-            BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
-            Object[] internalBuckets = buckets.v().values;
-            boolean[] states = buckets.v().allocated;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    List<LongTerms.Bucket> sameTermBuckets = (List<LongTerms.Bucket>) internalBuckets[i];
-                    ordered.insertWithOverflow(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
-                }
+        BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
+        Object[] internalBuckets = buckets.v().values;
+        boolean[] states = buckets.v().allocated;
+        for (int i = 0; i < states.length; i++) {
+            if (states[i]) {
+                List<LongTerms.Bucket> sameTermBuckets = (List<LongTerms.Bucket>) internalBuckets[i];
+                ordered.insertWithOverflow(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
             }
-            buckets.release();
-            InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
-            for (int i = ordered.size() - 1; i >= 0; i--) {
-                list[i] = (Bucket) ordered.pop();
-            }
-            reduced.buckets = Arrays.asList(list);
-            return reduced;
-        } else {
-            BoundedTreeSet<InternalTerms.Bucket> ordered = new BoundedTreeSet<InternalTerms.Bucket>(order.comparator(), requiredSize);
-            List<LongTerms.Bucket>[] internalBuckets = buckets.v().values;
-            boolean[] states = buckets.v().allocated;
-            for (int i = 0; i < states.length; i++) {
-                if (states[i]) {
-                    List<LongTerms.Bucket> sameTermBuckets = internalBuckets[i];
-                    ordered.add(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
-                }
-            }
-            buckets.release();
-            reduced.buckets = ordered;
-            return reduced;
         }
+        buckets.release();
+        InternalTerms.Bucket[] list = new InternalTerms.Bucket[ordered.size()];
+        for (int i = ordered.size() - 1; i >= 0; i--) {
+            list[i] = (Bucket) ordered.pop();
+        }
+        reduced.buckets = Arrays.asList(list);
+        return reduced;
     }
 
     @Override

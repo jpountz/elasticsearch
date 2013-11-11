@@ -21,7 +21,6 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import com.google.common.collect.Maps;
 import org.elasticsearch.cache.recycler.CacheRecycler;
-import org.elasticsearch.common.collect.BoundedTreeSet;
 import org.elasticsearch.common.io.stream.Streamable;
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.xcontent.ToXContent;
@@ -161,27 +160,17 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
             return (UnmappedTerms) aggregations.get(0);
         }
 
-        if (requiredSize < BucketPriorityQueue.LIMIT) {
-            BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
-            for (Map.Entry<Text, List<Bucket>> entry : buckets.entrySet()) {
-                List<Bucket> sameTermBuckets = entry.getValue();
-                ordered.insertWithOverflow(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
-            }
-            Bucket[] list = new Bucket[ordered.size()];
-            for (int i = ordered.size() - 1; i >= 0; i--) {
-                list[i] = (Bucket) ordered.pop();
-            }
-            reduced.buckets = Arrays.asList(list);
-            return reduced;
-        } else {
-            BoundedTreeSet<Bucket> ordered = new BoundedTreeSet<Bucket>(order.comparator(), requiredSize);
-            for (Map.Entry<Text, List<Bucket>> entry : buckets.entrySet()) {
-                List<Bucket> sameTermBuckets = entry.getValue();
-                ordered.add(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
-            }
-            reduced.buckets = ordered;
-            return reduced;
+        BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
+        for (Map.Entry<Text, List<Bucket>> entry : buckets.entrySet()) {
+            List<Bucket> sameTermBuckets = entry.getValue();
+            ordered.insertWithOverflow(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));
         }
+        Bucket[] list = new Bucket[ordered.size()];
+        for (int i = ordered.size() - 1; i >= 0; i--) {
+            list[i] = (Bucket) ordered.pop();
+        }
+        reduced.buckets = Arrays.asList(list);
+        return reduced;
     }
 
 

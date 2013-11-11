@@ -25,8 +25,6 @@ import java.util.Comparator;
 
 public class BucketPriorityQueue extends PriorityQueue<Terms.Bucket> {
 
-    public static final int LIMIT = 5000;
-
     private final Comparator<Terms.Bucket> comparator;
 
     public BucketPriorityQueue(int size, Comparator<Terms.Bucket> comparator) {
