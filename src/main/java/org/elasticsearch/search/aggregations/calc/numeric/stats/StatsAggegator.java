@@ -102,9 +102,10 @@ public class StatsAggegator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= counts.size()) {
+        if (valuesSource == null) {
             return new InternalStats(name, 0, 0, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
         }
+        assert owningBucketOrdinal < counts.size();
         return new InternalStats(name, counts.get(owningBucketOrdinal), sums.get(owningBucketOrdinal), mins.get(owningBucketOrdinal), maxes.get(owningBucketOrdinal));
     }
 

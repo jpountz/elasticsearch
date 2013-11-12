@@ -51,6 +51,7 @@ public class UnmappedTermsAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
         return new UnmappedTerms(name, order, requiredSize);
     }
 

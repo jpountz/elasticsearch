@@ -81,9 +81,10 @@ public class MaxAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= maxes.size()) {
+        if (valuesSource == null) {
             return new InternalMax(name, Double.NEGATIVE_INFINITY);
         }
+        assert owningBucketOrdinal < maxes.size();
         return new InternalMax(name, maxes.get(owningBucketOrdinal));
     }
 

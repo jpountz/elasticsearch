@@ -72,9 +72,10 @@ public class CountAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= counts.size()) {
+        if (valuesSource == null) {
             return new InternalCount(name, 0);
         }
+        assert owningBucketOrdinal < counts.size();
         return new InternalCount(name, counts.get(owningBucketOrdinal));
     }
 

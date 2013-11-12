@@ -83,9 +83,10 @@ public class MinAggregator extends Aggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (valuesSource == null || owningBucketOrdinal >= mins.size()) {
+        if (valuesSource == null) {
             return new InternalMin(name, Double.POSITIVE_INFINITY);
         }
+        assert owningBucketOrdinal < mins.size();
         return new InternalMin(name, mins.get(owningBucketOrdinal));
     }
 

@@ -97,6 +97,7 @@ public class GeoDistanceAggregator extends BucketsAggregator {
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        assert owningBucketOrdinal == 0;
         final GeoPointValues values = valuesSource.values();
         final int valuesCount = values.setDocument(doc);
         assert noMatchYet();
@@ -135,6 +136,7 @@ public class GeoDistanceAggregator extends BucketsAggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
         List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
         for (int i = 0; i < ranges.length; i++) {
             DistanceRange range = ranges[i];

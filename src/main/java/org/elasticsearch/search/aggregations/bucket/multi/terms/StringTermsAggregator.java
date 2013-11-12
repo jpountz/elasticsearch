@@ -88,6 +88,7 @@ public class StringTermsAggregator extends BucketsAggregator {
 
     @Override
     public StringTerms buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
         final int size = Math.min(bucketOrds.size(), requiredSize);
 
         BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());

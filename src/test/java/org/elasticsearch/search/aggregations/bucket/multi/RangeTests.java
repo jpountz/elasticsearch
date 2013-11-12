@@ -544,6 +544,37 @@ public class RangeTests extends AbstractIntegrationTest {
     }
 
     @Test
+    public void emptyRange() throws Exception {
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(range("range")
+                        .field("values")
+                        .addUnboundedTo(-1)
+                        .addUnboundedFrom(1000))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        Range range = response.getAggregations().get("range");
+        assertThat(range, notNullValue());
+        assertThat(range.getName(), equalTo("range"));
+        assertThat(range.buckets().size(), equalTo(2));
+
+        Range.Bucket bucket = range.getByKey("*--1.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("*--1.0"));
+        assertThat(bucket.getFrom(), equalTo(Double.NEGATIVE_INFINITY));
+        assertThat(bucket.getTo(), equalTo(-1.0));
+        assertThat(bucket.getDocCount(), equalTo(0l));
+
+        bucket = range.getByKey("1000.0-*");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("1000.0-*"));
+        assertThat(bucket.getFrom(), equalTo(1000d));
+        assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
+        assertThat(bucket.getDocCount(), equalTo(0l));
+    }
+
+    @Test
     public void script_MultiValued() throws Exception {
         SearchResponse response = client().prepareSearch("idx")
                 .addAggregation(range("range")

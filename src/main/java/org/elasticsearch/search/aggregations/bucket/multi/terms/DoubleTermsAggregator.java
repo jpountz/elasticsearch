@@ -87,6 +87,7 @@ public class DoubleTermsAggregator extends BucketsAggregator {
 
     @Override
     public DoubleTerms buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
         final int size = (int) Math.min(bucketOrds.size(), requiredSize);
 
         BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());

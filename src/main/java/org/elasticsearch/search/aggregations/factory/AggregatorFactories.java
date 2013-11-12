@@ -68,6 +68,9 @@ public class AggregatorFactories {
                 {
                     aggregators = BigArrays.newObjectArray(estimatedBucketsCount);
                     aggregators.set(0, first);
+                    for (long i = 1; i < estimatedBucketsCount; ++i) {
+                        aggregators.set(i, factory.create(parent.context(), parent, estimatedBucketsCount));
+                    }
                 }
 
                 @Override
@@ -98,12 +101,7 @@ public class AggregatorFactories {
 
                 @Override
                 public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-                    if (owningBucketOrdinal >= aggregators.size() || aggregators.get(owningBucketOrdinal) == null) {
-                        // nocommit: should we have an Aggregator.buildEmptyAggregation instead? or maybe return null and expect callers to deal with it?
-                        return first.buildAggregation(1); // we know 1 is unused since we used 0
-                    } else {
-                        return aggregators.get(owningBucketOrdinal).buildAggregation(owningBucketOrdinal);
-                    }
+                    return aggregators.get(owningBucketOrdinal).buildAggregation(0);
                 }
             };
         }

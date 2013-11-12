@@ -124,6 +124,8 @@ public class RangeAggregator extends BucketsAggregator {
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        assert owningBucketOrdinal == 0;
+
         final DoubleValues values = valuesSource.doubleValues();
         final int valuesCount = values.setDocument(doc);
         assert noMatchYet();
@@ -136,6 +138,7 @@ public class RangeAggregator extends BucketsAggregator {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
         List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
         for (int i = 0; i < ranges.length; i++) {
             Range range = ranges[i];
@@ -272,6 +275,7 @@ public class RangeAggregator extends BucketsAggregator {
 
         @Override
         public AbstractRangeBase buildAggregation(long owningBucketOrdinal) {
+            assert owningBucketOrdinal == 0;
             List<RangeBase.Bucket> buckets = new ArrayList<RangeBase.Bucket>(ranges.size());
             for (RangeAggregator.Range range : ranges) {
                 buckets.add(factory.createBucket(range.key, range.from, range.to, 0, InternalAggregations.EMPTY, formatter));

@@ -75,9 +75,7 @@ public abstract class BucketsAggregator extends Aggregator {
      * Utility method to return the number of documents that fell in the given bucket (identified by the bucket ordinal)
      */
     protected final long bucketDocCount(long bucketOrd) {
-        if (bucketOrd >= docCounts.size()) {
-            return 0;
-        }
+        assert bucketOrd < docCounts.size();
         return docCounts.get(bucketOrd);
     }
 
