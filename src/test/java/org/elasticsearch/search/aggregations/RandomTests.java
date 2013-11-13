@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations;
 
+import com.carrotsearch.hppc.IntOpenHashSet;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.IgnoreIndices;
 import org.elasticsearch.common.settings.Settings;
@@ -123,13 +124,30 @@ public class RandomTests extends AbstractIntegrationTest {
     // test long/double/string terms aggs with high number of buckets that require array growth
     public void testDuellTerms() throws Exception {
         final int numDocs = atLeast(1000);
-        final int numTerms = randomIntBetween(10, 10000);
+        final int maxNumTerms = randomIntBetween(10, 10000);
 
-        createIndex("idx");
+        final IntOpenHashSet valuesSet = new IntOpenHashSet();
+        wipeIndices("idx");
+        client().admin().indices().prepareCreate("idx").addMapping("type", jsonBuilder().startObject()
+              .startObject("type")
+                .startObject("properties")
+                  .startObject("string_values")
+                    .field("type", "string")
+                    .field("index", "not_analyzed")
+                  .endObject()
+                  .startObject("long_values")
+                    .field("type", "long")
+                  .endObject()
+                  .startObject("double_values")
+                    .field("type", "double")
+                  .endObject()
+                .endObject()
+              .endObject()).execute().actionGet();
         for (int i = 0; i < numDocs; ++i) {
             final int[] values = new int[randomInt(4)];
             for (int j = 0; j < values.length; ++j) {
-                values[j] = randomInt(numTerms - 1);
+                values[j] = randomInt(maxNumTerms - 1) - 1000;
+                valuesSet.add(values[j]);
             }
             XContentBuilder source = jsonBuilder()
                     .startObject()
@@ -152,16 +170,18 @@ public class RandomTests extends AbstractIntegrationTest {
         assertNoFailures(client().admin().indices().prepareRefresh("idx").setIgnoreIndices(IgnoreIndices.MISSING).execute().get());
 
         SearchResponse resp = client().prepareSearch("idx")
-                .addAggregation(terms("long").field("long_values").size(numTerms).subAggregation(min("min").field("num")))
-                .addAggregation(terms("double").field("double_values").size(numTerms).subAggregation(max("max").field("num")))
-                .addAggregation(terms("string").field("string_values").size(numTerms).subAggregation(stats("stats").field("num"))).execute().actionGet();
+                .addAggregation(terms("long").field("long_values").size(maxNumTerms).subAggregation(min("min").field("num")))
+                .addAggregation(terms("double").field("double_values").size(maxNumTerms).subAggregation(max("max").field("num")))
+                .addAggregation(terms("string").field("string_values").size(maxNumTerms).subAggregation(stats("stats").field("num"))).execute().actionGet();
+        assertEquals(0, resp.getFailedShards());
 
         final Terms longTerms = resp.getAggregations().get("long");
         final Terms doubleTerms = resp.getAggregations().get("double");
         final Terms stringTerms = resp.getAggregations().get("string");
 
-        assertEquals(longTerms.buckets().size(), doubleTerms.buckets().size());
-        assertEquals(longTerms.buckets().size(), stringTerms.buckets().size());
+        assertEquals(valuesSet.size(), longTerms.buckets().size());
+        assertEquals(valuesSet.size(), doubleTerms.buckets().size());
+        assertEquals(valuesSet.size(), stringTerms.buckets().size());
         for (Terms.Bucket bucket : longTerms.buckets()) {
             final Terms.Bucket doubleBucket = doubleTerms.getByTerm(Double.toString(Long.parseLong(bucket.getTerm().string())));
             final Terms.Bucket stringBucket = stringTerms.getByTerm(bucket.getTerm().string());

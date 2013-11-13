@@ -166,7 +166,7 @@ public class LongTerms extends InternalTerms {
         int size = in.readVInt();
         List<InternalTerms.Bucket> buckets = new ArrayList<InternalTerms.Bucket>(size);
         for (int i = 0; i < size; i++) {
-            buckets.add(new Bucket(in.readVLong(), in.readVLong(), InternalAggregations.readAggregations(in)));
+            buckets.add(new Bucket(in.readLong(), in.readVLong(), InternalAggregations.readAggregations(in)));
         }
         this.buckets = buckets;
         this.bucketMap = null;
@@ -180,7 +180,7 @@ public class LongTerms extends InternalTerms {
         out.writeVInt(requiredSize);
         out.writeVInt(buckets.size());
         for (InternalTerms.Bucket bucket : buckets) {
-            out.writeVLong(((Bucket) bucket).term);
+            out.writeLong(((Bucket) bucket).term);
             out.writeVLong(bucket.getDocCount());
             ((InternalAggregations) bucket.getAggregations()).writeTo(out);
         }
