@@ -98,6 +98,7 @@ public class RangeAggregator extends BucketsAggregator {
                            Aggregator parent) {
 
         super(name, BucketAggregationMode.PER_BUCKET, factories, ranges.size(), aggregationContext, parent);
+        assert valuesSource != null;
         this.valuesSource = valuesSource;
         this.keyed = keyed;
         this.rangeFactory = rangeFactory;
@@ -119,7 +120,7 @@ public class RangeAggregator extends BucketsAggregator {
 
     @Override
     public boolean shouldCollect() {
-        return valuesSource != null;
+        return true;
     }
 
     @Override
