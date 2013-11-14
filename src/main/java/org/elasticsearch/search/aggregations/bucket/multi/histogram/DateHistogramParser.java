@@ -96,6 +96,7 @@ public class DateHistogramParser implements AggregatorParser {
         String format = null;
         long preOffset = 0;
         long postOffset = 0;
+        boolean assumeSorted = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -131,6 +132,8 @@ public class DateHistogramParser implements AggregatorParser {
                     keyed = parser.booleanValue();
                 } else if ("compute_empty_buckets".equals(currentFieldName) || "computeEmptyBuckets".equals(currentFieldName)) {
                     computeEmptyBuckets = parser.booleanValue();
+                } else if ("script_values_sorted".equals(currentFieldName)) {
+                    assumeSorted = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.START_OBJECT) {
                 if ("params".equals(currentFieldName)) {
@@ -158,6 +161,11 @@ public class DateHistogramParser implements AggregatorParser {
         if (script != null) {
             searchScript = context.scriptService().search(context.lookup(), scriptLang, script, scriptParams);
             config.script(searchScript);
+        }
+
+        if (!assumeSorted) {
+            // we need values to be sorted and unique for efficiency
+            config.ensureSorted(true);
         }
 
         TimeZoneRounding.Builder tzRoundingBuilder;

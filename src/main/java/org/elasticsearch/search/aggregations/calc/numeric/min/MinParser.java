@@ -35,6 +35,11 @@ public class MinParser extends NumericAggregatorParser<InternalMin> {
     }
 
     @Override
+    protected boolean requiresSortedValues() {
+        return true;
+    }
+
+    @Override
     protected AggregatorFactory createFactory(String aggregationName, ValuesSourceConfig<NumericValuesSource> config) {
         return new MinAggregator.Factory(aggregationName, config);
     }

@@ -24,7 +24,6 @@ import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
-import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -64,7 +63,7 @@ public class MinAggregator extends Aggregator {
         assert valuesSource != null : "collect must only be called if #shouldCollect returns true";
 
         DoubleValues values = valuesSource.doubleValues();
-        if (values == null) {
+        if (values == null || values.setDocument(doc) == 0) {
             return;
         }
 
@@ -74,12 +73,7 @@ public class MinAggregator extends Aggregator {
             mins.fill(from, mins.size(), Double.POSITIVE_INFINITY);
         }
 
-        final int valueCount = values.setDocument(doc);
-        double min = mins.get(owningBucketOrdinal);
-        for (int i = 0; i < valueCount; i++) {
-            min = Math.min(min, values.nextValue());
-        }
-        mins.set(owningBucketOrdinal, min);
+        mins.set(owningBucketOrdinal, Math.min(values.nextValue(), mins.get(owningBucketOrdinal)));
     }
 
     @Override

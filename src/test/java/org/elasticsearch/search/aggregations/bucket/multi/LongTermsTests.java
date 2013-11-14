@@ -35,9 +35,7 @@ import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.sum;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
@@ -290,7 +288,7 @@ public class LongTermsTests extends AbstractIntegrationTest {
         SearchResponse response = client().prepareSearch("idx").setTypes("type")
                 .addAggregation(terms("terms")
                         .field("values")
-                        .script("_value + 1"))
+                        .script("_value - 1"))
                 .execute().actionGet();
 
         assertThat(response.getFailedShards(), equalTo(0));
@@ -301,16 +299,38 @@ public class LongTermsTests extends AbstractIntegrationTest {
         assertThat(terms.buckets().size(), equalTo(6));
 
         for (int i = 0; i < 6; i++) {
-            Terms.Bucket bucket = terms.getByTerm("" + (i+1));
+            Terms.Bucket bucket = terms.getByTerm("" + (i-1));
             assertThat(bucket, notNullValue());
-            assertThat(bucket.getTerm().string(), equalTo("" + (i+1)));
-            assertThat(bucket.getTermAsNumber().intValue(), equalTo(i+1));
+            assertThat(bucket.getTerm().string(), equalTo("" + (i-1)));
+            assertThat(bucket.getTermAsNumber().intValue(), equalTo(i-1));
             if (i == 0 || i == 5) {
                 assertThat(bucket.getDocCount(), equalTo(1l));
             } else {
                 assertThat(bucket.getDocCount(), equalTo(2l));
             }
         }
+    }
+
+    @Test
+    public void multiValuedField_WithValueScript_NotUnique() throws Exception {
+        SearchResponse response = client().prepareSearch("idx").setTypes("type")
+                .addAggregation(terms("terms")
+                        .field("values")
+                        .script("_value / 1000 + 1"))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        Terms terms = response.getAggregations().get("terms");
+        assertThat(terms, notNullValue());
+        assertThat(terms.getName(), equalTo("terms"));
+        assertThat(terms.buckets().size(), equalTo(1));
+
+        Terms.Bucket bucket = terms.getByTerm("1");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getTerm().string(), equalTo("1"));
+        assertThat(bucket.getTermAsNumber().intValue(), equalTo(1));
+        assertThat(bucket.getDocCount(), equalTo(5l));
     }
 
     /*

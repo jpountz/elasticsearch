@@ -65,6 +65,7 @@ public class TermsParser implements AggregatorParser {
         String orderKey = "_count";
         boolean orderAsc = false;
         String format = null;
+        boolean assumeUnique = false;
 
 
         XContentParser.Token token;
@@ -83,6 +84,10 @@ public class TermsParser implements AggregatorParser {
                     valueType = Terms.ValueType.resolveType(parser.text());
                 } else if ("format".equals(currentFieldName)) {
                     format = parser.text();
+                }
+            } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
+                if ("script_values_unique".equals(currentFieldName)) {
+                    assumeUnique = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.VALUE_NUMBER) {
                 if ("size".equals(currentFieldName)) {
@@ -123,6 +128,9 @@ public class TermsParser implements AggregatorParser {
                 config.scriptValueType(valueType.scriptValueType);
             }
             config.script(searchScript);
+            if (!assumeUnique) {
+                config.ensureUnique(true);
+            }
             return new TermsAggregatorFactory(aggregationName, config, order, requiredSize);
         }
 
@@ -163,6 +171,11 @@ public class TermsParser implements AggregatorParser {
         config.script(searchScript);
 
         config.fieldContext(new FieldContext(field, indexFieldData));
+
+        // We need values to be unique to be able to run terms aggs efficiently
+        if (!assumeUnique) {
+            config.ensureUnique(true);
+        }
 
         return new TermsAggregatorFactory(aggregationName, config, order, requiredSize);
     }

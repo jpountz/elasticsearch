@@ -19,9 +19,7 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
-import com.carrotsearch.hppc.LongArrayList;
 import org.apache.lucene.util.CollectionUtil;
-import org.apache.lucene.util.OpenBitSet;
 import org.elasticsearch.common.inject.internal.Nullable;
 import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.index.fielddata.LongValues;
@@ -53,8 +51,6 @@ public class HistogramAggregator extends BucketsAggregator {
     private final AbstractHistogramBase.Factory histogramFactory;
 
     private final LongHash bucketOrds;
-    private OpenBitSet matched = new OpenBitSet();
-    private final LongArrayList matchedList;
 
     public HistogramAggregator(String name,
                                AggregatorFactories factories,
@@ -76,8 +72,6 @@ public class HistogramAggregator extends BucketsAggregator {
         this.histogramFactory = histogramFactory;
 
         bucketOrds = new LongHash(INITIAL_CAPACITY);
-        matched = new OpenBitSet(INITIAL_CAPACITY);
-        matchedList = new LongArrayList();
     }
 
     @Override
@@ -91,29 +85,21 @@ public class HistogramAggregator extends BucketsAggregator {
         final LongValues values = valuesSource.longValues();
         final int valuesCount = values.setDocument(doc);
 
-        // nocommit the matched logic could be more efficient if we knew the values are in order
-        assert matched.cardinality() == 0;
+        long previousKey = Long.MIN_VALUE;
         for (int i = 0; i < valuesCount; ++i) {
             long value = values.nextValue();
             long key = rounding.round(value);
+            assert key >= previousKey;
+            if (key == previousKey) {
+                continue;
+            }
             long bucketOrd = bucketOrds.add(key);
             if (bucketOrd < 0) { // already seen
                 bucketOrd = -1 - bucketOrd;
             }
-            if (!matched.get(bucketOrd)) {
-                matched.set(bucketOrd);
-                matchedList.add(bucketOrd);
-                collectBucket(doc, bucketOrd);
-            }
+            collectBucket(doc, bucketOrd);
+            previousKey = key;
         }
-        resetMatches();
-    }
-
-    private void resetMatches() {
-        for (int i = 0; i < matchedList.size(); ++i) {
-            matched.clear(matchedList.get(i));
-        }
-        matchedList.clear();
     }
 
     @Override

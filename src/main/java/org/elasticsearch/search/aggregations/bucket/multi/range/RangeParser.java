@@ -56,6 +56,7 @@ public class RangeParser implements AggregatorParser {
         String scriptLang = null;
         Map<String, Object> scriptParams = null;
         boolean keyed = false;
+        boolean assumeSorted = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -109,6 +110,8 @@ public class RangeParser implements AggregatorParser {
             } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
                 if ("keyed".equals(currentFieldName)) {
                     keyed = parser.booleanValue();
+                } else if ("script_values_sorted".equals(currentFieldName)) {
+                    assumeSorted = parser.booleanValue();
                 }
             }
         }
@@ -119,6 +122,11 @@ public class RangeParser implements AggregatorParser {
 
         if (script != null) {
             config.script(context.scriptService().search(context.lookup(), scriptLang, script, scriptParams));
+        }
+
+        if (!assumeSorted) {
+            // we need values to be sorted and unique for efficiency
+            config.ensureSorted(true);
         }
 
         if (field == null) {

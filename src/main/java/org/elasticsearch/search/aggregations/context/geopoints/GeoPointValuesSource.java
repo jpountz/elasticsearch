@@ -19,6 +19,7 @@
 
 package org.elasticsearch.search.aggregations.context.geopoints;
 
+import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.context.FieldDataSource;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -26,23 +27,23 @@ import org.elasticsearch.search.aggregations.context.ValuesSource;
 import java.io.IOException;
 
 /**
- *
+ * A source of geo points.
  */
-public interface GeoPointValuesSource extends ValuesSource {
+public final class GeoPointValuesSource implements ValuesSource {
 
-    GeoPointValues values() throws IOException;
+    private final FieldDataSource.GeoPoint source;
 
+    public GeoPointValuesSource(FieldDataSource.GeoPoint source) {
+        this.source = source;
+    }
 
-    public static class FieldData extends ValuesSource.FieldData<FieldDataSource.GeoPoint> implements GeoPointValuesSource {
+    @Override
+    public BytesValues bytesValues() {
+        return source.bytesValues();
+    }
 
-        public FieldData(FieldDataSource.GeoPoint source) {
-            super(source);
-        }
-
-        @Override
-        public GeoPointValues values() throws IOException {
-            return source.geoPointValues();
-        }
+    public final GeoPointValues values() throws IOException {
+        return source.geoPointValues();
     }
 
 }
