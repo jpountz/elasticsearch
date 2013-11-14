@@ -24,6 +24,7 @@ import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -80,6 +81,11 @@ public class SumAggregator extends Aggregator {
             return new InternalSum(name, 0);
         }
         return new InternalSum(name, sums.get(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalSum(name, 0.0);
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {

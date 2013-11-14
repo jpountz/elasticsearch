@@ -20,10 +20,12 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.min.Min;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.min;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
@@ -32,6 +34,26 @@ import static org.hamcrest.Matchers.notNullValue;
  *
  */
 public class MinTests extends AbstractNumericTests {
+
+    @Test
+    public void testEmptyAggregation() throws Exception {
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(min("min")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, notNullValue());
+
+        Min min = bucket.getAggregations().get("min");
+        assertThat(min, notNullValue());
+        assertThat(min.getName(), equalTo("min"));
+        assertThat(min.getValue(), equalTo(Double.POSITIVE_INFINITY));
+    }
 
     @Test
     public void testUnmapped() throws Exception {

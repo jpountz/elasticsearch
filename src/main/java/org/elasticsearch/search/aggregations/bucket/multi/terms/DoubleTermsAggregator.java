@@ -30,6 +30,8 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -115,6 +117,11 @@ public class DoubleTermsAggregator extends BucketsAggregator {
             list[i] = bucket;
         }
         return new DoubleTerms(name, order, valuesSource.formatter(), requiredSize, Arrays.asList(list));
+    }
+
+    @Override
+    public DoubleTerms buildEmptyAggregation() {
+        return new DoubleTerms(name, order, valuesSource.formatter(), requiredSize, Collections.<InternalTerms.Bucket>emptyList());
     }
 
 }

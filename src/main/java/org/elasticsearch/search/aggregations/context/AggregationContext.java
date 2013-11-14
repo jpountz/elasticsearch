@@ -127,14 +127,11 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
             return (VS) numericField(fieldDataSources, config.fieldContext, config.script, config.formatter, config.parser);
         }
-        if (BytesValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) bytesField(fieldDataSources, config.fieldContext, config.script, config.needsHashes);
-        }
         if (GeoPointValuesSource.class.isAssignableFrom(config.valueSourceType)) {
             return (VS) geoPointField(fieldDataSources, config.fieldContext);
         }
-
-        throw new AggregationExecutionException("value source of type [" + config.valueSourceType.getSimpleName() + "] is not supported");
+        // falling back to bytes values
+        return (VS) bytesField(fieldDataSources, config.fieldContext, config.script, config.needsHashes);
     }
 
     private NumericValuesSource.Script numericScript(SearchScript script, ScriptValueType scriptValueType, ValueFormatter formatter, ValueParser parser) {

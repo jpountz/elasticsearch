@@ -20,18 +20,43 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.Stats;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.stats;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.*;
 
 /**
  *
  */
 public class StatsTests extends AbstractNumericTests {
+
+    @Test
+    public void testEmptyAggregation() throws Exception {
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(stats("stats")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, notNullValue());
+
+        Stats stats = bucket.getAggregations().get("stats");
+        assertThat(stats, notNullValue());
+        assertThat(stats.getName(), equalTo("stats"));
+        assertThat(stats.getCount(), equalTo(0l));
+        assertThat(stats.getSum(), equalTo(0.0));
+        assertThat(stats.getMin(), equalTo(Double.POSITIVE_INFINITY));
+        assertThat(stats.getMax(), equalTo(Double.NEGATIVE_INFINITY));
+        assertThat(Double.isNaN(stats.getAvg()), is(true));
+    }
 
     @Test
     public void testUnmapped() throws Exception {

@@ -25,6 +25,7 @@ import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -107,6 +108,11 @@ public class StatsAggegator extends Aggregator {
         }
         assert owningBucketOrdinal < counts.size();
         return new InternalStats(name, counts.get(owningBucketOrdinal), sums.get(owningBucketOrdinal), mins.get(owningBucketOrdinal), maxes.get(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalStats(name, 0, 0, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY);
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {

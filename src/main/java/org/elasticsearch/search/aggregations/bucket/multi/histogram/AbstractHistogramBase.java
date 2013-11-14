@@ -46,8 +46,6 @@ import java.util.ListIterator;
 
 /**
  * An internal implementation of {@link HistogramBase}
- *
- * nocommit I'd love to rename it to AbstractHistogram (see the comment on {@link Histogram}
  */
 abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends InternalAggregation implements HistogramBase<B>, ToXContent, Streamable {
 
@@ -97,12 +95,30 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         }
     }
 
+    static class EmptyBucketInfo {
+        final Rounding rounding;
+        final InternalAggregations subAggregations;
+
+        EmptyBucketInfo(Rounding rounding, InternalAggregations subAggregations) {
+            this.rounding = rounding;
+            this.subAggregations = subAggregations;
+        }
+
+        public static EmptyBucketInfo readFrom(StreamInput in) throws IOException {
+            return new EmptyBucketInfo(Rounding.Streams.read(in), InternalAggregations.readAggregations(in));
+        }
+
+        public static void writeTo(EmptyBucketInfo info, StreamOutput out) throws IOException {
+            Rounding.Streams.write(info.rounding, out);
+            info.subAggregations.writeTo(out);
+        }
+    }
 
     public static interface Factory<B extends HistogramBase.Bucket> {
 
         String type();
 
-        AbstractHistogramBase create(String name, List<B> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed);
+        AbstractHistogramBase create(String name, List<B> buckets, InternalOrder order, EmptyBucketInfo emptyBucketInfo, ValueFormatter formatter, boolean keyed);
 
         Bucket createBucket(long key, long docCount, InternalAggregations aggregations);
 
@@ -113,15 +129,15 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
     private InternalOrder order;
     private ValueFormatter formatter;
     private boolean keyed;
-    private Rounding rounding;
+    private EmptyBucketInfo emptyBucketInfo;
 
     protected AbstractHistogramBase() {} // for serialization
 
-    protected AbstractHistogramBase(String name, List<B> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
+    protected AbstractHistogramBase(String name, List<B> buckets, InternalOrder order, EmptyBucketInfo emptyBucketInfo, ValueFormatter formatter, boolean keyed) {
         super(name);
         this.buckets = buckets;
         this.order = order;
-        this.rounding = rounding;
+        this.emptyBucketInfo = emptyBucketInfo;
         this.formatter = formatter;
         this.keyed = keyed;
     }
@@ -153,7 +169,37 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
     public InternalAggregation reduce(ReduceContext reduceContext) {
         List<InternalAggregation> aggregations = reduceContext.aggregations();
         if (aggregations.size() == 1) {
-            return aggregations.get(0);
+
+            if (emptyBucketInfo == null) {
+                return aggregations.get(0);
+            }
+
+            // we need to fill the gaps with empty buckets
+            AbstractHistogramBase histo = (AbstractHistogramBase) aggregations.get(0);
+            CollectionUtil.introSort(histo.buckets, order.asc ? InternalOrder.KEY_ASC.comparator() : InternalOrder.KEY_DESC.comparator());
+            List<HistogramBase.Bucket> list = order.asc ? histo.buckets : Lists.reverse(histo.buckets);
+            HistogramBase.Bucket prevBucket = null;
+            ListIterator<HistogramBase.Bucket> iter = list.listIterator();
+            while (iter.hasNext()) {
+                // look ahead on the next bucket without advancing the iter
+                // so we'll be able to insert elements at the right position
+                HistogramBase.Bucket nextBucket = list.get(iter.nextIndex());
+                if (prevBucket != null) {
+                    long key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
+                    while (key != nextBucket.getKey()) {
+                        iter.add(createBucket(key, 0, emptyBucketInfo.subAggregations));
+                        key = emptyBucketInfo.rounding.nextRoundingValue(key);
+                    }
+                }
+                prevBucket = iter.next();
+            }
+
+            if (order != InternalOrder.KEY_ASC && order != InternalOrder.KEY_DESC) {
+                CollectionUtil.introSort(histo.buckets, order.comparator());
+            }
+
+            return histo;
+
         }
 
         AbstractHistogramBase reduced = (AbstractHistogramBase) aggregations.get(0);
@@ -185,7 +231,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
 
 
         // adding empty buckets in needed
-        if (rounding != null) {
+        if (emptyBucketInfo != null) {
             CollectionUtil.introSort(reducedBuckets, order.asc ? InternalOrder.KEY_ASC.comparator() : InternalOrder.KEY_DESC.comparator());
             List<HistogramBase.Bucket> list = order.asc ? reducedBuckets : Lists.reverse(reducedBuckets);
             HistogramBase.Bucket prevBucket = null;
@@ -193,10 +239,10 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
             while (iter.hasNext()) {
                 HistogramBase.Bucket nextBucket = list.get(iter.nextIndex());
                 if (prevBucket != null) {
-                    long key = rounding.nextRoundingValue(prevBucket.getKey());
+                    long key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
                     while (key != nextBucket.getKey()) {
-                        iter.add(createBucket(key, 0, InternalAggregations.EMPTY));
-                        key = rounding.nextRoundingValue(key);
+                        iter.add(createBucket(key, 0, emptyBucketInfo.subAggregations));
+                        key = emptyBucketInfo.rounding.nextRoundingValue(key);
                     }
                 }
                 prevBucket = iter.next();
@@ -224,7 +270,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         name = in.readString();
         order = InternalOrder.Streams.readOrder(in);
         if (in.readBoolean()) {
-            rounding = Rounding.Streams.read(in);
+            emptyBucketInfo = EmptyBucketInfo.readFrom(in);
         }
         formatter = ValueFormatterStreams.readOptional(in);
         keyed = in.readBoolean();
@@ -241,11 +287,11 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
     public void writeTo(StreamOutput out) throws IOException {
         out.writeString(name);
         InternalOrder.Streams.writeOrder(order, out);
-        if (rounding == null) {
+        if (emptyBucketInfo == null) {
             out.writeBoolean(false);
         } else {
             out.writeBoolean(true);
-            Rounding.Streams.write(rounding, out);
+            EmptyBucketInfo.writeTo(emptyBucketInfo, out);
         }
         ValueFormatterStreams.writeOptional(formatter, out);
         out.writeBoolean(keyed);

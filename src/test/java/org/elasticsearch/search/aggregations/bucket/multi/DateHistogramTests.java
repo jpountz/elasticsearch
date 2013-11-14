@@ -19,20 +19,28 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi;
 
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.DateHistogram;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.elasticsearch.test.AbstractIntegrationTest;
+import org.hamcrest.Matchers;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
 
 /**
@@ -850,4 +858,33 @@ public class DateHistogramTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(3l));
     }
 
+    @Test
+    public void emptyAggregation() throws Exception {
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer").execute().actionGet();
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", ""+i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i*2)
+                    .endObject()));
+        }
+        indexRandom(true, builders);
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(dateHistogram("date_histo").interval(1)))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, Matchers.notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, Matchers.notNullValue());
+
+        DateHistogram dateHisto = bucket.getAggregations().get("date_histo");
+        assertThat(dateHisto, Matchers.notNullValue());
+        assertThat(dateHisto.getName(), equalTo("date_histo"));
+        assertThat(dateHisto.buckets().isEmpty(), is(true));
+
+    }
 }

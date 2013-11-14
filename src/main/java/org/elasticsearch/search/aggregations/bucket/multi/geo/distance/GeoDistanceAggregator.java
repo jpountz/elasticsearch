@@ -26,6 +26,7 @@ import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
@@ -146,7 +147,17 @@ public class GeoDistanceAggregator extends BucketsAggregator {
         return new InternalGeoDistance(name, buckets);
     }
 
-
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        InternalAggregations subAggs = buildEmptySubAggregations();
+        List<GeoDistance.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+        for (int i = 0; i < ranges.length; i++) {
+            DistanceRange range = ranges[i];
+            InternalGeoDistance.Bucket bucket = new InternalGeoDistance.Bucket(range.key, range.unit, range.from, range.to, 0, subAggs);
+            buckets.add(bucket);
+        }
+        return new InternalGeoDistance(name, buckets);
+    }
 
     public static class Factory extends ValueSourceAggregatorFactory<GeoPointValuesSource> {
 

@@ -13,6 +13,7 @@ public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBu
 
     private Long interval;
     private HistogramBase.Order order;
+    private Boolean computeEmptyBuckets;
 
     public HistogramBuilder(String name) {
         super(name, InternalHistogram.TYPE.name());
@@ -28,6 +29,11 @@ public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBu
         return this;
     }
 
+    public HistogramBuilder computeEmptyBuckets(boolean computeEmptyBuckets) {
+        this.computeEmptyBuckets = computeEmptyBuckets;
+        return this;
+    }
+
     @Override
     protected XContentBuilder doInternalXContent(XContentBuilder builder, Params params) throws IOException {
         if (interval == null) {
@@ -38,6 +44,10 @@ public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBu
         if (order != null) {
             builder.field("order");
             order.toXContent(builder, params);
+        }
+
+        if (computeEmptyBuckets != null) {
+            builder.field("compute_empty_buckets", computeEmptyBuckets);
         }
 
         return builder;

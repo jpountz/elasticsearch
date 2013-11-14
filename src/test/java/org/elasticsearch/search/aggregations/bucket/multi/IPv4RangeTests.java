@@ -23,6 +23,7 @@ import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.mapper.ip.IpFieldMapper;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.range.ipv4.IPv4Range;
 import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
@@ -31,9 +32,14 @@ import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
 import static org.hamcrest.core.IsNull.nullValue;
 
@@ -807,5 +813,38 @@ public class IPv4RangeTests extends AbstractIntegrationTest {
         assertThat(bucket.getDocCount(), equalTo(55l));
     }
 
+    @Test
+    public void emptyAggregation() throws Exception {
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer", "ip", "type=ip").execute().actionGet();
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", "" + i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i * 2)
+                    .field("ip", "10.0.0.5")
+                    .endObject()));
+        }
+        indexRandom(true, builders);
 
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true)
+                        .subAggregation(ipRange("ip_range").field("ip").addRange("r1", "10.0.0.1", "10.0.0.10")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, Matchers.notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, Matchers.notNullValue());
+
+        IPv4Range range = bucket.getAggregations().get("ip_range");
+        assertThat(range, Matchers.notNullValue());
+        assertThat(range.getName(), equalTo("ip_range"));
+        assertThat(range.buckets().size(), is(1));
+        assertThat(range.buckets().get(0).getKey(), equalTo("r1"));
+        assertThat(range.buckets().get(0).getFromAsString(), equalTo("10.0.0.1"));
+        assertThat(range.buckets().get(0).getToAsString(), equalTo("10.0.0.10"));
+        assertThat(range.buckets().get(0).getDocCount(), equalTo(0l));
+    }
 }

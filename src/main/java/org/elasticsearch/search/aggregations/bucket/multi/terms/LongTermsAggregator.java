@@ -30,6 +30,8 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  *
@@ -114,6 +116,11 @@ public class LongTermsAggregator extends BucketsAggregator {
             list[i] = bucket;
         }
         return new LongTerms(name, order, valuesSource.formatter(), requiredSize, Arrays.asList(list));
+    }
+
+    @Override
+    public LongTerms buildEmptyAggregation() {
+        return new LongTerms(name, order, valuesSource.formatter(), requiredSize, Collections.<InternalTerms.Bucket>emptyList());
     }
 
 }

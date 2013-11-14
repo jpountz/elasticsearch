@@ -20,18 +20,39 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.avg.Avg;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.avg;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.notNullValue;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
+import static org.hamcrest.Matchers.*;
 
 /**
  *
  */
 public class AvgTests extends AbstractNumericTests {
+
+    @Test
+    public void testEmptyAggregation() throws Exception {
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(avg("avg")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, notNullValue());
+
+        Avg avg = bucket.getAggregations().get("avg");
+        assertThat(avg, notNullValue());
+        assertThat(avg.getName(), equalTo("avg"));
+        assertThat(Double.isNaN(avg.getValue()), is(true));
+    }
 
     @Test
     public void testUnmapped() throws Exception {

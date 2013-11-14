@@ -23,6 +23,7 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -30,6 +31,8 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
@@ -110,6 +113,11 @@ public class StringTermsAggregator extends BucketsAggregator {
             list[i] = bucket;
         }
         return new StringTerms(name, order, requiredSize, Arrays.asList(list));
+    }
+
+    @Override
+    public StringTerms buildEmptyAggregation() {
+        return new StringTerms(name, order, requiredSize, Collections.<InternalTerms.Bucket>emptyList());
     }
 
 }

@@ -24,6 +24,7 @@ import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
@@ -77,6 +78,11 @@ public class CountAggregator extends Aggregator {
         }
         assert owningBucketOrdinal < counts.size();
         return new InternalCount(name, counts.get(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalCount(name, 0l);
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<BytesValuesSource> {

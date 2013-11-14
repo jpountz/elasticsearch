@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import org.elasticsearch.common.io.stream.StreamInput;
-import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.search.aggregations.AggregationStreams;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.InternalAggregations;
@@ -78,8 +77,8 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
         }
 
         @Override
-        public AbstractHistogramBase<?> create(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
-            return new InternalDateHistogram(name, buckets, order, rounding, formatter, keyed);
+        public AbstractHistogramBase<?> create(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, EmptyBucketInfo emptyBucketInfo, ValueFormatter formatter, boolean keyed) {
+            return new InternalDateHistogram(name, buckets, order, emptyBucketInfo, formatter, keyed);
         }
 
         @Override
@@ -90,8 +89,8 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
 
     InternalDateHistogram() {} // for serialization
 
-    InternalDateHistogram(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, Rounding rounding, ValueFormatter formatter, boolean keyed) {
-        super(name, buckets, order, rounding, formatter, keyed);
+    InternalDateHistogram(String name, List<DateHistogram.Bucket> buckets, InternalOrder order, EmptyBucketInfo emptyBucketInfo, ValueFormatter formatter, boolean keyed) {
+        super(name, buckets, order, emptyBucketInfo, formatter, keyed);
     }
 
     @Override

@@ -38,6 +38,7 @@ import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactor
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class HistogramAggregator extends BucketsAggregator {
@@ -126,12 +127,23 @@ public class HistogramAggregator extends BucketsAggregator {
             }
             buckets.add(histogramFactory.createBucket(bucketOrds.key(i), bucketDocCount(ord), bucketAggregations(ord)));
         }
+
+
         CollectionUtil.introSort(buckets, order.comparator());
 
         // value source will be null for unmapped fields
         ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-        return histogramFactory.create(name, buckets, order, computeEmptyBuckets ? rounding : null, formatter, keyed);
+        AbstractHistogramBase.EmptyBucketInfo emptyBucketInfo = computeEmptyBuckets ? new AbstractHistogramBase.EmptyBucketInfo(rounding, buildEmptySubAggregations()) : null;
+        return histogramFactory.create(name, buckets, order, emptyBucketInfo, formatter, keyed);
     }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
+        AbstractHistogramBase.EmptyBucketInfo emptyBucketInfo = computeEmptyBuckets ? new AbstractHistogramBase.EmptyBucketInfo(rounding, buildEmptySubAggregations()) : null;
+        return histogramFactory.create(name, (List<HistogramBase.Bucket>) Collections.EMPTY_LIST, order, emptyBucketInfo, formatter, keyed);
+    }
+
 
 
     public static class Factory extends ValueSourceAggregatorFactory<NumericValuesSource> {

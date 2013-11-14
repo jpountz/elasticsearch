@@ -22,8 +22,8 @@ package org.elasticsearch.search.aggregations.bucket.single.missing;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.search.aggregations.context.FieldContext;
+import org.elasticsearch.search.aggregations.context.ValuesSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
-import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
 import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.internal.SearchContext;
@@ -43,7 +43,7 @@ public class MissingParser implements AggregatorParser {
     @Override
     public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 
-        ValuesSourceConfig<BytesValuesSource> config = new ValuesSourceConfig<BytesValuesSource>(BytesValuesSource.class);
+        ValuesSourceConfig<ValuesSource> config = new ValuesSourceConfig<ValuesSource>(ValuesSource.class);
 
         String field = null;
 

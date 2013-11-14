@@ -20,21 +20,25 @@
 package org.elasticsearch.search.aggregations.bucket.multi;
 
 import com.google.common.collect.Sets;
+import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.search.aggregations.bucket.multi.geo.distance.GeoDistance;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.test.AbstractIntegrationTest;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.geoDistance;
-import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
@@ -318,5 +322,41 @@ public class GeoDistanceTests extends AbstractIntegrationTest {
             names.add(city.getTerm().string());
         }
         assertThat(names.contains("tel-aviv"), is(true));
+    }
+
+    @Test
+    public void emptyAggregation() throws Exception {
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer", "location", "type=geo_point").execute().actionGet();
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", "" + i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i * 2)
+                    .field("location", "52.0945, 5.116")
+                    .endObject()));
+        }
+        indexRandom(true, builders);
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true)
+                        .subAggregation(geoDistance("geo_dist").field("location").point("52.3760, 4.894").addRange("0-100", 0.0, 100.0)))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, Matchers.notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, Matchers.notNullValue());
+
+        GeoDistance geoDistance = bucket.getAggregations().get("geo_dist");
+        assertThat(geoDistance, Matchers.notNullValue());
+        assertThat(geoDistance.getName(), equalTo("geo_dist"));
+        assertThat(geoDistance.buckets().size(), is(1));
+        assertThat(geoDistance.buckets().get(0).getKey(), equalTo("0-100"));
+        assertThat(geoDistance.buckets().get(0).getFrom(), equalTo(0.0));
+        assertThat(geoDistance.buckets().get(0).getTo(), equalTo(100.0));
+        assertThat(geoDistance.buckets().get(0).getDocCount(), equalTo(0l));
+
     }
 }

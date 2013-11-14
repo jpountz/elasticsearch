@@ -27,12 +27,16 @@ import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.Stats;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.elasticsearch.test.AbstractIntegrationTest;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -835,6 +839,36 @@ public class HistogramTests extends AbstractIntegrationTest {
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(8l));
         assertThat(bucket.getDocCount(), equalTo(2l)); // values: 8, 9
+    }
+
+    @Test
+    public void emptyAggregation() throws Exception {
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer").execute().actionGet();
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", "" + i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i * 2)
+                    .endObject()));
+        }
+        indexRandom(true, builders);
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true)
+                        .subAggregation(histogram("sub_histo").interval(1l)))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, Matchers.notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, Matchers.notNullValue());
+
+        histo = bucket.getAggregations().get("sub_histo");
+        assertThat(histo, Matchers.notNullValue());
+        assertThat(histo.getName(), equalTo("sub_histo"));
+        assertThat(histo.buckets().isEmpty(), is(true));
     }
 
 }

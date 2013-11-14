@@ -46,6 +46,7 @@ public abstract class AbstractNumericTests extends AbstractIntegrationTest {
     public void init() throws Exception {
         createIndex("idx");
         createIndex("idx2");
+
         List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
 
         for (int i = 0; i < 10; i++) { // NOCOMMIT randomize the size and the params in here?
@@ -56,7 +57,24 @@ public abstract class AbstractNumericTests extends AbstractIntegrationTest {
                     .endObject()));
         }
         indexRandom(true, builders);
+
+        // creating an index to test the empty buckets functionality. The way it works is by indexing
+        // two docs {value: 0} and {value : 2}, then building a histogram agg with interval 1 and with empty
+        // buckets computed.. the empty bucket is the one associated with key "1". then each test will have
+        // to check that this bucket exists with the appropriate sub aggregations.
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer").execute().actionGet();
+        builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", ""+i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i*2)
+                    .endObject()));
+        }
+        indexRandom(true, builders);
+
     }
+
+    public abstract void testEmptyAggregation() throws Exception;
 
     public abstract void testUnmapped() throws Exception;
 

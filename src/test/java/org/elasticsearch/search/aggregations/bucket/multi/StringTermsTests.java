@@ -23,16 +23,24 @@ import com.google.common.base.Strings;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.calc.bytes.count.Count;
 import org.elasticsearch.test.AbstractIntegrationTest;
+import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.count;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.terms;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.core.IsNull.notNullValue;
 
 /**
@@ -515,6 +523,36 @@ public class StringTermsTests extends AbstractIntegrationTest {
             assertThat(bucket.getTerm().string(), equalTo("val" + i));
             assertThat(bucket.getDocCount(), equalTo(1l));
         }
+    }
+
+    @Test
+    public void emptyAggregation() throws Exception {
+        prepareCreate("empty_bucket_idx").addMapping("type", "value", "type=integer").execute().actionGet();
+        List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
+        for (int i = 0; i < 2; i++) {
+            builders.add(client().prepareIndex("empty_bucket_idx", "type", ""+i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i*2)
+                    .endObject()));
+        }
+        indexRandom(true, builders);
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true)
+                        .subAggregation(terms("terms")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, Matchers.notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, Matchers.notNullValue());
+
+        Terms terms = bucket.getAggregations().get("terms");
+        assertThat(terms, Matchers.notNullValue());
+        assertThat(terms.getName(), equalTo("terms"));
+        assertThat(terms.buckets().isEmpty(), is(true));
     }
 
 }

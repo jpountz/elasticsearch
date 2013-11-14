@@ -27,6 +27,7 @@ import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -53,8 +54,12 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalFilter(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
+    public void setNextReader(AtomicReaderContext reader) {
+        try {
+            bits = DocIdSets.toSafeBits(reader.reader(), filter.getDocIdSet(reader, reader.reader().getLiveDocs()));
+        } catch (IOException ioe) {
+            throw new AggregationExecutionException("Failed to aggregate filter aggregator [" + name + "]", ioe);
+        }
     }
 
     @Override
@@ -65,12 +70,13 @@ public class FilterAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    public void setNextReader(AtomicReaderContext reader) {
-        try {
-            bits = DocIdSets.toSafeBits(reader.reader(), filter.getDocIdSet(reader, reader.reader().getLiveDocs()));
-        } catch (IOException ioe) {
-            throw new AggregationExecutionException("Failed to aggregate filter aggregator [" + name + "]", ioe);
-        }
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalFilter(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalFilter(name, 0, buildEmptySubAggregations());
     }
 
     public static class Factory extends AggregatorFactory {

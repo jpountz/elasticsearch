@@ -21,6 +21,7 @@ package org.elasticsearch.search.aggregations.bucket.multi.terms;
 
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 
@@ -55,4 +56,8 @@ public class UnmappedTermsAggregator extends Aggregator {
         return new UnmappedTerms(name, order, requiredSize);
     }
 
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new UnmappedTerms(name, order, requiredSize);
+    }
 }

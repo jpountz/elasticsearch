@@ -24,6 +24,7 @@ import org.elasticsearch.common.util.DoubleArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -88,6 +89,11 @@ public class MinAggregator extends Aggregator {
         }
         assert owningBucketOrdinal < mins.size();
         return new InternalMin(name, mins.get(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalMin(name, Double.POSITIVE_INFINITY);
     }
 
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {

@@ -137,21 +137,6 @@ public class RangeAggregator extends BucketsAggregator {
         resetMatches();
     }
 
-    @Override
-    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        assert owningBucketOrdinal == 0;
-        List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
-        for (int i = 0; i < ranges.length; i++) {
-            Range range = ranges[i];
-            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketDocCount(i),
-                    bucketAggregations(i), valuesSource.formatter());
-            buckets.add(bucket);
-        }
-        // value source can be null in the case of unmapped fields
-        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
-        return rangeFactory.create(name, buckets, formatter, keyed);
-    }
-
     private boolean noMatchYet() {
         for (int i = 0; i < matched.length; ++i) {
             if (matched[i]) {
@@ -216,6 +201,35 @@ public class RangeAggregator extends BucketsAggregator {
         }
     }
 
+    @Override
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        assert owningBucketOrdinal == 0;
+        List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+        for (int i = 0; i < ranges.length; i++) {
+            Range range = ranges[i];
+            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, bucketDocCount(i),
+                    bucketAggregations(i), valuesSource.formatter());
+            buckets.add(bucket);
+        }
+        // value source can be null in the case of unmapped fields
+        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
+        return rangeFactory.create(name, buckets, formatter, keyed);
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        InternalAggregations subAggs = buildEmptySubAggregations();
+        List<RangeBase.Bucket> buckets = Lists.newArrayListWithCapacity(ranges.length);
+        for (int i = 0; i < ranges.length; i++) {
+            Range range = ranges[i];
+            RangeBase.Bucket bucket = rangeFactory.createBucket(range.key, range.from, range.to, 0, subAggs, valuesSource.formatter());
+            buckets.add(bucket);
+        }
+        // value source can be null in the case of unmapped fields
+        ValueFormatter formatter = valuesSource != null ? valuesSource.formatter() : null;
+        return rangeFactory.create(name, buckets, formatter, keyed);
+    }
+
     private static final void sortRanges(final Range[] ranges) {
         new InPlaceMergeSorter() {
 
@@ -276,10 +290,15 @@ public class RangeAggregator extends BucketsAggregator {
 
         @Override
         public AbstractRangeBase buildAggregation(long owningBucketOrdinal) {
-            assert owningBucketOrdinal == 0;
+            return (AbstractRangeBase) buildEmptyAggregation();
+        }
+
+        @Override
+        public AbstractRangeBase buildEmptyAggregation() {
+            InternalAggregations subAggs = buildEmptySubAggregations();
             List<RangeBase.Bucket> buckets = new ArrayList<RangeBase.Bucket>(ranges.size());
             for (RangeAggregator.Range range : ranges) {
-                buckets.add(factory.createBucket(range.key, range.from, range.to, 0, InternalAggregations.EMPTY, formatter));
+                buckets.add(factory.createBucket(range.key, range.from, range.to, 0, subAggs, formatter));
             }
             return factory.create(name, buckets, formatter, keyed);
         }

@@ -20,10 +20,12 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.sum;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
@@ -32,6 +34,26 @@ import static org.hamcrest.Matchers.notNullValue;
  *
  */
 public class SumTests extends AbstractNumericTests {
+
+    @Test
+    public void testEmptyAggregation() throws Exception {
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(sum("sum")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, notNullValue());
+
+        Sum sum = bucket.getAggregations().get("sum");
+        assertThat(sum, notNullValue());
+        assertThat(sum.getName(), equalTo("sum"));
+        assertThat(sum.getValue(), equalTo(0.0));
+    }
 
     @Test
     public void testUnmapped() throws Exception {

@@ -103,6 +103,11 @@ public class AggregatorFactories {
                 public InternalAggregation buildAggregation(long owningBucketOrdinal) {
                     return aggregators.get(owningBucketOrdinal).buildAggregation(0);
                 }
+
+                @Override
+                public InternalAggregation buildEmptyAggregation() {
+                    return first.buildEmptyAggregation();
+                }
             };
         }
         return aggregators;

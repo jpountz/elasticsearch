@@ -22,6 +22,7 @@ package org.elasticsearch.search.aggregations.bucket.single.global;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -39,15 +40,20 @@ public class GlobalAggregator extends SingleBucketAggregator {
     }
 
     @Override
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        assert owningBucketOrdinal == 0 : "global aggregator can only be a top level aggregator";
+        collectBucket(doc, owningBucketOrdinal);
+    }
+
+    @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         assert owningBucketOrdinal == 0 : "global aggregator can only be a top level aggregator";
         return new InternalGlobal(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
-    public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        assert owningBucketOrdinal == 0 : "global aggregator can only be a top level aggregator";
-        collectBucket(doc, owningBucketOrdinal);
+    public InternalAggregation buildEmptyAggregation() {
+        throw new UnsupportedOperationException("global aggregations cannot serve as sub-aggregations, hence should never be called on #buildEmptyAggregations");
     }
 
     public static class Factory extends AggregatorFactory {

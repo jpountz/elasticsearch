@@ -25,6 +25,7 @@ import org.elasticsearch.common.util.LongArray;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
@@ -88,6 +89,11 @@ public class AvgAggregator extends Aggregator {
         return new InternalAvg(name, sums.get(owningBucketOrdinal), counts.get(owningBucketOrdinal));
     }
 
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalAvg(name, 0.0, 0l);
+    }
+
     public static class Factory extends ValueSourceAggregatorFactory.LeafOnly<NumericValuesSource> {
 
         public Factory(String name, String type, ValuesSourceConfig<NumericValuesSource> valuesSourceConfig) {
@@ -104,4 +110,5 @@ public class AvgAggregator extends Aggregator {
             return new AvgAggregator(name, expectedBucketsCount, valuesSource, aggregationContext, parent);
         }
     }
+
 }

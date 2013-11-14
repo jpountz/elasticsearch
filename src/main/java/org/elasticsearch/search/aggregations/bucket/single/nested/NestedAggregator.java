@@ -32,6 +32,7 @@ import org.elasticsearch.index.search.nested.NonNestedDocsFilter;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
@@ -68,11 +69,6 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
     }
 
     @Override
-    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        return new InternalNested(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
-    }
-
-    @Override
     public void setNextReader(AtomicReaderContext reader) {
         try {
             DocIdSet docIdSet = parentFilter.getDocIdSet(reader, null);
@@ -106,6 +102,16 @@ public class NestedAggregator extends SingleBucketAggregator implements ReaderCo
             }
         }
         incrementBucketDocCount(numChildren, bucketOrd);
+    }
+
+    @Override
+    public InternalAggregation buildAggregation(long owningBucketOrdinal) {
+        return new InternalNested(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
+    }
+
+    @Override
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalNested(name, 0, buildEmptySubAggregations());
     }
 
     public static class Factory extends AggregatorFactory {

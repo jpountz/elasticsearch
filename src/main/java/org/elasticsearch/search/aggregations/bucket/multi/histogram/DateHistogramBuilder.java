@@ -1,5 +1,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.aggregations.ValuesSourceAggregationBuilder;
 import org.elasticsearch.search.builder.SearchSourceBuilderException;
@@ -73,6 +74,9 @@ public class DateHistogramBuilder extends ValuesSourceAggregationBuilder<DateHis
     protected XContentBuilder doInternalXContent(XContentBuilder builder, Params params) throws IOException {
         if (interval == null) {
             throw new SearchSourceBuilderException("[interval] must be defined for histogram aggregation [" + name + "]");
+        }
+        if (interval instanceof Number) {
+            interval = TimeValue.timeValueMillis(((Number) interval).longValue()).toString();
         }
         builder.field("interval", interval);
 

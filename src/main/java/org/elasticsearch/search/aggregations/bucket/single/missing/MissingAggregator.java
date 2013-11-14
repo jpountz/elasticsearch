@@ -21,6 +21,7 @@ package org.elasticsearch.search.aggregations.bucket.single.missing;
 
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
+import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.single.SingleBucketAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -44,15 +45,20 @@ public class MissingAggregator extends SingleBucketAggregator {
     }
 
     @Override
+    public void collect(int doc, long owningBucketOrdinal) throws IOException {
+        if (valuesSource == null || valuesSource.bytesValues().setDocument(doc) == 0) {
+            collectBucket(doc, owningBucketOrdinal);
+        }
+    }
+
+    @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
         return new InternalMissing(name, bucketDocCount(owningBucketOrdinal), bucketAggregations(owningBucketOrdinal));
     }
 
     @Override
-    public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        if (valuesSource == null || valuesSource.bytesValues().setDocument(doc) == 0) {
-            collectBucket(doc, owningBucketOrdinal);
-        }
+    public InternalAggregation buildEmptyAggregation() {
+        return new InternalMissing(name, 0, buildEmptySubAggregations());
     }
 
     public static class Factory extends ValueSourceAggregatorFactory {

@@ -20,10 +20,12 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.junit.Test;
 
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.histogram;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.max;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
@@ -33,6 +35,25 @@ import static org.hamcrest.Matchers.notNullValue;
  */
 public class MaxTests extends AbstractNumericTests {
 
+    @Test
+    public void testEmptyAggregation() throws Exception {
+
+        SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(histogram("histo").field("value").interval(1l).computeEmptyBuckets(true).subAggregation(max("max")))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(2l));
+        Histogram histo = searchResponse.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        Histogram.Bucket bucket = histo.getByKey(1l);
+        assertThat(bucket, notNullValue());
+
+        Max max = bucket.getAggregations().get("max");
+        assertThat(max, notNullValue());
+        assertThat(max.getName(), equalTo("max"));
+        assertThat(max.getValue(), equalTo(Double.NEGATIVE_INFINITY));
+    }
     @Test
     public void testUnmapped() throws Exception {
         client().admin().cluster().prepareHealth("idx2").setWaitForGreenStatus().execute().actionGet();
