@@ -36,6 +36,8 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
     ScriptValueType scriptValueType;
     boolean unmapped = false;
     boolean needsHashes = false;
+    boolean ensureUnique = false;
+    boolean ensureSorted = false;
 
     public ValuesSourceConfig(Class<VS> valueSourceType) {
         this.valueSourceType = valueSourceType;
@@ -101,6 +103,16 @@ public class ValuesSourceConfig<VS extends ValuesSource> {
 
     public ValuesSourceConfig<VS> needsHashes(boolean needsHashes) {
         this.needsHashes = needsHashes;
+        return this;
+    }
+
+    public ValuesSourceConfig<VS> ensureUnique(boolean unique) {
+        this.ensureUnique = unique;
+        return this;
+    }
+
+    public ValuesSourceConfig<VS> ensureSorted(boolean sorted) {
+        this.ensureSorted = sorted;
         return this;
     }
 }

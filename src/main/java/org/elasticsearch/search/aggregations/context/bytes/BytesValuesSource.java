@@ -20,35 +20,23 @@
 package org.elasticsearch.search.aggregations.context.bytes;
 
 import org.elasticsearch.index.fielddata.BytesValues;
-import org.elasticsearch.script.SearchScript;
 import org.elasticsearch.search.aggregations.context.FieldDataSource;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 
 /**
  *
  */
-public interface BytesValuesSource extends ValuesSource {
+public final class BytesValuesSource implements ValuesSource {
 
-    public static class FieldData extends ValuesSource.FieldData<FieldDataSource> implements BytesValuesSource {
+    private final FieldDataSource source;
 
-        public FieldData(FieldDataSource source) {
-            super(source);
-        }
-
+    public BytesValuesSource(FieldDataSource source) {
+        this.source = source;
     }
 
-    public class Script extends ValuesSource.Script implements BytesValuesSource {
-
-        private final ScriptBytesValues values;
-
-        public Script(SearchScript script) {
-            super(script);
-            this.values = new ScriptBytesValues(script);
-        }
-
-        @Override
-        public BytesValues bytesValues() {
-            return values;
-        }
+    @Override
+    public BytesValues bytesValues() {
+        return source.bytesValues();
     }
+
 }

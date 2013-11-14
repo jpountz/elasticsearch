@@ -23,172 +23,47 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.index.fielddata.LongValues;
-import org.elasticsearch.script.SearchScript;
 import org.elasticsearch.search.aggregations.context.FieldDataSource;
-import org.elasticsearch.search.aggregations.context.ScriptValueType;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
-import org.elasticsearch.search.aggregations.context.bytes.ScriptBytesValues;
 
 /**
- *
+ * A source of numeric data.
  */
-public interface NumericValuesSource extends ValuesSource {
+public final class NumericValuesSource implements ValuesSource {
 
-    boolean isFloatingPoint();
+    private final FieldDataSource.Numeric source;
+    private final ValueFormatter formatter;
+    private final ValueParser parser;
 
-    LongValues longValues();
-
-    DoubleValues doubleValues();
-
-    ValueFormatter formatter();
-
-    ValueParser parser();
-
-    public static class FieldData extends ValuesSource.FieldData<FieldDataSource.Numeric> implements NumericValuesSource {
-        private final ValueFormatter formatter;
-        private final ValueParser parser;
-
-        public FieldData(FieldDataSource.Numeric source, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
-            super(source);
-            this.formatter = formatter;
-            this.parser = parser;
-        }
-
-        @Override
-        public LongValues longValues() {
-            return source.longValues();
-        }
-
-        @Override
-        public DoubleValues doubleValues() {
-            return source.doubleValues();
-        }
-
-        @Override
-        public boolean isFloatingPoint() {
-            return source.isFloatingPoint();
-        }
-
-        @Override
-        public ValueFormatter formatter() {
-            return formatter;
-        }
-
-        @Override
-        public ValueParser parser() {
-            return parser;
-        }
+    public NumericValuesSource(FieldDataSource.Numeric source, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
+        this.source = source;
+        this.formatter = formatter;
+        this.parser = parser;
     }
 
-    public static class Script extends ValuesSource.Script implements NumericValuesSource {
-
-        private final ValueFormatter formatter;
-        private final ValueParser parser;
-        private final ScriptValueType scriptValueType;
-
-        private final ScriptDoubleValues doubleValues;
-        private final ScriptLongValues longValues;
-        private final ScriptBytesValues bytesValues;
-
-        public Script(SearchScript script, ScriptValueType scriptValueType, @Nullable ValueFormatter formatter, @Nullable ValueParser parser) {
-            super(script);
-            this.formatter = formatter;
-            this.parser = parser;
-            this.scriptValueType = scriptValueType;
-            longValues = new ScriptLongValues(script);
-            doubleValues = new ScriptDoubleValues(script);
-            bytesValues = new ScriptBytesValues(script);
-        }
-
-        @Override
-        public boolean isFloatingPoint() {
-            return scriptValueType != null ? scriptValueType.isFloatingPoint() : true;
-        }
-
-        @Override
-        public LongValues longValues() {
-            return longValues;
-        }
-
-        @Override
-        public DoubleValues doubleValues() {
-            return doubleValues;
-        }
-
-        @Override
-        public BytesValues bytesValues() {
-            return bytesValues;
-        }
-
-        @Override
-        public ValueFormatter formatter() {
-            return formatter;
-        }
-
-        @Override
-        public ValueParser parser() {
-            return parser;
-        }
-
+    @Override
+    public BytesValues bytesValues() {
+        return source.bytesValues();
     }
 
-    /**
-     * Wraps another numeric values source, and associates with it a different formatter and/or parser
-     */
-    static class Delegate implements  NumericValuesSource {
+    public boolean isFloatingPoint() {
+        return source.isFloatingPoint();
+    }
 
-        private final NumericValuesSource valuesSource;
-        private final ValueFormatter formatter;
-        private final ValueParser parser;
+    public LongValues longValues() {
+        return source.longValues();
+    }
 
-        public Delegate(NumericValuesSource valuesSource, ValueFormatter formatter) {
-            this(valuesSource, formatter, valuesSource.parser());
-        }
+    public DoubleValues doubleValues() {
+        return source.doubleValues();
+    }
 
-        public Delegate(NumericValuesSource valuesSource, ValueParser parser) {
-            this(valuesSource, valuesSource.formatter(), parser);
-        }
+    public ValueFormatter formatter() {
+        return formatter;
+    }
 
-        public Delegate(NumericValuesSource valuesSource, ValueFormatter formatter, ValueParser parser) {
-            this.valuesSource = valuesSource;
-            this.formatter = formatter;
-            this.parser = parser;
-        }
-
-        @Override
-        public boolean isFloatingPoint() {
-            return valuesSource.isFloatingPoint();
-        }
-
-        @Override
-        public LongValues longValues() {
-            return valuesSource.longValues();
-        }
-
-        @Override
-        public DoubleValues doubleValues() {
-            return valuesSource.doubleValues();
-        }
-
-        @Override
-        public BytesValues bytesValues() {
-            return valuesSource.bytesValues();
-        }
-
-        @Override
-        public ValueFormatter formatter() {
-            return formatter;
-        }
-
-        @Override
-        public ValueParser parser() {
-            return parser;
-        }
-
-        @Override
-        public Object key() {
-            return valuesSource.key();
-        }
+    public ValueParser parser() {
+        return parser;
     }
 
 }

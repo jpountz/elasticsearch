@@ -61,6 +61,7 @@ public class IpRangeParser implements AggregatorParser {
         String scriptLang = null;
         Map<String, Object> scriptParams = null;
         boolean keyed = false;
+        boolean assumeSorted = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -121,6 +122,8 @@ public class IpRangeParser implements AggregatorParser {
             } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
                 if ("keyed".equals(currentFieldName)) {
                     keyed = parser.booleanValue();
+                } else if ("assume_values_are_sorted".equals(currentFieldName)) { // nocommit: better name
+                    assumeSorted = parser.booleanValue();
                 }
             }
         }
@@ -131,6 +134,11 @@ public class IpRangeParser implements AggregatorParser {
 
         if (script != null) {
             config.script(context.scriptService().search(context.lookup(), scriptLang, script, scriptParams));
+        }
+
+        if (!assumeSorted) {
+            // we need values to be sorted and unique for efficiency
+            config.ensureSorted(true);
         }
 
         config.formatter(ValueFormatter.IPv4);

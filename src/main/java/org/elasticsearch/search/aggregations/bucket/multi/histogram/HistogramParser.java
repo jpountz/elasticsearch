@@ -57,6 +57,7 @@ public class HistogramParser implements AggregatorParser {
         boolean computeEmptyBuckets = false;
         InternalOrder order = (InternalOrder) InternalOrder.KEY_ASC;
         long interval = -1;
+        boolean assumeSorted = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -80,6 +81,8 @@ public class HistogramParser implements AggregatorParser {
                     keyed = parser.booleanValue();
                 } else if ("compute_empty_buckets".equals(currentFieldName) || "computeEmptyBuckets".equals(currentFieldName)) {
                     computeEmptyBuckets = parser.booleanValue();
+                } else if ("assume_values_are_sorted".equals(currentFieldName)) { // nocommit: better name
+                    assumeSorted = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.START_OBJECT) {
                 if ("params".equals(currentFieldName)) {
@@ -106,6 +109,11 @@ public class HistogramParser implements AggregatorParser {
 
         if (script != null) {
             config.script(context.scriptService().search(context.lookup(), scriptLang, script, scriptParams));
+        }
+
+        if (!assumeSorted) {
+            // we need values to be sorted and unique for efficiency
+            config.ensureSorted(true);
         }
 
         if (field == null) {

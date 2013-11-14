@@ -27,13 +27,12 @@ import org.apache.lucene.util.RamUsageEstimator;
 import org.elasticsearch.cache.recycler.CacheRecycler;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.common.lucene.ScorerAware;
-import org.elasticsearch.script.SearchScript;
+import org.elasticsearch.index.fielddata.IndexGeoPointFieldData;
+import org.elasticsearch.index.fielddata.IndexNumericFieldData;
 import org.elasticsearch.search.aggregations.AggregationExecutionException;
 import org.elasticsearch.search.aggregations.context.bytes.BytesValuesSource;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
 import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
-import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
-import org.elasticsearch.search.aggregations.context.numeric.ValueParser;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.util.ArrayList;
@@ -77,27 +76,15 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
 
     public void setNextReader(AtomicReaderContext reader) {
         this.reader = reader;
-        for (int i = 0; i < readerAwares.size(); i++) {
-            readerAwares.get(i).setNextReader(reader);
-        }
-        for (int k = 0; k < perDepthFieldDataSources.length; ++k) {
-            final ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources = perDepthFieldDataSources[k];
-            if (fieldDataSources == null) {
-                continue;
-            }
-            Object[] sources = fieldDataSources.values;
-            for (int i = 0; i < fieldDataSources.allocated.length; i++) {
-                if (fieldDataSources.allocated[i]) {
-                    ((FieldDataSource) sources[i]).setNextReader(reader);
-                }
-            }
+        for (ReaderContextAware aware : readerAwares) {
+            aware.setNextReader(reader);
         }
     }
 
     public void setScorer(Scorer scorer) {
         this.scorer = scorer;
-        for (int i = 0; i < scorerAwares.size(); i++) {
-            scorerAwares.get(i).setScorer(scorer);
+        for (ScorerAware scorerAware : scorerAwares) {
+            scorerAware.setScorer(scorer);
         }
     }
 
@@ -116,82 +103,112 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
 
         if (config.fieldContext == null) {
             if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-                return (VS) numericScript(config.script, config.scriptValueType, config.formatter, config.parser);
+                return (VS) numericScript(config);
             }
             if (BytesValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-                return (VS) bytesScript(config.script);
+                return (VS) bytesScript(config);
             }
             throw new AggregationExecutionException("value source of type [" + config.valueSourceType.getSimpleName() + "] is not supported by scripts");
         }
 
         if (NumericValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) numericField(fieldDataSources, config.fieldContext, config.script, config.formatter, config.parser);
+            return (VS) numericField(fieldDataSources, config);
         }
         if (GeoPointValuesSource.class.isAssignableFrom(config.valueSourceType)) {
-            return (VS) geoPointField(fieldDataSources, config.fieldContext);
+            return (VS) geoPointField(fieldDataSources, config);
         }
         // falling back to bytes values
-        return (VS) bytesField(fieldDataSources, config.fieldContext, config.script, config.needsHashes);
+        return (VS) bytesField(fieldDataSources, config);
     }
 
-    private NumericValuesSource.Script numericScript(SearchScript script, ScriptValueType scriptValueType, ValueFormatter formatter, ValueParser parser) {
-        setScorerIfNeeded(script);
-        setReaderIfNeeded(script);
-        scorerAwares.add(script);
-        readerAwares.add(script);
-        return new NumericValuesSource.Script(script, scriptValueType, formatter, parser);
+    private NumericValuesSource numericScript(ValuesSourceConfig<?> config) {
+        setScorerIfNeeded(config.script);
+        setReaderIfNeeded(config.script);
+        scorerAwares.add(config.script);
+        readerAwares.add(config.script);
+        FieldDataSource.Numeric source = new FieldDataSource.Numeric.Script(config.script, config.scriptValueType);
+        if (config.ensureUnique || config.ensureSorted) {
+            source = new FieldDataSource.Numeric.SortedAndUnique(source);
+            readerAwares.add((ReaderContextAware) source);
+        }
+        return new NumericValuesSource(source, config.formatter(), config.parser());
     }
 
-    private NumericValuesSource numericField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script, ValueFormatter formatter, ValueParser parser) {
-        FieldDataSource.Numeric dataSource = (FieldDataSource.Numeric) fieldDataSources.get(fieldContext.field());
+    private NumericValuesSource numericField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, ValuesSourceConfig<?> config) {
+        FieldDataSource.Numeric dataSource = (FieldDataSource.Numeric) fieldDataSources.get(config.fieldContext.field());
         if (dataSource == null) {
-            dataSource = new FieldDataSource.Numeric(fieldContext.field(), fieldContext.indexFieldData());
-            setReaderIfNeeded(dataSource);
-            fieldDataSources.put(fieldContext.field(), dataSource);
+            dataSource = new FieldDataSource.Numeric.FieldData((IndexNumericFieldData<?>) config.fieldContext.indexFieldData());
+            setReaderIfNeeded((ReaderContextAware) dataSource);
+            readerAwares.add((ReaderContextAware) dataSource);
+            fieldDataSources.put(config.fieldContext.field(), dataSource);
         }
-        if (script != null) {
-            setScorerIfNeeded(script);
-            setReaderIfNeeded(script);
-            scorerAwares.add(script);
-            readerAwares.add(script);
-            dataSource = new FieldDataSource.Numeric.WithScript(dataSource, script);
+        if (config.script != null) {
+            setScorerIfNeeded(config.script);
+            setReaderIfNeeded(config.script);
+            scorerAwares.add(config.script);
+            readerAwares.add(config.script);
+            dataSource = new FieldDataSource.Numeric.WithScript(dataSource, config.script);
         }
-        return new NumericValuesSource.FieldData(dataSource, formatter, parser);
+        if (config.ensureUnique || config.ensureSorted) {
+            dataSource = new FieldDataSource.Numeric.SortedAndUnique(dataSource);
+            readerAwares.add((ReaderContextAware) dataSource);
+        }
+        if (config.needsHashes) {
+            dataSource.setNeedsHashes(true);
+        }
+        return new NumericValuesSource(dataSource, config.formatter(), config.parser());
     }
 
-    private BytesValuesSource bytesField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext, SearchScript script, boolean needsHashes) {
-        FieldDataSource dataSource = fieldDataSources.get(fieldContext.field());
+    private BytesValuesSource bytesField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, ValuesSourceConfig<?> config) {
+        FieldDataSource dataSource = fieldDataSources.get(config.fieldContext.field());
         if (dataSource == null) {
-            dataSource = new FieldDataSource.Bytes(fieldContext.field(), fieldContext.indexFieldData(), needsHashes && script == null);
-            setReaderIfNeeded(dataSource);
-            fieldDataSources.put(fieldContext.field(), dataSource);
+            dataSource = new FieldDataSource.Bytes.FieldData(config.fieldContext.indexFieldData());
+            setReaderIfNeeded((ReaderContextAware) dataSource);
+            readerAwares.add((ReaderContextAware) dataSource);
+            fieldDataSources.put(config.fieldContext.field(), dataSource);
         }
-        if (script != null) {
-            setScorerIfNeeded(script);
-            setReaderIfNeeded(script);
-            scorerAwares.add(script);
-            readerAwares.add(script);
-            dataSource = new FieldDataSource.WithScript(dataSource, script);
+        if (config.script != null) {
+            setScorerIfNeeded(config.script);
+            setReaderIfNeeded(config.script);
+            scorerAwares.add(config.script);
+            readerAwares.add(config.script);
+            dataSource = new FieldDataSource.WithScript(dataSource, config.script);
         }
-        return new BytesValuesSource.FieldData(dataSource);
+        if (config.ensureUnique || config.ensureSorted) {
+            dataSource = new FieldDataSource.Bytes.SortedAndUnique(dataSource);
+            readerAwares.add((ReaderContextAware) dataSource);
+        }
+        if (config.needsHashes) { // the data source needs hash if at least one consumer needs hashes
+            dataSource.setNeedsHashes(true);
+        }
+        return new BytesValuesSource(dataSource);
     }
 
-    private BytesValuesSource bytesScript(SearchScript script) {
-        setScorerIfNeeded(script);
-        setReaderIfNeeded(script);
-        scorerAwares.add(script);
-        readerAwares.add(script);
-        return new BytesValuesSource.Script(script);
+    private BytesValuesSource bytesScript(ValuesSourceConfig<?> config) {
+        setScorerIfNeeded(config.script);
+        setReaderIfNeeded(config.script);
+        scorerAwares.add(config.script);
+        readerAwares.add(config.script);
+        FieldDataSource.Bytes source = new FieldDataSource.Bytes.Script(config.script);
+        if (config.ensureUnique || config.ensureSorted) {
+            source = new FieldDataSource.Bytes.SortedAndUnique(source);
+            readerAwares.add((ReaderContextAware) source);
+        }
+        return new BytesValuesSource(source);
     }
 
-    private GeoPointValuesSource geoPointField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, FieldContext fieldContext) {
-        FieldDataSource.GeoPoint dataSource = (FieldDataSource.GeoPoint) fieldDataSources.get(fieldContext.field());
+    private GeoPointValuesSource geoPointField(ObjectObjectOpenHashMap<String, FieldDataSource> fieldDataSources, ValuesSourceConfig<?> config) {
+        FieldDataSource.GeoPoint dataSource = (FieldDataSource.GeoPoint) fieldDataSources.get(config.fieldContext.field());
         if (dataSource == null) {
-            dataSource = new FieldDataSource.GeoPoint(fieldContext.field(), fieldContext.indexFieldData());
+            dataSource = new FieldDataSource.GeoPoint((IndexGeoPointFieldData<?>) config.fieldContext.indexFieldData());
             setReaderIfNeeded(dataSource);
-            fieldDataSources.put(fieldContext.field(), dataSource);
+            readerAwares.add(dataSource);
+            fieldDataSources.put(config.fieldContext.field(), dataSource);
         }
-        return new GeoPointValuesSource.FieldData(dataSource);
+        if (config.needsHashes) {
+            dataSource.setNeedsHashes(true);
+        }
+        return new GeoPointValuesSource(dataSource);
     }
 
     public void registerReaderContextAware(ReaderContextAware readerContextAware) {
@@ -204,9 +221,9 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
         scorerAwares.add(scorerAware);
     }
 
-    private void setReaderIfNeeded(ReaderContextAware readerContextAware) {
+    private void setReaderIfNeeded(ReaderContextAware readerAware) {
         if (reader != null) {
-            readerContextAware.setNextReader(reader);
+            readerAware.setNextReader(reader);
         }
     }
 

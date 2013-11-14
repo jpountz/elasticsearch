@@ -19,7 +19,6 @@
 
 package org.elasticsearch.search.aggregations.bucket.multi.range;
 
-import com.carrotsearch.hppc.IntArrayList;
 import com.google.common.collect.Lists;
 import org.apache.lucene.util.InPlaceMergeSorter;
 import org.elasticsearch.index.fielddata.DoubleValues;
@@ -84,9 +83,7 @@ public class RangeAggregator extends BucketsAggregator {
     private final boolean keyed;
     private final AbstractRangeBase.Factory rangeFactory;
 
-    final boolean[] matched;
     final double[] maxTo;
-    final IntArrayList matchedList;
 
     public RangeAggregator(String name,
                            AggregatorFactories factories,
@@ -108,13 +105,11 @@ public class RangeAggregator extends BucketsAggregator {
         }
         sortRanges(this.ranges);
 
-        matched = new boolean[ranges.size()];
-        maxTo = new double[matched.length];
+        maxTo = new double[this.ranges.length];
         maxTo[0] = this.ranges[0].to;
         for (int i = 1; i < this.ranges.length; ++i) {
             maxTo[i] = Math.max(this.ranges[i].to,maxTo[i-1]);
         }
-        matchedList = new IntArrayList();
 
     }
 
@@ -129,34 +124,16 @@ public class RangeAggregator extends BucketsAggregator {
 
         final DoubleValues values = valuesSource.doubleValues();
         final int valuesCount = values.setDocument(doc);
-        assert noMatchYet();
-        for (int i = 0; i < valuesCount; ++i) {
+        for (int i = 0, lo = 0; i < valuesCount; ++i) {
             final double value = values.nextValue();
-            collect(doc, value);
+            lo = collect(doc, value, lo);
         }
-        resetMatches();
     }
 
-    private boolean noMatchYet() {
-        for (int i = 0; i < matched.length; ++i) {
-            if (matched[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void resetMatches() {
-        for (int i = 0; i < matchedList.size(); ++i) {
-            matched[matchedList.get(i)] = false;
-        }
-        matchedList.clear();
-    }
-
-    private void collect(int doc, double value) throws IOException {
-        int lo = 0, hi = ranges.length - 1; // all candidates are between these indexes
+    private int collect(int doc, double value, int lowBound) throws IOException {
+        int lo = lowBound, hi = ranges.length - 1; // all candidates are between these indexes
         int mid = (lo + hi) >>> 1;
-        while (lo < hi) { // not <= because we want hi to remain >= 0 for the next binary searches
+        while (lo <= hi) {
             if (value < ranges[mid].from) {
                 hi = mid - 1;
             } else if (value >= maxTo[mid]) {
@@ -166,6 +143,7 @@ public class RangeAggregator extends BucketsAggregator {
             }
             mid = (lo + hi) >>> 1;
         }
+        if (lo > hi) return lo; // no potential candidate
 
         // binary search the lower bound
         int startLo = lo, startHi = mid;
@@ -189,16 +167,16 @@ public class RangeAggregator extends BucketsAggregator {
             }
         }
 
-        assert startLo == 0 || value >= maxTo[startLo - 1];
+        assert startLo == lowBound || value >= maxTo[startLo - 1];
         assert endHi == ranges.length - 1 || value < ranges[endHi + 1].from;
 
         for (int i = startLo; i <= endHi; ++i) {
-            if (!matched[i] && ranges[i].matches(value)) {
-                matched[i] = true;
-                matchedList.add(i);
+            if (ranges[i].matches(value)) {
                 collectBucket(doc, i);
             }
         }
+
+        return endHi + 1;
     }
 
     @Override

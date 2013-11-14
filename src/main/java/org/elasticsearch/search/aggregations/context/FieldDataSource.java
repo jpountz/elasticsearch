@@ -20,138 +20,187 @@
 package org.elasticsearch.search.aggregations.context;
 
 import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.util.ArrayUtil;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.BytesRefHash;
+import org.apache.lucene.util.InPlaceMergeSorter;
 import org.elasticsearch.common.lucene.ReaderContextAware;
 import org.elasticsearch.index.fielddata.*;
+import org.elasticsearch.index.fielddata.AtomicFieldData.Order;
 import org.elasticsearch.script.SearchScript;
+import org.elasticsearch.search.aggregations.context.FieldDataSource.Bytes.SortedAndUnique.SortedUniqueBytesValues;
+import org.elasticsearch.search.aggregations.context.bytes.ScriptBytesValues;
+import org.elasticsearch.search.aggregations.context.numeric.ScriptDoubleValues;
+import org.elasticsearch.search.aggregations.context.numeric.ScriptLongValues;
 
 /**
  *
  */
-public abstract class FieldDataSource implements ReaderContextAware {
+public abstract class FieldDataSource {
 
-    protected final String field;
-    protected final IndexFieldData<?> indexFieldData;
-    protected final boolean needsHashes;
-    protected AtomicFieldData<?> fieldData;
-    protected BytesValues bytesValues;
-
-    public FieldDataSource(String field, IndexFieldData<?> indexFieldData, boolean needsHashes) {
-        this.field = field;
-        this.indexFieldData = indexFieldData;
-        this.needsHashes = needsHashes;
+    /** Whether values are unique or not per document. */
+    public enum Uniqueness {
+        UNIQUE,
+        NOT_UNIQUE,
+        UNKNOWN;
     }
 
-    public void setNextReader(AtomicReaderContext reader) {
-        fieldData = indexFieldData.load(reader);
-        if (bytesValues != null) {
-            bytesValues = fieldData.getBytesValues(needsHashes);
-        }
+    /** Return whether values are unique. */
+    public Uniqueness getUniqueness() {
+        return Uniqueness.UNKNOWN;
     }
 
-    public String field() {
-        return field;
-    }
+    /** Get the current {@link BytesValues}. */
+    public abstract BytesValues bytesValues();
 
-    public BytesValues bytesValues() {
-        if (bytesValues == null) {
-            bytesValues = fieldData.getBytesValues(needsHashes);
-        }
-        return bytesValues;
-    }
+    /** Ask the underlying data source to provide pre-computed hashes, optional operation. */
+    public void setNeedsHashes(boolean needsHashes) {}
 
-    public static class WithScript extends FieldDataSource {
+    public static abstract class Bytes extends FieldDataSource {
 
-        private final FieldDataSource delegate;
-        private final BytesValues bytesValues;
+        public static class FieldData extends Bytes implements ReaderContextAware {
 
-        public WithScript(FieldDataSource delegate, SearchScript script) {
-            super(null, null, false); // hashes can't be cached with scripts anyway
-            this.delegate = delegate;
-            this.bytesValues = new BytesValues(delegate, script);
+            protected boolean needsHashes;
+            protected final IndexFieldData<?> indexFieldData;
+            protected AtomicFieldData<?> atomicFieldData;
+            private BytesValues bytesValues;
 
-        }
-
-        @Override
-        public void setNextReader(AtomicReaderContext reader) {
-            // no need to do anything... already taken care of by the delegate
-        }
-
-        @Override
-        public String field() {
-            return delegate.field();
-        }
-
-        @Override
-        public BytesValues bytesValues() {
-            return bytesValues;
-        }
-
-        static class BytesValues extends org.elasticsearch.index.fielddata.BytesValues {
-
-            private final FieldDataSource source;
-            private final SearchScript script;
-            private final BytesRef scratch;
-
-            public BytesValues(FieldDataSource source, SearchScript script) {
-                super(true);
-                this.source = source;
-                this.script = script;
-                scratch = new BytesRef();
+            public FieldData(IndexFieldData<?> indexFieldData) {
+                this.indexFieldData = indexFieldData;
+                needsHashes = false;
             }
 
             @Override
-            public int setDocument(int docId) {
-                return source.bytesValues().setDocument(docId);
+            public Uniqueness getUniqueness() {
+                return Uniqueness.UNIQUE;
+            }
+
+            public final void setNeedsHashes(boolean needsHashes) {
+                this.needsHashes = needsHashes;
             }
 
             @Override
-            public BytesRef nextValue() {
-                BytesRef value = source.bytesValues().nextValue();
-                script.setNextVar("_value", value.utf8ToString());
-                scratch.copyChars(script.run().toString());
-                return scratch;
+            public void setNextReader(AtomicReaderContext reader) {
+                atomicFieldData = indexFieldData.load(reader);
+                if (bytesValues != null) {
+                    bytesValues = atomicFieldData.getBytesValues(needsHashes);
+                }
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+                if (bytesValues == null) {
+                    bytesValues = atomicFieldData.getBytesValues(needsHashes);
+                }
+                return bytesValues;
             }
         }
+
+        public static class Script extends Bytes {
+
+            private final ScriptBytesValues values;
+
+            public Script(SearchScript script) {
+                values = new ScriptBytesValues(script);
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+                return values;
+            }
+
+        }
+
+        public static class SortedAndUnique extends Bytes implements ReaderContextAware {
+
+            private final FieldDataSource delegate;
+            private BytesValues bytesValues;
+
+            public SortedAndUnique(FieldDataSource delegate) {
+                this.delegate = delegate;
+            }
+
+            @Override
+            public Uniqueness getUniqueness() {
+                return Uniqueness.UNIQUE;
+            }
+
+            @Override
+            public void setNextReader(AtomicReaderContext reader) {
+                bytesValues = null; // order may change per-segment -> reset
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+                if (bytesValues == null) {
+                    bytesValues = delegate.bytesValues();
+                    if (bytesValues.isMultiValued() &&
+                            (delegate.getUniqueness() != Uniqueness.UNIQUE || bytesValues.getOrder() != Order.BYTES)) {
+                        bytesValues = new SortedUniqueBytesValues(bytesValues);
+                    }
+                }
+                return bytesValues;
+            }
+
+            static class SortedUniqueBytesValues extends FilterBytesValues {
+
+                final BytesRef spare;
+                int[] sortedIds;
+                final BytesRefHash bytes;
+                int numUniqueValues;
+                int pos = Integer.MAX_VALUE;
+
+                public SortedUniqueBytesValues(BytesValues delegate) {
+                    super(delegate);
+                    bytes = new BytesRefHash();
+                    spare = new BytesRef();
+                }
+
+                @Override
+                public int setDocument(int docId) {
+                    final int numValues = super.setDocument(docId);
+                    if (numValues == 0) {
+                        sortedIds = null;
+                        return 0;
+                    }
+                    bytes.clear();
+                    bytes.reinit();
+                    for (int i = 0; i < numValues; ++i) {
+                        bytes.add(super.nextValue(), super.hashCode());
+                    }
+                    numUniqueValues = bytes.size();
+                    sortedIds = bytes.sort(BytesRef.getUTF8SortedAsUnicodeComparator());
+                    pos = 0;
+                    return numUniqueValues;
+                }
+
+                @Override
+                public BytesRef nextValue() {
+                    bytes.get(sortedIds[pos++], spare);
+                    return spare;
+                }
+
+                @Override
+                public Order getOrder() {
+                    return Order.BYTES;
+                }
+
+            }
+
+        }
+
     }
 
-    public static class Numeric extends FieldDataSource {
+    public static abstract class Numeric extends FieldDataSource {
 
-        private DoubleValues doubleValues;
-        private LongValues longValues;
+        /** Whether the underlying data is floating-point or not. */
+        public abstract boolean isFloatingPoint();
 
-        public Numeric(String field, IndexFieldData<?> indexFieldData) {
-            super(field, indexFieldData, false); // don't cache hashes with numerics, they can be hashed very quickly
-        }
+        /** Get the current {@link LongValues}. */
+        public abstract LongValues longValues();
 
-        @Override
-        public void setNextReader(AtomicReaderContext reader) {
-            super.setNextReader(reader);
-            if (doubleValues != null) {
-                doubleValues = ((AtomicNumericFieldData) fieldData).getDoubleValues();
-            }
-            if (longValues != null) {
-                longValues = ((AtomicNumericFieldData) fieldData).getLongValues();
-            }
-        }
-
-        public DoubleValues doubleValues() {
-            if (doubleValues == null) {
-                doubleValues = ((AtomicNumericFieldData) fieldData).getDoubleValues();
-            }
-            return doubleValues;
-        }
-
-        public LongValues longValues() {
-            if (longValues == null) {
-                longValues = ((AtomicNumericFieldData) fieldData).getLongValues();
-            }
-            return longValues;
-        }
-
-        public boolean isFloatingPoint() {
-            return ((IndexNumericFieldData<?>) indexFieldData).getNumericType().isFloatingPoint();
-        }
+        /** Get the current {@link DoubleValues}. */
+        public abstract DoubleValues doubleValues();
 
         public static class WithScript extends Numeric {
 
@@ -161,27 +210,15 @@ public abstract class FieldDataSource implements ReaderContextAware {
             private final FieldDataSource.WithScript.BytesValues bytesValues;
 
             public WithScript(Numeric delegate, SearchScript script) {
-                super(null, null);
                 this.delegate = delegate;
                 this.longValues = new LongValues(delegate, script);
                 this.doubleValues = new DoubleValues(delegate, script);
                 this.bytesValues = new FieldDataSource.WithScript.BytesValues(delegate, script);
-
             }
 
             @Override
             public boolean isFloatingPoint() {
-                return delegate.isFloatingPoint();
-            }
-
-            @Override
-            public void setNextReader(AtomicReaderContext reader) {
-                // no need to do anything... already taken care of by the delegate
-            }
-
-            @Override
-            public String field() {
-                return delegate.field();
+                return delegate.isFloatingPoint(); // nocommit: can't a script change a long to a double, should we always return true?
             }
 
             @Override
@@ -246,35 +283,372 @@ public abstract class FieldDataSource implements ReaderContextAware {
             }
         }
 
-    }
+        public static class FieldData extends Numeric implements ReaderContextAware {
 
-    public static class Bytes extends FieldDataSource {
+            protected boolean needsHashes;
+            protected final IndexNumericFieldData<?> indexFieldData;
+            protected AtomicNumericFieldData atomicFieldData;
+            private BytesValues bytesValues;
+            private LongValues longValues;
+            private DoubleValues doubleValues;
 
-        public Bytes(String field, IndexFieldData<?> indexFieldData, boolean needsHashes) {
-            super(field, indexFieldData, needsHashes);
+            public FieldData(IndexNumericFieldData<?> indexFieldData) {
+                this.indexFieldData = indexFieldData;
+                needsHashes = false;
+            }
+
+            @Override
+            public Uniqueness getUniqueness() {
+                return Uniqueness.UNIQUE;
+            }
+
+            @Override
+            public boolean isFloatingPoint() {
+                return indexFieldData.getNumericType().isFloatingPoint();
+            }
+
+            @Override
+            public final void setNeedsHashes(boolean needsHashes) {
+                this.needsHashes = needsHashes;
+            }
+
+            @Override
+            public void setNextReader(AtomicReaderContext reader) {
+                atomicFieldData = indexFieldData.load(reader);
+                if (bytesValues != null) {
+                    bytesValues = atomicFieldData.getBytesValues(needsHashes);
+                }
+                if (longValues != null) {
+                    longValues = atomicFieldData.getLongValues();
+                }
+                if (doubleValues != null) {
+                    doubleValues = atomicFieldData.getDoubleValues();
+                }
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+                if (bytesValues == null) {
+                    bytesValues = atomicFieldData.getBytesValues(needsHashes);
+                }
+                return bytesValues;
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.LongValues longValues() {
+                if (longValues == null) {
+                    longValues = atomicFieldData.getLongValues();
+                }
+                return longValues;
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.DoubleValues doubleValues() {
+                if (doubleValues == null) {
+                    doubleValues = atomicFieldData.getDoubleValues();
+                }
+                return doubleValues;
+            }
+        }
+
+        public static class Script extends Numeric {
+            private final ScriptValueType scriptValueType;
+
+            private final ScriptDoubleValues doubleValues;
+            private final ScriptLongValues longValues;
+            private final ScriptBytesValues bytesValues;
+
+            public Script(SearchScript script, ScriptValueType scriptValueType) {
+                this.scriptValueType = scriptValueType;
+                longValues = new ScriptLongValues(script);
+                doubleValues = new ScriptDoubleValues(script);
+                bytesValues = new ScriptBytesValues(script);
+            }
+
+            @Override
+            public boolean isFloatingPoint() {
+                return scriptValueType != null ? scriptValueType.isFloatingPoint() : true;
+            }
+
+            @Override
+            public LongValues longValues() {
+                return longValues;
+            }
+
+            @Override
+            public DoubleValues doubleValues() {
+                return doubleValues;
+            }
+
+            @Override
+            public BytesValues bytesValues() {
+                return bytesValues;
+            }
+
+        }
+
+        public static class SortedAndUnique extends Numeric implements ReaderContextAware {
+
+            private final Numeric delegate;
+            private LongValues longValues;
+            private DoubleValues doubleValues;
+            private BytesValues bytesValues;
+
+            public SortedAndUnique(Numeric delegate) {
+                this.delegate = delegate;
+            }
+
+            @Override
+            public Uniqueness getUniqueness() {
+                return Uniqueness.UNIQUE;
+            }
+
+            @Override
+            public boolean isFloatingPoint() {
+                return delegate.isFloatingPoint();
+            }
+
+            @Override
+            public void setNextReader(AtomicReaderContext reader) {
+                longValues = null; // order may change per-segment -> reset
+                doubleValues = null;
+                bytesValues = null;
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.LongValues longValues() {
+                if (longValues == null) {
+                    longValues = delegate.longValues();
+                    if (longValues.isMultiValued() &&
+                            (delegate.getUniqueness() != Uniqueness.UNIQUE || longValues.getOrder() != Order.NUMERIC)) {
+                        longValues = new SortedUniqueLongValues(longValues);
+                    }
+                }
+                return longValues;
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.DoubleValues doubleValues() {
+                if (doubleValues == null) {
+                    doubleValues = delegate.doubleValues();
+                    if (doubleValues.isMultiValued() &&
+                            (delegate.getUniqueness() != Uniqueness.UNIQUE || doubleValues.getOrder() != Order.NUMERIC)) {
+                        doubleValues = new SortedUniqueDoubleValues(doubleValues);
+                    }
+                }
+                return doubleValues;
+            }
+
+            @Override
+            public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+                if (bytesValues == null) {
+                    bytesValues = delegate.bytesValues();
+                    if (bytesValues.isMultiValued() &&
+                            (delegate.getUniqueness() != Uniqueness.UNIQUE || bytesValues.getOrder() != Order.BYTES)) {
+                        bytesValues = new SortedUniqueBytesValues(bytesValues);
+                    }
+                }
+                return bytesValues;
+            }
+
+            private static class SortedUniqueLongValues extends FilterLongValues {
+
+                int numUniqueValues;
+                long[] array = new long[2];
+                int pos = Integer.MAX_VALUE;
+
+                final InPlaceMergeSorter sorter = new InPlaceMergeSorter() {
+                    @Override
+                    protected void swap(int i, int j) {
+                        final long tmp = array[i];
+                        array[i] = array[j];
+                        array[j] = tmp;
+                    }
+                    @Override
+                    protected int compare(int i, int j) {
+                        final long l1 = array[i];
+                        final long l2 = array[j];
+                        return l1 < l2 ? -1 : l1 == l2 ? 0 : 1;
+                    }
+                };
+
+                protected SortedUniqueLongValues(LongValues delegate) {
+                    super(delegate);
+                }
+
+                @Override
+                public int setDocument(int docId) {
+                    final int numValues = super.setDocument(docId);
+                    array = ArrayUtil.grow(array, numValues);
+                    for (int i = 0; i < numValues; ++i) {
+                        array[i] = super.nextValue();
+                    }
+                    sorter.sort(0, numValues);
+                    numUniqueValues = 1;
+                    for (int i = 1; i < numValues; ++i) {
+                        if (array[i] != array[i-1]) {
+                            array[numUniqueValues++] = array[i];
+                        }
+                    }
+                    pos = 0;
+                    return numUniqueValues;
+                }
+
+                @Override
+                public long nextValue() {
+                    assert pos < numUniqueValues;
+                    return array[pos++];
+                }
+
+                @Override
+                public Order getOrder() {
+                    return Order.NUMERIC;
+                }
+
+            }
+
+            private static class SortedUniqueDoubleValues extends FilterDoubleValues {
+
+                int numUniqueValues;
+                double[] array = new double[2];
+                int pos = Integer.MAX_VALUE;
+
+                final InPlaceMergeSorter sorter = new InPlaceMergeSorter() {
+                    @Override
+                    protected void swap(int i, int j) {
+                        final double tmp = array[i];
+                        array[i] = array[j];
+                        array[j] = tmp;
+                    }
+                    @Override
+                    protected int compare(int i, int j) {
+                        return Double.compare(array[i], array[j]);
+                    }
+                };
+
+                SortedUniqueDoubleValues(DoubleValues delegate) {
+                    super(delegate);
+                }
+
+                @Override
+                public int setDocument(int docId) {
+                    final int numValues = super.setDocument(docId);
+                    array = ArrayUtil.grow(array, numValues);
+                    for (int i = 0; i < numValues; ++i) {
+                        array[i] = super.nextValue();
+                    }
+                    sorter.sort(0, numValues);
+                    numUniqueValues = 1;
+                    for (int i = 1; i < numValues; ++i) {
+                        if (array[i] != array[i-1]) {
+                            array[numUniqueValues++] = array[i];
+                        }
+                    }
+                    pos = 0;
+                    return numUniqueValues;
+                }
+
+                @Override
+                public double nextValue() {
+                    assert pos < numUniqueValues;
+                    return array[pos++];
+                }
+
+                @Override
+                public Order getOrder() {
+                    return Order.NUMERIC;
+                }
+
+            }
+
         }
 
     }
 
-    public static class GeoPoint extends FieldDataSource {
+    // No need to implement ReaderContextAware here, the delegate already takes care of updating data structures
+    public static class WithScript extends Bytes {
 
+        private final BytesValues bytesValues;
+
+        public WithScript(FieldDataSource delegate, SearchScript script) {
+            this.bytesValues = new BytesValues(delegate, script);
+        }
+
+        @Override
+        public BytesValues bytesValues() {
+            return bytesValues;
+        }
+
+        static class BytesValues extends org.elasticsearch.index.fielddata.BytesValues {
+
+            private final FieldDataSource source;
+            private final SearchScript script;
+            private final BytesRef scratch;
+
+            public BytesValues(FieldDataSource source, SearchScript script) {
+                super(true);
+                this.source = source;
+                this.script = script;
+                scratch = new BytesRef();
+            }
+
+            @Override
+            public int setDocument(int docId) {
+                return source.bytesValues().setDocument(docId);
+            }
+
+            @Override
+            public BytesRef nextValue() {
+                BytesRef value = source.bytesValues().nextValue();
+                script.setNextVar("_value", value.utf8ToString());
+                scratch.copyChars(script.run().toString());
+                return scratch;
+            }
+        }
+    }
+
+    public static class GeoPoint extends FieldDataSource implements ReaderContextAware {
+
+        protected boolean needsHashes;
+        protected final IndexGeoPointFieldData<?> indexFieldData;
+        protected AtomicGeoPointFieldData<?> atomicFieldData;
+        private BytesValues bytesValues;
         private GeoPointValues geoPointValues;
 
-        public GeoPoint(String field, IndexFieldData<?> indexFieldData) {
-            super(field, indexFieldData, false); // geo points are useful for distances, no hashes needed
+        public GeoPoint(IndexGeoPointFieldData<?> indexFieldData) {
+            this.indexFieldData = indexFieldData;
+            needsHashes = false;
+        }
+
+        @Override
+        public Uniqueness getUniqueness() {
+            return Uniqueness.UNIQUE;
+        }
+
+        @Override
+        public final void setNeedsHashes(boolean needsHashes) {
+            this.needsHashes = needsHashes;
         }
 
         @Override
         public void setNextReader(AtomicReaderContext reader) {
-            super.setNextReader(reader);
-            if (geoPointValues != null) {
-                geoPointValues = ((AtomicGeoPointFieldData<?>) fieldData).getGeoPointValues();
+            atomicFieldData = indexFieldData.load(reader);
+            if (bytesValues != null) {
+                bytesValues = atomicFieldData.getBytesValues(needsHashes);
             }
         }
 
-        public GeoPointValues geoPointValues() {
+        @Override
+        public org.elasticsearch.index.fielddata.BytesValues bytesValues() {
+            if (bytesValues == null) {
+                bytesValues = atomicFieldData.getBytesValues(needsHashes);
+            }
+            return bytesValues;
+        }
+
+        public org.elasticsearch.index.fielddata.GeoPointValues geoPointValues() {
             if (geoPointValues == null) {
-                geoPointValues = ((AtomicGeoPointFieldData<?>) fieldData).getGeoPointValues();
+                geoPointValues = atomicFieldData.getGeoPointValues();
             }
             return geoPointValues;
         }
