@@ -122,7 +122,7 @@ public class IpRangeParser implements AggregatorParser {
             } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
                 if ("keyed".equals(currentFieldName)) {
                     keyed = parser.booleanValue();
-                } else if ("assume_values_are_sorted".equals(currentFieldName)) { // nocommit: better name
+                } else if ("script_values_sorted".equals(currentFieldName)) {
                     assumeSorted = parser.booleanValue();
                 }
             }

@@ -86,7 +86,7 @@ public class TermsParser implements AggregatorParser {
                     format = parser.text();
                 }
             } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
-                if ("assume_values_are_unique".equals(currentFieldName)) { // nocommit: better name?
+                if ("script_values_unique".equals(currentFieldName)) {
                     assumeUnique = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.VALUE_NUMBER) {

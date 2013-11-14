@@ -81,7 +81,7 @@ public class HistogramParser implements AggregatorParser {
                     keyed = parser.booleanValue();
                 } else if ("compute_empty_buckets".equals(currentFieldName) || "computeEmptyBuckets".equals(currentFieldName)) {
                     computeEmptyBuckets = parser.booleanValue();
-                } else if ("assume_values_are_sorted".equals(currentFieldName)) { // nocommit: better name
+                } else if ("script_values_sorted".equals(currentFieldName)) {
                     assumeSorted = parser.booleanValue();
                 }
             } else if (token == XContentParser.Token.START_OBJECT) {

@@ -163,6 +163,22 @@ public class MinTests extends AbstractNumericTests {
     }
 
     @Test
+    public void testMultiValuedField_WithValueScript_Reverse() throws Exception {
+        // test what happens when values arrive in reverse order since the min aggregator is optimized to work on sorted values
+        SearchResponse searchResponse = client().prepareSearch("idx")
+                .setQuery(matchAllQuery())
+                .addAggregation(min("min").field("values").script("_value * -1"))
+                .execute().actionGet();
+
+        assertThat(searchResponse.getHits().getTotalHits(), equalTo(10l));
+
+        Min min = searchResponse.getAggregations().get("min");
+        assertThat(min, notNullValue());
+        assertThat(min.getName(), equalTo("min"));
+        assertThat(min.getValue(), equalTo(-12d));
+    }
+
+    @Test
     public void testMultiValuedField_WithValueScript_WithParams() throws Exception {
         SearchResponse searchResponse = client().prepareSearch("idx")
                 .setQuery(matchAllQuery())

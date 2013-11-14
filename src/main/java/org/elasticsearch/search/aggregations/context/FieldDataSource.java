@@ -339,6 +339,7 @@ public abstract class FieldDataSource {
                 if (longValues == null) {
                     longValues = atomicFieldData.getLongValues();
                 }
+                assert longValues.getOrder() == Order.NUMERIC;
                 return longValues;
             }
 
@@ -347,6 +348,7 @@ public abstract class FieldDataSource {
                 if (doubleValues == null) {
                     doubleValues = atomicFieldData.getDoubleValues();
                 }
+                assert doubleValues.getOrder() == Order.NUMERIC;
                 return doubleValues;
             }
         }

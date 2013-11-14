@@ -148,10 +148,11 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
             scorerAwares.add(config.script);
             readerAwares.add(config.script);
             dataSource = new FieldDataSource.Numeric.WithScript(dataSource, config.script);
-        }
-        if (config.ensureUnique || config.ensureSorted) {
-            dataSource = new FieldDataSource.Numeric.SortedAndUnique(dataSource);
-            readerAwares.add((ReaderContextAware) dataSource);
+
+            if (config.ensureUnique || config.ensureSorted) {
+                dataSource = new FieldDataSource.Numeric.SortedAndUnique(dataSource);
+                readerAwares.add((ReaderContextAware) dataSource);
+            }
         }
         if (config.needsHashes) {
             dataSource.setNeedsHashes(true);
@@ -174,7 +175,10 @@ public class AggregationContext implements ReaderContextAware, ScorerAware {
             readerAwares.add(config.script);
             dataSource = new FieldDataSource.WithScript(dataSource, config.script);
         }
-        if (config.ensureUnique || config.ensureSorted) {
+        // Even in case we wrap field data, we might still need to wrap for sorting, because the wrapped field data might be
+        // eg. a numeric field data that doesn't sort according to the byte order. However field data values are unique so no
+        // need to wrap for uniqueness
+        if ((config.ensureUnique && !(dataSource instanceof FieldDataSource.Bytes.FieldData)) || config.ensureSorted) {
             dataSource = new FieldDataSource.Bytes.SortedAndUnique(dataSource);
             readerAwares.add((ReaderContextAware) dataSource);
         }

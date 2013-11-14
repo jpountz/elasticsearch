@@ -37,6 +37,10 @@ import java.util.Map;
  */
 public abstract class NumericAggregatorParser<S extends NumericAggregation> implements AggregatorParser {
 
+    protected boolean requiresSortedValues() {
+        return false;
+    }
+
     @Override
     public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 
@@ -46,6 +50,7 @@ public abstract class NumericAggregatorParser<S extends NumericAggregation> impl
         String script = null;
         String scriptLang = null;
         Map<String, Object> scriptParams = null;
+        boolean assumeSorted = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -64,11 +69,19 @@ public abstract class NumericAggregatorParser<S extends NumericAggregation> impl
                 if ("params".equals(currentFieldName)) {
                     scriptParams = parser.map();
                 }
+            } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
+                if ("script_values_sorted".equals(currentFieldName)) {
+                    assumeSorted = parser.booleanValue();
+                }
             }
         }
 
         if (script != null) {
             config.script(context.scriptService().search(context.lookup(), scriptLang, script, scriptParams));
+        }
+
+        if (!assumeSorted && requiresSortedValues()) {
+            config.ensureSorted(true);
         }
 
         if (field == null) {
