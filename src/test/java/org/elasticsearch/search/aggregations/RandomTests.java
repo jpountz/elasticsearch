@@ -22,24 +22,25 @@ package org.elasticsearch.search.aggregations;
 import com.carrotsearch.hppc.IntOpenHashSet;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.support.IgnoreIndices;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.range.Range;
 import org.elasticsearch.search.aggregations.bucket.multi.range.Range.Bucket;
 import org.elasticsearch.search.aggregations.bucket.multi.range.RangeBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertNoFailures;
 
 /** Additional tests that aim at testing more complex aggregation trees on larger random datasets, so that things like the growth of dynamic arrays is tested. */
-public class RandomTests extends AbstractIntegrationTest {
+public class RandomTests extends ElasticsearchIntegrationTest {
 
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
                 .put("index.number_of_shards", between(1, 5))
                 .put("index.number_of_replicas", between(0, 1))
                 .build();

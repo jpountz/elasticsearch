@@ -22,12 +22,13 @@ package org.elasticsearch.search.aggregations.bucket.multi;
 import com.google.common.collect.Sets;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.search.aggregations.bucket.multi.geo.distance.GeoDistance;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
@@ -46,12 +47,14 @@ import static org.hamcrest.core.IsNull.notNullValue;
 /**
  *
  */
-public class GeoDistanceTests extends AbstractIntegrationTest {
+public class GeoDistanceTests extends ElasticsearchIntegrationTest {
 
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
-                .put("index.number_of_shards", between(1, 5))
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
+//                .put("index.number_of_shards", between(1, 5))
+//                .put("index.number_of_replicas", between(0, 1))
+                .put("index.number_of_shards", 3)
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
     }
@@ -88,6 +91,49 @@ public class GeoDistanceTests extends AbstractIntegrationTest {
 
         client().admin().indices().prepareFlush().execute().actionGet();
         client().admin().indices().prepareRefresh().execute().actionGet();
+    }
+
+    @Test
+    public void testGeoDistance2() throws Exception {
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(geoDistance("amsterdam_rings")
+                        .field("location")
+                        .unit(DistanceUnit.KILOMETERS)
+                        .point("52.3760, 4.894") // coords of amsterdam
+                        .addUnboundedTo(500)
+                        .addRange(500, 1000)
+                        .addUnboundedFrom(1000)
+                        .subAggregation(terms("cities").field("city")
+                            .subAggregation(sum("distance").script("doc['location'].distanceInKm(52.3760, 4.894)"))))
+                .execute().actionGet();
+
+        assertThat(response.getFailedShards(), equalTo(0));
+
+        GeoDistance geoDist = response.getAggregations().get("amsterdam_rings");
+        assertThat(geoDist, notNullValue());
+        assertThat(geoDist.getName(), equalTo("amsterdam_rings"));
+        assertThat(geoDist.buckets().size(), equalTo(3));
+
+        GeoDistance.Bucket bucket = geoDist.getByKey("*-500.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("*-500.0"));
+        assertThat(bucket.getFrom(), equalTo(0.0));
+        assertThat(bucket.getTo(), equalTo(500.0));
+        assertThat(bucket.getDocCount(), equalTo(2l));
+
+        bucket = geoDist.getByKey("500.0-1000.0");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("500.0-1000.0"));
+        assertThat(bucket.getFrom(), equalTo(500.0));
+        assertThat(bucket.getTo(), equalTo(1000.0));
+        assertThat(bucket.getDocCount(), equalTo(2l));
+
+        bucket = geoDist.getByKey("1000.0-*");
+        assertThat(bucket, notNullValue());
+        assertThat(bucket.getKey(), equalTo("1000.0-*"));
+        assertThat(bucket.getFrom(), equalTo(1000.0));
+        assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
+        assertThat(bucket.getDocCount(), equalTo(1l));
     }
 
 
@@ -335,7 +381,7 @@ public class GeoDistanceTests extends AbstractIntegrationTest {
                     .field("location", "52.0945, 5.116")
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
 
         SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
                 .setQuery(matchAllQuery())

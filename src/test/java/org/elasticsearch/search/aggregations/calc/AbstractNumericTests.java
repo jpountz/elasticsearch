@@ -20,8 +20,9 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.junit.Before;
 
 import java.util.ArrayList;
@@ -32,11 +33,11 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 /**
  *
  */
-public abstract class AbstractNumericTests extends AbstractIntegrationTest {
+public abstract class AbstractNumericTests extends ElasticsearchIntegrationTest {
     
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
                 .put("index.number_of_shards", between(1, 5))
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
@@ -56,7 +57,7 @@ public abstract class AbstractNumericTests extends AbstractIntegrationTest {
                     .startArray("values").value(i+2).value(i+3).endArray()
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
 
         // creating an index to test the empty buckets functionality. The way it works is by indexing
         // two docs {value: 0} and {value : 2}, then building a histogram agg with interval 1 and with empty
@@ -70,7 +71,7 @@ public abstract class AbstractNumericTests extends AbstractIntegrationTest {
                     .field("value", i*2)
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
 
     }
 

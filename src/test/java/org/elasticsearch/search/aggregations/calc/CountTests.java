@@ -20,9 +20,10 @@
 package org.elasticsearch.search.aggregations.calc;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.calc.bytes.count.Count;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -35,11 +36,11 @@ import static org.hamcrest.Matchers.notNullValue;
 /**
  *
  */
-public class CountTests extends AbstractIntegrationTest {
+public class CountTests extends ElasticsearchIntegrationTest {
     
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
                 .put("index.number_of_shards", numberOfShards())
                 .put("index.number_of_replicas", 0)
                 .build();

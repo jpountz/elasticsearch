@@ -70,6 +70,10 @@ public class StringTerms extends InternalTerms {
             return new BytesText(new BytesArray(termBytes));
         }
 
+        public String getTermAsString() {
+            return termBytes.utf8ToString();
+        }
+
         @Override
         public Number getTermAsNumber() {
             // this method is needed for scripted numeric faceting

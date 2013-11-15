@@ -22,15 +22,14 @@ package org.elasticsearch.search.aggregations.bucket.single;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.LongTerms;
-import org.elasticsearch.search.aggregations.bucket.multi.terms.StringTerms;
-import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.bucket.single.nested.Nested;
 import org.elasticsearch.search.aggregations.calc.numeric.max.Max;
 import org.elasticsearch.search.aggregations.calc.numeric.stats.Stats;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.index.query.FilterBuilders.matchAllFilter;
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.hamcrest.Matchers.equalTo;
@@ -49,11 +47,11 @@ import static org.hamcrest.core.IsNull.notNullValue;
 /**
  *
  */
-public class NestedTests extends AbstractIntegrationTest {
+public class NestedTests extends ElasticsearchIntegrationTest {
 
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
                 .put("index.number_of_shards", between(1, 5))
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
@@ -80,7 +78,7 @@ public class NestedTests extends AbstractIntegrationTest {
 
         client().admin().indices().prepareCreate("idx")
                 .addMapping("type", "nested", "type=nested")
-                .setSettings(getSettings())
+                .setSettings(indexSettings())
                 .execute().actionGet();
         List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
 
@@ -97,7 +95,7 @@ public class NestedTests extends AbstractIntegrationTest {
                         .endArray()
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
     }
 
     @Test
@@ -237,7 +235,7 @@ public class NestedTests extends AbstractIntegrationTest {
                     .endArray()
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
 
         SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
                 .setQuery(matchAllQuery())

@@ -21,11 +21,12 @@ package org.elasticsearch.search.aggregations.bucket.multi;
 
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.Histogram;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.Terms;
 import org.elasticsearch.search.aggregations.calc.numeric.sum.Sum;
-import org.elasticsearch.test.AbstractIntegrationTest;
+import org.elasticsearch.test.ElasticsearchIntegrationTest;
 import org.hamcrest.Matchers;
 import org.junit.Before;
 import org.junit.Test;
@@ -43,13 +44,13 @@ import static org.hamcrest.core.IsNull.notNullValue;
 /**
  *
  */
-public class DoubleTermsTests extends AbstractIntegrationTest {
+public class DoubleTermsTests extends ElasticsearchIntegrationTest {
 
     private static final int NUM_DOCS = 5; // nocommit randomize the size
 
     @Override
-    public Settings getSettings() {
-        return randomSettingsBuilder()
+    public Settings indexSettings() {
+        return ImmutableSettings.builder()
                 .put("index.number_of_shards", between(1, 5))
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
@@ -575,7 +576,7 @@ public class DoubleTermsTests extends AbstractIntegrationTest {
                     .field("value", i*2)
                     .endObject()));
         }
-        indexRandom(true, builders);
+        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
 
         SearchResponse searchResponse = client().prepareSearch("empty_bucket_idx")
                 .setQuery(matchAllQuery())
