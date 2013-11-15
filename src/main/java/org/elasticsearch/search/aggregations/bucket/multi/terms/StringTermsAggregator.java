@@ -23,7 +23,6 @@ import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefHash;
 import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
-import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.bucket.BucketsAggregator;
 import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
@@ -32,11 +31,11 @@ import org.elasticsearch.search.aggregations.factory.AggregatorFactories;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 
 /**
- * nocommit we need to change this aggregator to be based on ordinals (see {@link org.elasticsearch.search.facet.terms.strings.TermsStringOrdinalsFacetExecutor})
+ * An aggregator of string values.
  */
+// TODO we need a similar aggregator that would use ords, similarly to TermsStringOrdinalsFacetExecutor
 public class StringTermsAggregator extends BucketsAggregator {
 
     private static final int INITIAL_CAPACITY = 50; // TODO sizing

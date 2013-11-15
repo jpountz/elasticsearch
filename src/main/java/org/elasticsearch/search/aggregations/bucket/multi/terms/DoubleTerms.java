@@ -140,9 +140,9 @@ public class DoubleTerms extends InternalTerms {
             return (UnmappedTerms) aggregations.get(0);
         }
 
-        //nocommit we can just sort the backing array buffer of LongObjectOpenHashMap and use arraycopy instead of using prio-queue/treeset
-
-        BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
+        // TODO: would it be better to sort the backing array buffer of hppc map directly instead of using a PQ?
+        final int size = Math.min(requiredSize, buckets.v().size());
+        BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
         boolean[] states = buckets.v().allocated;
         Object[] internalBuckets = buckets.v().values;
         for (int i = 0; i < states.length; i++) {

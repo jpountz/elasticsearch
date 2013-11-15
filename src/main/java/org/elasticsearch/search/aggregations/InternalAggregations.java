@@ -110,7 +110,6 @@ public class InternalAggregations implements Aggregations, ToXContent, Streamabl
     @SuppressWarnings("unchecked")
     @Override
     public <A extends Aggregation> A get(String name) {
-        // nocommit is this unchecked cast ok?
         return (A) asMap().get(name);
     }
 

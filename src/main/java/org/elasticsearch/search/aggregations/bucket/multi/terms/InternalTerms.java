@@ -134,7 +134,7 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
         }
         InternalTerms reduced = null;
 
-        //nocommit we should use HPPC here instead of a HashMap (that will enable us to also sort the backing array buffer instead of using priority queue/treeset)
+        // TODO: would it be better to use a hppc map and then directly work on the backing array instead of using a PQ?
 
         Map<Text, List<InternalTerms.Bucket>> buckets = new HashMap<Text, List<InternalTerms.Bucket>>(requiredSize);
         for (InternalAggregation aggregation : aggregations) {
@@ -160,7 +160,8 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
             return (UnmappedTerms) aggregations.get(0);
         }
 
-        BucketPriorityQueue ordered = new BucketPriorityQueue(requiredSize, order.comparator());
+        final int size = Math.min(requiredSize, buckets.size());
+        BucketPriorityQueue ordered = new BucketPriorityQueue(size, order.comparator());
         for (Map.Entry<Text, List<Bucket>> entry : buckets.entrySet()) {
             List<Bucket> sameTermBuckets = entry.getValue();
             ordered.insertWithOverflow(sameTermBuckets.get(0).reduce(sameTermBuckets, reduceContext.cacheRecycler()));

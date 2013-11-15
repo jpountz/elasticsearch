@@ -163,7 +163,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         return (B) bucketsMap.get(key);
     }
 
-    //nocommit extract the reduce logic to a strategy class and have it configurable at request time (two possible strategies - total & delta)
+    // TODO extract the reduce logic to a strategy class and have it configurable at request time (two possible strategies - total & delta)
 
     @Override
     public InternalAggregation reduce(ReduceContext reduceContext) {
