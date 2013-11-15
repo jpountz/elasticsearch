@@ -57,24 +57,28 @@ public class FilterTests extends ElasticsearchIntegrationTest {
                 .build();
     }
 
+    int numDocs, numTag1Docs;
+
     @Before
     public void init() throws Exception {
         createIndex("idx");
         createIndex("idx2");
+        numDocs = randomIntBetween(5, 20);
+        numTag1Docs = randomIntBetween(1, numDocs - 1);
         List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
-            builders.add(client().prepareIndex("idx", "type", ""+i+1).setSource(jsonBuilder()
+        for (int i = 0; i < numTag1Docs; i++) {
+            builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
                     .field("value", i + 1)
                     .field("tag", "tag1")
                     .endObject()));
         }
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
-            builders.add(client().prepareIndex("idx", "type", ""+i+6).setSource(jsonBuilder()
+        for (int i = numTag1Docs; i < numDocs; i++) {
+            builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
-                    .field("value", i + 6)
+                    .field("value", i)
                     .field("tag", "tag2")
-                    .field("name", "name" + i+6)
+                    .field("name", "name" + i)
                     .endObject()));
         }
         indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
@@ -91,7 +95,7 @@ public class FilterTests extends ElasticsearchIntegrationTest {
         Filter filter = response.getAggregations().get("tag1");
         assertThat(filter, notNullValue());
         assertThat(filter.getName(), equalTo("tag1"));
-        assertThat(filter.getDocCount(), equalTo(5l));
+        assertThat(filter.getDocCount(), equalTo((long) numTag1Docs));
     }
 
     @Test
@@ -107,13 +111,17 @@ public class FilterTests extends ElasticsearchIntegrationTest {
         Filter filter = response.getAggregations().get("tag1");
         assertThat(filter, notNullValue());
         assertThat(filter.getName(), equalTo("tag1"));
-        assertThat(filter.getDocCount(), equalTo(5l));
+        assertThat(filter.getDocCount(), equalTo((long) numTag1Docs));
 
+        long sum = 0;
+        for (int i = 0; i < numTag1Docs; ++i) {
+            sum += i + 1;
+        }
         assertThat(filter.getAggregations().asList().isEmpty(), is(false));
         Avg avgValue = filter.getAggregations().get("avg_value");
         assertThat(avgValue, notNullValue());
         assertThat(avgValue.getName(), equalTo("avg_value"));
-        assertThat(avgValue.getValue(), equalTo((double) (1+2+3+4+5) / 5));
+        assertThat(avgValue.getValue(), equalTo((double) sum / numTag1Docs));
     }
 
     @Test
