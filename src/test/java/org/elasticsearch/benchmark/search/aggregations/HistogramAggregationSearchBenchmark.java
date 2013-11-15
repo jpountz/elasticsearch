@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.benchmark.search.facet;
+package org.elasticsearch.benchmark.search.aggregations;
 
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -40,13 +40,20 @@ import static org.elasticsearch.common.settings.ImmutableSettings.settingsBuilde
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
+import static org.elasticsearch.search.aggregations.AggregationBuilders.*;
 import static org.elasticsearch.search.facet.FacetBuilders.dateHistogramFacet;
 import static org.elasticsearch.search.facet.FacetBuilders.histogramFacet;
 
 /**
  *
  */
-public class HistogramFacetSearchBenchmark {
+public class HistogramAggregationSearchBenchmark {
+
+    static final long COUNT = SizeValue.parseSizeValue("20m").singles();
+    static final int BATCH = 1000;
+    static final int QUERY_WARMUP = 5;
+    static final int QUERY_COUNT = 20;
+    static final int NUMBER_OF_TERMS = 1000;
 
     public static void main(String[] args) throws Exception {
         Settings settings = settingsBuilder()
@@ -56,7 +63,7 @@ public class HistogramFacetSearchBenchmark {
                 .put(SETTING_NUMBER_OF_REPLICAS, 1)
                 .build();
 
-        String clusterName = HistogramFacetSearchBenchmark.class.getSimpleName();
+        String clusterName = HistogramAggregationSearchBenchmark.class.getSimpleName();
         Node node1 = nodeBuilder()
                 .clusterName(clusterName)
                 .settings(settingsBuilder().put(settings).put("name", "node1")).node();
@@ -64,12 +71,6 @@ public class HistogramFacetSearchBenchmark {
         //Node clientNode = nodeBuilder().clusterName(clusterName).settings(settingsBuilder().put(settings).put("name", "client")).client(true).node();
 
         Client client = node1.client();
-
-        long COUNT = SizeValue.parseSizeValue("20m").singles();
-        int BATCH = 500;
-        int QUERY_WARMUP = 20;
-        int QUERY_COUNT = 200;
-        int NUMBER_OF_TERMS = 1000;
 
         long[] lValues = new long[NUMBER_OF_TERMS];
         for (int i = 0; i < NUMBER_OF_TERMS; i++) {
@@ -108,10 +109,10 @@ public class HistogramFacetSearchBenchmark {
             StopWatch stopWatch = new StopWatch().start();
 
             System.out.println("--> Indexing [" + COUNT + "] ...");
-            long ITERS = COUNT / BATCH;
+            long iters = COUNT / BATCH;
             long i = 1;
             int counter = 0;
-            for (; i <= ITERS; i++) {
+            for (; i <= iters; i++) {
                 BulkRequestBuilder request = client.prepareBulk();
                 for (int j = 0; j < BATCH; j++) {
                     counter++;
@@ -145,7 +146,9 @@ public class HistogramFacetSearchBenchmark {
             }
         }
         client.admin().indices().prepareRefresh().execute().actionGet();
-        COUNT = client.prepareCount().setQuery(matchAllQuery()).execute().actionGet().getCount();
+        if (client.prepareCount().setQuery(matchAllQuery()).execute().actionGet().getCount() != COUNT) {
+            throw new Error();
+        }
         System.out.println("--> Number of docs in index: " + COUNT);
 
         System.out.println("--> Warmup...");
@@ -158,6 +161,11 @@ public class HistogramFacetSearchBenchmark {
                     .addFacet(histogramFacet("s_value").field("s_value").interval(4))
                     .addFacet(histogramFacet("b_value").field("b_value").interval(4))
                     .addFacet(histogramFacet("date").field("date").interval(1000))
+                    .addAggregation(histogram("l_value").field("l_value").interval(4))
+                    .addAggregation(histogram("i_value").field("i_value").interval(4))
+                    .addAggregation(histogram("s_value").field("s_value").interval(4))
+                    .addAggregation(histogram("b_value").field("b_value").interval(4))
+                    .addAggregation(histogram("date").field("date").interval(1000))
                     .execute().actionGet();
             if (j == 0) {
                 System.out.println("--> Warmup took: " + searchResponse.getTook());
@@ -183,11 +191,23 @@ public class HistogramFacetSearchBenchmark {
             }
             System.out.println("--> Histogram Facet (" + field + ") " + (totalQueryTime / QUERY_COUNT) + "ms");
 
+            for (int j = 0; j < QUERY_COUNT; j++) {
+                SearchResponse searchResponse = client.prepareSearch()
+                        .setQuery(matchAllQuery())
+                        .addAggregation(histogram(field).field(field).interval(4))
+                        .execute().actionGet();
+                if (searchResponse.getHits().totalHits() != COUNT) {
+                    System.err.println("--> mismatch on hits");
+                }
+                totalQueryTime += searchResponse.getTookInMillis();
+            }
+            System.out.println("--> Histogram Aggregation (" + field + ") " + (totalQueryTime / QUERY_COUNT) + "ms");
+
             totalQueryTime = 0;
             for (int j = 0; j < QUERY_COUNT; j++) {
                 SearchResponse searchResponse = client.prepareSearch()
                         .setQuery(matchAllQuery())
-                        .addFacet(histogramFacet("l_value").field("l_value").valueField("l_value").interval(4))
+                        .addFacet(histogramFacet(field).field(field).valueField(field).interval(4))
                         .execute().actionGet();
                 if (searchResponse.getHits().totalHits() != COUNT) {
                     System.err.println("--> mismatch on hits");
@@ -195,6 +215,19 @@ public class HistogramFacetSearchBenchmark {
                 totalQueryTime += searchResponse.getTookInMillis();
             }
             System.out.println("--> Histogram Facet (" + field + "/" + field + ") " + (totalQueryTime / QUERY_COUNT) + "ms");
+
+            totalQueryTime = 0;
+            for (int j = 0; j < QUERY_COUNT; j++) {
+                SearchResponse searchResponse = client.prepareSearch()
+                        .setQuery(matchAllQuery())
+                        .addAggregation(histogram(field).field(field).subAggregation(stats(field).field(field)).interval(4))
+                        .execute().actionGet();
+                if (searchResponse.getHits().totalHits() != COUNT) {
+                    System.err.println("--> mismatch on hits");
+                }
+                totalQueryTime += searchResponse.getTookInMillis();
+            }
+            System.out.println("--> Histogram Aggregation (" + field + "/" + field + ") " + (totalQueryTime / QUERY_COUNT) + "ms");
         }
 
         totalQueryTime = 0;
@@ -214,6 +247,19 @@ public class HistogramFacetSearchBenchmark {
         for (int j = 0; j < QUERY_COUNT; j++) {
             SearchResponse searchResponse = client.prepareSearch()
                     .setQuery(matchAllQuery())
+                    .addAggregation(dateHistogram("date").field("date").interval(1000))
+                    .execute().actionGet();
+            if (searchResponse.getHits().totalHits() != COUNT) {
+                System.err.println("--> mismatch on hits");
+            }
+            totalQueryTime += searchResponse.getTookInMillis();
+        }
+        System.out.println("--> Histogram Aggregation (date) " + (totalQueryTime / QUERY_COUNT) + "ms");
+
+        totalQueryTime = 0;
+        for (int j = 0; j < QUERY_COUNT; j++) {
+            SearchResponse searchResponse = client.prepareSearch()
+                    .setQuery(matchAllQuery())
                     .addFacet(histogramFacet("date").field("date").valueField("l_value").interval(1000))
                     .execute().actionGet();
             if (searchResponse.getHits().totalHits() != COUNT) {
@@ -223,6 +269,18 @@ public class HistogramFacetSearchBenchmark {
         }
         System.out.println("--> Histogram Facet (date/l_value) " + (totalQueryTime / QUERY_COUNT) + "ms");
 
+        totalQueryTime = 0;
+        for (int j = 0; j < QUERY_COUNT; j++) {
+            SearchResponse searchResponse = client.prepareSearch()
+                    .setQuery(matchAllQuery())
+                    .addAggregation(dateHistogram("date").field("date").interval(1000).subAggregation(stats("stats").field("l_value")))
+                    .execute().actionGet();
+            if (searchResponse.getHits().totalHits() != COUNT) {
+                System.err.println("--> mismatch on hits");
+            }
+            totalQueryTime += searchResponse.getTookInMillis();
+        }
+        System.out.println("--> Histogram Aggregation (date/l_value) " + (totalQueryTime / QUERY_COUNT) + "ms");
 
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {

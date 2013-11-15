@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.benchmark.search.facet;
+package org.elasticsearch.benchmark.search.aggregations;
 
 import jsr166y.ThreadLocalRandom;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
@@ -31,7 +31,9 @@ import org.elasticsearch.common.StopWatch;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.SizeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.index.query.FilterBuilders;
 import org.elasticsearch.node.Node;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.facet.FacetBuilder;
 import org.elasticsearch.search.facet.FacetBuilders;
 
@@ -44,12 +46,12 @@ import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
 
-public class QueryFilterFacetSearchBenchmark {
+public class QueryFilterAggregationSearchBenchmark {
 
-    static long COUNT = SizeValue.parseSizeValue("1m").singles();
-    static int BATCH = 100;
-    static int QUERY_COUNT = 200;
-    static int NUMBER_OF_TERMS = 200;
+    static final long COUNT = SizeValue.parseSizeValue("5m").singles();
+    static final int BATCH = 1000;
+    static final int QUERY_COUNT = 200;
+    static final int NUMBER_OF_TERMS = 200;
 
     static Client client;
 
@@ -61,7 +63,7 @@ public class QueryFilterFacetSearchBenchmark {
                 .put(SETTING_NUMBER_OF_REPLICAS, 0)
                 .build();
 
-        String clusterName = QueryFilterFacetSearchBenchmark.class.getSimpleName();
+        String clusterName = QueryFilterAggregationSearchBenchmark.class.getSimpleName();
         Node node1 = nodeBuilder()
                 .clusterName(clusterName)
                 .settings(settingsBuilder().put(settings).put("name", "node1")).node();
@@ -89,7 +91,7 @@ public class QueryFilterFacetSearchBenchmark {
 
                     XContentBuilder builder = jsonBuilder().startObject();
                     builder.field("id", Integer.toString(counter));
-                    builder.field("l_value", lValues[counter % lValues.length]);
+                    builder.field("l_value", lValues[ThreadLocalRandom.current().nextInt(NUMBER_OF_TERMS)]);
 
                     builder.endObject();
 
@@ -100,7 +102,7 @@ public class QueryFilterFacetSearchBenchmark {
                 if (response.hasFailures()) {
                     System.err.println("--> failures...");
                 }
-                if (((i * BATCH) % 10000) == 0) {
+                if (((i * BATCH) % 100000) == 0) {
                     System.out.println("--> Indexed " + (i * BATCH) + " took " + stopWatch.stop().lastTaskTime());
                     stopWatch.start();
                 }
@@ -114,53 +116,67 @@ public class QueryFilterFacetSearchBenchmark {
             }
         }
         client.admin().indices().prepareRefresh().execute().actionGet();
-        COUNT = client.prepareCount().setQuery(matchAllQuery()).execute().actionGet().getCount();
+        if (client.prepareCount().setQuery(matchAllQuery()).execute().actionGet().getCount() != COUNT) {
+            throw new Error();
+        }
         System.out.println("--> Number of docs in index: " + COUNT);
 
-
+        final long anyValue = ((Number) client.prepareSearch().execute().actionGet().getHits().hits()[0].sourceAsMap().get("l_value")).longValue();
+        
         long totalQueryTime = 0;
 
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
             SearchResponse searchResponse = client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(termQuery("l_value", lValues[0]))
+                    .setQuery(termQuery("l_value", anyValue))
                     .execute().actionGet();
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("-->  Simple Query on first l_value " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("-->  Simple Query on first l_value " + totalQueryTime + "ms");
 
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
             SearchResponse searchResponse = client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(termQuery("l_value", lValues[0]))
-                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", lValues[0])))
+                    .setQuery(termQuery("l_value", anyValue))
+                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", anyValue)))
                     .execute().actionGet();
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("-->  Query facet first l_value " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("-->  Query facet first l_value " + totalQueryTime + "ms");
 
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
             SearchResponse searchResponse = client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(termQuery("l_value", lValues[0]))
-                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", lValues[0])).global(true).mode(FacetBuilder.Mode.COLLECTOR))
+                    .setQuery(termQuery("l_value", anyValue))
+                    .addAggregation(AggregationBuilders.filter("filter").filter(FilterBuilders.termFilter("l_value", anyValue)))
                     .execute().actionGet();
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("-->  Query facet first l_value (global) (mode/collector) " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("-->  Filter agg first l_value " + totalQueryTime + "ms");
 
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
             SearchResponse searchResponse = client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(termQuery("l_value", lValues[0]))
-                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", lValues[0])).global(true).mode(FacetBuilder.Mode.POST))
+                    .setQuery(termQuery("l_value", anyValue))
+                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", anyValue)).global(true).mode(FacetBuilder.Mode.COLLECTOR))
                     .execute().actionGet();
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("-->  Query facet first l_value (global) (mode/post) " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("-->  Query facet first l_value (global) (mode/collector) " + totalQueryTime + "ms");
+
+        totalQueryTime = 0;
+        for (int j = 0; j < QUERY_COUNT; j++) {
+            SearchResponse searchResponse = client.prepareSearch()
+                    .setSearchType(SearchType.COUNT)
+                    .setQuery(termQuery("l_value", anyValue))
+                    .addFacet(FacetBuilders.queryFacet("query").query(termQuery("l_value", anyValue)).global(true).mode(FacetBuilder.Mode.POST))
+                    .execute().actionGet();
+            totalQueryTime += searchResponse.getTookInMillis();
+        }
+        System.out.println("-->  Query facet first l_value (global) (mode/post) " + totalQueryTime + "ms");
     }
 }

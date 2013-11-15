@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.benchmark.search.facet;
+package org.elasticsearch.benchmark.search.aggregations;
 
 import com.carrotsearch.randomizedtesting.generators.RandomStrings;
 import com.google.common.collect.Lists;
@@ -25,6 +25,7 @@ import jsr166y.ThreadLocalRandom;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.Client;
@@ -35,6 +36,7 @@ import org.elasticsearch.common.unit.SizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.node.Node;
+import org.elasticsearch.search.aggregations.AggregationBuilders;
 
 import java.util.List;
 import java.util.Random;
@@ -52,17 +54,44 @@ import static org.elasticsearch.search.facet.FacetBuilders.termsStatsFacet;
 /**
  *
  */
-public class TermsFacetSearchBenchmark {
+public class TermsAggregationSearchBenchmark {
 
     static long COUNT = SizeValue.parseSizeValue("2m").singles();
-    static int BATCH = 100;
-    static int QUERY_WARMUP = 20;
-    static int QUERY_COUNT = 200;
+    static int BATCH = 1000;
+    static int QUERY_WARMUP = 10;
+    static int QUERY_COUNT = 100;
     static int NUMBER_OF_TERMS = 200;
     static int NUMBER_OF_MULTI_VALUE_TERMS = 10;
     static int STRING_TERM_SIZE = 5;
 
     static Client client;
+
+    private enum Method {
+        FACET {
+            @Override
+            SearchRequestBuilder addTermsAgg(SearchRequestBuilder builder, String name, String field, String executionHint) {
+                return builder.addFacet(termsFacet(name).field(field).executionHint(executionHint));
+            }
+
+            @Override
+            SearchRequestBuilder addTermsStatsAgg(SearchRequestBuilder builder, String name, String keyField, String valueField) {
+                return builder.addFacet(termsStatsFacet(name).keyField(keyField).valueField(valueField));
+            }
+        },
+        AGGREGATION {
+            @Override
+            SearchRequestBuilder addTermsAgg(SearchRequestBuilder builder, String name, String field, String executionHint) {
+                return builder.addAggregation(AggregationBuilders.terms(name).field(field));
+            }
+
+            @Override
+            SearchRequestBuilder addTermsStatsAgg(SearchRequestBuilder builder, String name, String keyField, String valueField) {
+                return builder.addAggregation(AggregationBuilders.terms(name).field(keyField).subAggregation(AggregationBuilders.stats("stats").field(valueField)));
+            }
+        };
+        abstract SearchRequestBuilder addTermsAgg(SearchRequestBuilder builder, String name, String field, String executionHint);
+        abstract SearchRequestBuilder addTermsStatsAgg(SearchRequestBuilder builder, String name, String keyField, String valueField);
+    }
 
     public static void main(String[] args) throws Exception {
         Random random = new Random();
@@ -74,7 +103,7 @@ public class TermsFacetSearchBenchmark {
                 .put(SETTING_NUMBER_OF_REPLICAS, 0)
                 .build();
 
-        String clusterName = TermsFacetSearchBenchmark.class.getSimpleName();
+        String clusterName = TermsAggregationSearchBenchmark.class.getSimpleName();
         Node[] nodes = new Node[1];
         for (int i = 0; i < nodes.length; i++) {
             nodes[i] = nodeBuilder().clusterName(clusterName)
@@ -199,29 +228,39 @@ public class TermsFacetSearchBenchmark {
 
 
         List<StatsResult> stats = Lists.newArrayList();
-        stats.add(terms("terms_s", "s_value", null));
-        stats.add(terms("terms_s_dv", "s_value_dv", null));
-        stats.add(terms("terms_map_s", "s_value", "map"));
-        stats.add(terms("terms_map_s_dv", "s_value_dv", "map"));
-        stats.add(terms("terms_l", "l_value", null));
-        stats.add(terms("terms_l_dv", "l_value_dv", null));
-        stats.add(terms("terms_map_l", "l_value", "map"));
-        stats.add(terms("terms_map_l_dv", "l_value_dv", "map"));
-        stats.add(terms("terms_sm", "sm_value", null));
-        stats.add(terms("terms_sm_dv", "sm_value_dv", null));
-        stats.add(terms("terms_map_sm", "sm_value", "map"));
-        stats.add(terms("terms_map_sm_dv", "sm_value_dv", "map"));
-        stats.add(terms("terms_lm", "lm_value", null));
-        stats.add(terms("terms_lm_dv", "lm_value_dv", null));
-        stats.add(terms("terms_map_lm", "lm_value", "map"));
-        stats.add(terms("terms_map_lm_dv", "lm_value_dv", "map"));
+        stats.add(terms("terms_facet_s", Method.FACET, "s_value", null));
+        stats.add(terms("terms_facet_s_dv", Method.FACET, "s_value_dv", null));
+        stats.add(terms("terms_facet_map_s", Method.FACET, "s_value", "map"));
+        stats.add(terms("terms_facet_map_s_dv", Method.FACET, "s_value_dv", "map"));
+        stats.add(terms("terms_agg_s", Method.AGGREGATION, "s_value", null));
+        stats.add(terms("terms_agg_s_dv", Method.AGGREGATION, "s_value_dv", null));
+        stats.add(terms("terms_facet_l", Method.FACET, "l_value", null));
+        stats.add(terms("terms_facet_l_dv", Method.FACET, "l_value_dv", null));
+        stats.add(terms("terms_agg_l", Method.AGGREGATION, "l_value", null));
+        stats.add(terms("terms_agg_l_dv", Method.AGGREGATION, "l_value_dv", null));
+        stats.add(terms("terms_facet_sm", Method.FACET, "sm_value", null));
+        stats.add(terms("terms_facet_sm_dv", Method.FACET, "sm_value_dv", null));
+        stats.add(terms("terms_facet_map_sm", Method.FACET, "sm_value", "map"));
+        stats.add(terms("terms_facet_map_sm_dv", Method.FACET, "sm_value_dv", "map"));
+        stats.add(terms("terms_agg_sm", Method.AGGREGATION, "sm_value", null));
+        stats.add(terms("terms_agg_sm_dv", Method.AGGREGATION, "sm_value_dv", null));
+        stats.add(terms("terms_facet_lm", Method.FACET, "lm_value", null));
+        stats.add(terms("terms_facet_lm_dv", Method.FACET, "lm_value_dv", null));
+        stats.add(terms("terms_agg_lm", Method.AGGREGATION, "lm_value", null));
+        stats.add(terms("terms_agg_lm_dv", Method.AGGREGATION, "lm_value_dv", null));
 
-        stats.add(termsStats("terms_stats_s_l", "s_value", "l_value", null));
-        stats.add(termsStats("terms_stats_s_l_dv", "s_value_dv", "l_value_dv", null));
-        stats.add(termsStats("terms_stats_s_lm", "s_value", "lm_value", null));
-        stats.add(termsStats("terms_stats_s_lm_dv", "s_value_dv", "lm_value_dv", null));
-        stats.add(termsStats("terms_stats_sm_l", "sm_value", "l_value", null));
-        stats.add(termsStats("terms_stats_sm_l_dv", "sm_value_dv", "l_value_dv", null));
+        stats.add(termsStats("terms_stats_facet_s_l", Method.FACET, "s_value", "l_value", null));
+        stats.add(termsStats("terms_stats_facet_s_l_dv", Method.FACET, "s_value_dv", "l_value_dv", null));
+        stats.add(termsStats("terms_stats_agg_s_l", Method.AGGREGATION, "s_value", "l_value", null));
+        stats.add(termsStats("terms_stats_agg_s_l_dv", Method.AGGREGATION, "s_value_dv", "l_value_dv", null));
+        stats.add(termsStats("terms_stats_facet_s_lm", Method.FACET, "s_value", "lm_value", null));
+        stats.add(termsStats("terms_stats_facet_s_lm_dv", Method.FACET, "s_value_dv", "lm_value_dv", null));
+        stats.add(termsStats("terms_stats_agg_s_lm", Method.AGGREGATION, "s_value", "lm_value", null));
+        stats.add(termsStats("terms_stats_agg_s_lm_dv", Method.AGGREGATION, "s_value_dv", "lm_value_dv", null));
+        stats.add(termsStats("terms_stats_facet_sm_l", Method.FACET, "sm_value", "l_value", null));
+        stats.add(termsStats("terms_stats_facet_sm_l_dv", Method.FACET, "sm_value_dv", "l_value_dv", null));
+        stats.add(termsStats("terms_stats_agg_sm_l", Method.AGGREGATION, "sm_value", "l_value", null));
+        stats.add(termsStats("terms_stats_agg_sm_l_dv", Method.AGGREGATION, "sm_value_dv", "l_value_dv", null));
 
         System.out.println("------------------ SUMMARY -------------------------------");
         System.out.format("%25s%10s%10s\n", "name", "took", "millis");
@@ -247,7 +286,7 @@ public class TermsFacetSearchBenchmark {
         }
     }
 
-    private static StatsResult terms(String name, String field, String executionHint) {
+    private static StatsResult terms(String name, Method method, String field, String executionHint) {
         long totalQueryTime;// LM VALUE
 
         client.admin().indices().prepareClearCache().setFieldDataCache(true).execute().actionGet();
@@ -255,10 +294,9 @@ public class TermsFacetSearchBenchmark {
         System.out.println("--> Warmup (" + name + ")...");
         // run just the child query, warm up first
         for (int j = 0; j < QUERY_WARMUP; j++) {
-            SearchResponse searchResponse = client.prepareSearch()
+            SearchResponse searchResponse = method.addTermsAgg(client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(matchAllQuery())
-                    .addFacet(termsFacet(field).field(field).executionHint(executionHint))
+                    .setQuery(matchAllQuery()), name, field, executionHint)
                     .execute().actionGet();
             if (j == 0) {
                 System.out.println("--> Loading (" + field + "): took: " + searchResponse.getTook());
@@ -273,21 +311,20 @@ public class TermsFacetSearchBenchmark {
         System.out.println("--> Running (" + name + ")...");
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
-            SearchResponse searchResponse = client.prepareSearch()
+            SearchResponse searchResponse = method.addTermsAgg(client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(matchAllQuery())
-                    .addFacet(termsFacet(field).field(field).executionHint(executionHint))
+                    .setQuery(matchAllQuery()), name, field, executionHint)
                     .execute().actionGet();
             if (searchResponse.getHits().totalHits() != COUNT) {
                 System.err.println("--> mismatch on hits");
             }
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("--> Terms Facet (" + field + "), hint(" + executionHint + "): " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("--> Terms Agg (" + name + "): " + (totalQueryTime / QUERY_COUNT) + "ms");
         return new StatsResult(name, totalQueryTime);
     }
 
-    private static StatsResult termsStats(String name, String keyField, String valueField, String executionHint) {
+    private static StatsResult termsStats(String name, Method method, String keyField, String valueField, String executionHint) {
         long totalQueryTime;
 
         client.admin().indices().prepareClearCache().setFieldDataCache(true).execute().actionGet();
@@ -295,10 +332,9 @@ public class TermsFacetSearchBenchmark {
         System.out.println("--> Warmup (" + name + ")...");
         // run just the child query, warm up first
         for (int j = 0; j < QUERY_WARMUP; j++) {
-            SearchResponse searchResponse = client.prepareSearch()
+            SearchResponse searchResponse = method.addTermsStatsAgg(client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(matchAllQuery())
-                    .addFacet(termsStatsFacet(name).keyField(keyField).valueField(valueField))
+                    .setQuery(matchAllQuery()), name, keyField, valueField)
                     .execute().actionGet();
             if (j == 0) {
                 System.out.println("--> Loading (" + name + "): took: " + searchResponse.getTook());
@@ -313,17 +349,16 @@ public class TermsFacetSearchBenchmark {
         System.out.println("--> Running (" + name + ")...");
         totalQueryTime = 0;
         for (int j = 0; j < QUERY_COUNT; j++) {
-            SearchResponse searchResponse = client.prepareSearch()
+            SearchResponse searchResponse = method.addTermsStatsAgg(client.prepareSearch()
                     .setSearchType(SearchType.COUNT)
-                    .setQuery(matchAllQuery())
-                    .addFacet(termsStatsFacet(name).keyField(keyField).valueField(valueField))
+                    .setQuery(matchAllQuery()), name, keyField, valueField)
                     .execute().actionGet();
             if (searchResponse.getHits().totalHits() != COUNT) {
                 System.err.println("--> mismatch on hits");
             }
             totalQueryTime += searchResponse.getTookInMillis();
         }
-        System.out.println("--> Terms Facet (" + name + "), hint(" + executionHint + "): " + (totalQueryTime / QUERY_COUNT) + "ms");
+        System.out.println("--> Terms stats agg (" + name + "): " + (totalQueryTime / QUERY_COUNT) + "ms");
         return new StatsResult(name, totalQueryTime);
     }
 }
