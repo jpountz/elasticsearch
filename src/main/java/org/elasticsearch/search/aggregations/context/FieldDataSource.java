@@ -218,7 +218,7 @@ public abstract class FieldDataSource {
 
             @Override
             public boolean isFloatingPoint() {
-                return delegate.isFloatingPoint(); // nocommit: can't a script change a long to a double, should we always return true?
+                return true; // even if the underlying source produces longs, scripts can change them to doubles
             }
 
             @Override

@@ -248,9 +248,9 @@ public class LongTermsTests extends AbstractIntegrationTest {
         assertThat(terms.buckets().size(), equalTo(5));
 
         for (int i = 0; i < 5; i++) {
-            Terms.Bucket bucket = terms.getByTerm("" + (i+1));
+            Terms.Bucket bucket = terms.getByTerm("" + (i+1d));
             assertThat(bucket, notNullValue());
-            assertThat(bucket.getTerm().string(), equalTo("" + (i+1)));
+            assertThat(bucket.getTerm().string(), equalTo("" + (i+1d)));
             assertThat(bucket.getTermAsNumber().intValue(), equalTo(i+1));
             assertThat(bucket.getDocCount(), equalTo(1l));
         }
@@ -299,9 +299,9 @@ public class LongTermsTests extends AbstractIntegrationTest {
         assertThat(terms.buckets().size(), equalTo(6));
 
         for (int i = 0; i < 6; i++) {
-            Terms.Bucket bucket = terms.getByTerm("" + (i-1));
+            Terms.Bucket bucket = terms.getByTerm("" + (i-1d));
             assertThat(bucket, notNullValue());
-            assertThat(bucket.getTerm().string(), equalTo("" + (i-1)));
+            assertThat(bucket.getTerm().string(), equalTo("" + (i-1d)));
             assertThat(bucket.getTermAsNumber().intValue(), equalTo(i-1));
             if (i == 0 || i == 5) {
                 assertThat(bucket.getDocCount(), equalTo(1l));
@@ -316,7 +316,7 @@ public class LongTermsTests extends AbstractIntegrationTest {
         SearchResponse response = client().prepareSearch("idx").setTypes("type")
                 .addAggregation(terms("terms")
                         .field("values")
-                        .script("_value / 1000 + 1"))
+                        .script("floor(_value / 1000 + 1)"))
                 .execute().actionGet();
 
         assertThat(response.getFailedShards(), equalTo(0));
@@ -326,9 +326,9 @@ public class LongTermsTests extends AbstractIntegrationTest {
         assertThat(terms.getName(), equalTo("terms"));
         assertThat(terms.buckets().size(), equalTo(1));
 
-        Terms.Bucket bucket = terms.getByTerm("1");
+        Terms.Bucket bucket = terms.getByTerm("1.0");
         assertThat(bucket, notNullValue());
-        assertThat(bucket.getTerm().string(), equalTo("1"));
+        assertThat(bucket.getTerm().string(), equalTo("1.0"));
         assertThat(bucket.getTermAsNumber().intValue(), equalTo(1));
         assertThat(bucket.getDocCount(), equalTo(5l));
     }
@@ -367,9 +367,9 @@ public class LongTermsTests extends AbstractIntegrationTest {
         assertThat(terms.buckets().size(), equalTo(6));
 
         for (int i = 0; i < 6; i++) {
-            Terms.Bucket bucket = terms.getByTerm("" + (i+1));
+            Terms.Bucket bucket = terms.getByTerm("" + (i+1d));
             assertThat(bucket, notNullValue());
-            assertThat(bucket.getTerm().string(), equalTo("" + (i+1)));
+            assertThat(bucket.getTerm().string(), equalTo("" + (i+1d)));
             assertThat(bucket.getTermAsNumber().intValue(), equalTo(i+1));
             final long count = i == 0 || i == 5 ? 1 : 2;
             double s = 0;

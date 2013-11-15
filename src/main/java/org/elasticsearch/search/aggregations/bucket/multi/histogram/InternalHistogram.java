@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.bucket.multi.histogram;
 
 import org.elasticsearch.common.io.stream.StreamInput;
-import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.search.aggregations.AggregationStreams;
 import org.elasticsearch.search.aggregations.InternalAggregations;
 import org.elasticsearch.search.aggregations.context.numeric.ValueFormatter;
@@ -29,7 +28,7 @@ import java.io.IOException;
 import java.util.List;
 
 /**
- * nocommit I'd love to rename this to InternalNumericHistogram (see comment on {@link Histogram})
+ * TODO should be renamed to InternalNumericHistogram (see comment on {@link Histogram})?
  */
 public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> implements Histogram {
 
