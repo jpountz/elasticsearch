@@ -55,28 +55,33 @@ public class MissingTests extends ElasticsearchIntegrationTest {
                 .build();
     }
 
+    int numDocs, numDocsMissing, numDocsUnmapped;
+
     @Before
     public void init() throws Exception {
         createIndex("idx");
         List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
+        numDocs = randomIntBetween(5, 20);
+        numDocsMissing = randomIntBetween(1, numDocs - 1);
+        for (int i = 0; i < numDocsMissing; i++) {
+            builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
+                    .startObject()
+                    .field("value", i)
+                    .endObject()));
+        }
+        for (int i = numDocsMissing; i < numDocs; i++) {
             builders.add(client().prepareIndex("idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
                     .field("tag", "tag1")
                     .endObject()));
         }
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
-            builders.add(client().prepareIndex("idx", "type", ""+i+6).setSource(jsonBuilder()
-                    .startObject()
-                    .field("value", i)
-                    .endObject()));
-        }
 
         createIndex("unmapped_idx");
-        for (int i = 0; i < 3; i++) { // NOCOMMIT randomize the size
+        numDocsUnmapped = randomIntBetween(2, 5);
+        for (int i = 0; i < numDocsUnmapped; i++) {
             builders.add(client().prepareIndex("unmapped_idx", "type", ""+i).setSource(jsonBuilder()
                     .startObject()
-                    .field("value", i+5)
+                    .field("value", i)
                     .endObject()));
         }
 
@@ -95,7 +100,7 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing missing = response.getAggregations().get("missing_tag");
         assertThat(missing, notNullValue());
         assertThat(missing.getName(), equalTo("missing_tag"));
-        assertThat(missing.getDocCount(), equalTo(3l));
+        assertThat(missing.getDocCount(), equalTo((long) numDocsUnmapped));
     }
 
     @Test
@@ -109,7 +114,7 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing missing = response.getAggregations().get("missing_tag");
         assertThat(missing, notNullValue());
         assertThat(missing.getName(), equalTo("missing_tag"));
-        assertThat(missing.getDocCount(), equalTo(8l));
+        assertThat(missing.getDocCount(), equalTo((long) numDocsMissing + numDocsUnmapped));
     }
 
     @Test
@@ -123,7 +128,7 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing missing = response.getAggregations().get("missing_tag");
         assertThat(missing, notNullValue());
         assertThat(missing.getName(), equalTo("missing_tag"));
-        assertThat(missing.getDocCount(), equalTo(5l));
+        assertThat(missing.getDocCount(), equalTo((long) numDocsMissing));
     }
 
     @Test
@@ -138,13 +143,20 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing missing = response.getAggregations().get("missing_tag");
         assertThat(missing, notNullValue());
         assertThat(missing.getName(), equalTo("missing_tag"));
-        assertThat(missing.getDocCount(), equalTo(8l));
+        assertThat(missing.getDocCount(), equalTo((long) numDocsMissing + numDocsUnmapped));
         assertThat(missing.getAggregations().asList().isEmpty(), is(false));
 
+        long sum = 0;
+        for (int i = 0; i < numDocsMissing; ++i) {
+            sum += i;
+        }
+        for (int i = 0; i < numDocsUnmapped; ++i) {
+            sum += i;
+        }
         Avg avgValue = missing.getAggregations().get("avg_value");
         assertThat(avgValue, notNullValue());
         assertThat(avgValue.getName(), equalTo("avg_value"));
-        assertThat(avgValue.getValue(), equalTo((double) (0+1+2+3+4+5+6+7) / 8));
+        assertThat(avgValue.getValue(), equalTo((double) sum / (numDocsMissing + numDocsUnmapped)));
     }
 
     @Test
@@ -160,13 +172,13 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing topMissing = response.getAggregations().get("top_missing");
         assertThat(topMissing, notNullValue());
         assertThat(topMissing.getName(), equalTo("top_missing"));
-        assertThat(topMissing.getDocCount(), equalTo(5l));
+        assertThat(topMissing.getDocCount(), equalTo((long) numDocsMissing));
         assertThat(topMissing.getAggregations().asList().isEmpty(), is(false));
 
         Missing subMissing = topMissing.getAggregations().get("sub_missing");
         assertThat(subMissing, notNullValue());
         assertThat(subMissing.getName(), equalTo("sub_missing"));
-        assertThat(subMissing.getDocCount(), equalTo(5l));
+        assertThat(subMissing.getDocCount(), equalTo((long) numDocsMissing));
     }
 
     @Test
@@ -182,13 +194,13 @@ public class MissingTests extends ElasticsearchIntegrationTest {
         Missing topMissing = response.getAggregations().get("top_missing");
         assertThat(topMissing, notNullValue());
         assertThat(topMissing.getName(), equalTo("top_missing"));
-        assertThat(topMissing.getDocCount(), equalTo(8l));
+        assertThat(topMissing.getDocCount(), equalTo((long) numDocsMissing + numDocsUnmapped));
         assertThat(topMissing.getAggregations().asList().isEmpty(), is(false));
 
         Missing subMissing = topMissing.getAggregations().get("sub_missing");
         assertThat(subMissing, notNullValue());
         assertThat(subMissing.getName(), equalTo("sub_missing"));
-        assertThat(subMissing.getDocCount(), equalTo(8l));
+        assertThat(subMissing.getDocCount(), equalTo((long) numDocsMissing + numDocsUnmapped));
     }
 
     @Test
