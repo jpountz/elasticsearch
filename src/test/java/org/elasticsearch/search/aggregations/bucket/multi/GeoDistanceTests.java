@@ -52,9 +52,7 @@ public class GeoDistanceTests extends ElasticsearchIntegrationTest {
     @Override
     public Settings indexSettings() {
         return ImmutableSettings.builder()
-//                .put("index.number_of_shards", between(1, 5))
-//                .put("index.number_of_replicas", between(0, 1))
-                .put("index.number_of_shards", 3)
+                .put("index.number_of_shards", between(1, 5))
                 .put("index.number_of_replicas", between(0, 1))
                 .build();
     }
@@ -87,50 +85,6 @@ public class GeoDistanceTests extends ElasticsearchIntegrationTest {
                 // above 1000km
                 indexCity("tel-aviv", "32.0741, 34.777"));
     }
-
-    @Test
-    public void testGeoDistance2() throws Exception {
-        SearchResponse response = client().prepareSearch("idx")
-                .addAggregation(geoDistance("amsterdam_rings")
-                        .field("location")
-                        .unit(DistanceUnit.KILOMETERS)
-                        .point("52.3760, 4.894") // coords of amsterdam
-                        .addUnboundedTo(500)
-                        .addRange(500, 1000)
-                        .addUnboundedFrom(1000)
-                        .subAggregation(terms("cities").field("city")
-                            .subAggregation(sum("distance").script("doc['location'].distanceInKm(52.3760, 4.894)"))))
-                .execute().actionGet();
-
-        assertThat(response.getFailedShards(), equalTo(0));
-
-        GeoDistance geoDist = response.getAggregations().get("amsterdam_rings");
-        assertThat(geoDist, notNullValue());
-        assertThat(geoDist.getName(), equalTo("amsterdam_rings"));
-        assertThat(geoDist.buckets().size(), equalTo(3));
-
-        GeoDistance.Bucket bucket = geoDist.getByKey("*-500.0");
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("*-500.0"));
-        assertThat(bucket.getFrom(), equalTo(0.0));
-        assertThat(bucket.getTo(), equalTo(500.0));
-        assertThat(bucket.getDocCount(), equalTo(2l));
-
-        bucket = geoDist.getByKey("500.0-1000.0");
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("500.0-1000.0"));
-        assertThat(bucket.getFrom(), equalTo(500.0));
-        assertThat(bucket.getTo(), equalTo(1000.0));
-        assertThat(bucket.getDocCount(), equalTo(2l));
-
-        bucket = geoDist.getByKey("1000.0-*");
-        assertThat(bucket, notNullValue());
-        assertThat(bucket.getKey(), equalTo("1000.0-*"));
-        assertThat(bucket.getFrom(), equalTo(1000.0));
-        assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(1l));
-    }
-
 
     @Test
     public void testGeoDistance() throws Exception {
