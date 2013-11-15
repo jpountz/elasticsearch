@@ -129,7 +129,7 @@ public class RandomTests extends ElasticsearchIntegrationTest {
 
         final IntOpenHashSet valuesSet = new IntOpenHashSet();
         wipeIndices("idx");
-        client().admin().indices().prepareCreate("idx").addMapping("type", jsonBuilder().startObject()
+        prepareCreate("idx").addMapping("type", jsonBuilder().startObject()
               .startObject("type")
                 .startObject("properties")
                   .startObject("string_values")

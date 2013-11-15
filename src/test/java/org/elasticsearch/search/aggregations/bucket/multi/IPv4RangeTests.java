@@ -59,7 +59,7 @@ public class IPv4RangeTests extends ElasticsearchIntegrationTest {
     
     @Before
     public void init() throws Exception {
-        client().admin().indices().prepareCreate("idx")
+        prepareCreate("idx")
                 .addMapping("type", "ip", "type=ip", "ips", "type=ip")
                 .execute().actionGet();
         IndexRequestBuilder[] builders = new IndexRequestBuilder[255]; // NOCOMMIT randomize the number of docs

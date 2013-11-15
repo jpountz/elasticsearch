@@ -76,7 +76,7 @@ public class NestedTests extends ElasticsearchIntegrationTest {
     @Before
     public void init() throws Exception {
 
-        client().admin().indices().prepareCreate("idx")
+        prepareCreate("idx")
                 .addMapping("type", "nested", "type=nested")
                 .setSettings(indexSettings())
                 .execute().actionGet();
