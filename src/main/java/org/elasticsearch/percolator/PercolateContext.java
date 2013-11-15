@@ -285,8 +285,24 @@ public class PercolateContext extends SearchContext {
     }
 
     @Override
-    public int hashCode() {
-        return super.hashCode();    //To change body of overridden methods use File | Settings | File Templates.
+    public SearchContextAggregations aggregations() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SearchContext aggregations(SearchContextAggregations aggregations) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public SearchContextFacets facets() {
+        return facets;
+    }
+
+    @Override
+    public SearchContext facets(SearchContextFacets facets) {
+        this.facets = facets;
+        return this;
     }
 
     // Unused:
@@ -362,25 +378,6 @@ public class PercolateContext extends SearchContext {
 
     @Override
     public SearchContext scroll(Scroll scroll) {
-        throw new UnsupportedOperationException();
-    }
-
-    public SearchContextAggregations aggregations() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public SearchContext aggregations(SearchContextAggregations aggregations) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public SearchContextFacets facets() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public SearchContext facets(SearchContextFacets facets) {
         throw new UnsupportedOperationException();
     }
 
