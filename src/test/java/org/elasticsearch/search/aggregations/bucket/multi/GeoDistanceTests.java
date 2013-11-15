@@ -59,38 +59,33 @@ public class GeoDistanceTests extends ElasticsearchIntegrationTest {
                 .build();
     }
 
-    private void indexCity(String name, String latLon) throws Exception {
-        client().prepareIndex("idx", "type").setSource(jsonBuilder()
+    private IndexRequestBuilder indexCity(String name, String latLon) throws Exception {
+        return client().prepareIndex("idx", "type").setSource(jsonBuilder()
                 .startObject()
                     .field("city", name)
                     .field("location", latLon)
-                .endObject())
-                .execute().actionGet();
+                .endObject());
     }
 
     @Before
     public void init() throws Exception {
-        client().admin().indices().prepareCreate("idx")
+        prepareCreate("idx")
                 .addMapping("type", "location", "type=geo_point", "city", "type=string,index=not_analyzed")
                 .execute().actionGet();
-        
-        //NOCOMMIT index these things randomized and inject dummy docs 
-        
-        // below 500km
-        indexCity("utrecht", "52.0945, 5.116");
-        indexCity("haarlem", "52.3890, 4.637");
-
-        // above 500km, below 1000km
-        indexCity("berlin", "52.540, 13.409");
-        indexCity("prague", "50.086, 14.439");
-
-        // above 1000km
-        indexCity("tel-aviv", "32.0741, 34.777");
 
         createIndex("idx_unmapped");
 
-        client().admin().indices().prepareFlush().execute().actionGet();
-        client().admin().indices().prepareRefresh().execute().actionGet();
+        //NOCOMMIT inject dummy docs
+
+        indexRandom(true,
+                // below 500km
+                indexCity("utrecht", "52.0945, 5.116"),
+                indexCity("haarlem", "52.3890, 4.637"),
+                // above 500km, below 1000km
+                indexCity("berlin", "52.540, 13.409"),
+                indexCity("prague", "50.086, 14.439"),
+                // above 1000km
+                indexCity("tel-aviv", "32.0741, 34.777"));
     }
 
     @Test

@@ -638,6 +638,9 @@ public abstract class FieldDataSource {
             if (bytesValues != null) {
                 bytesValues = atomicFieldData.getBytesValues(needsHashes);
             }
+            if (geoPointValues != null) {
+                geoPointValues = atomicFieldData.getGeoPointValues();
+            }
         }
 
         @Override
