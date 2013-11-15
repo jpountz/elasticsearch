@@ -46,6 +46,8 @@ import static org.hamcrest.core.IsNull.notNullValue;
  */
 public class GlobalTests extends ElasticsearchIntegrationTest {
 
+    int numDocs;
+
     @Override
     public Settings indexSettings() {
         return ImmutableSettings.builder()
@@ -59,22 +61,23 @@ public class GlobalTests extends ElasticsearchIntegrationTest {
         createIndex("idx");
         createIndex("idx2");
         List<IndexRequestBuilder> builders = new ArrayList<IndexRequestBuilder>();
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
+        numDocs = randomIntBetween(3, 20);
+        for (int i = 0; i < numDocs / 2; i++) {
             builders.add(client().prepareIndex("idx", "type", ""+i+1).setSource(jsonBuilder()
                     .startObject()
                     .field("value", i + 1)
                     .field("tag", "tag1")
                     .endObject()));
         }
-        for (int i = 0; i < 5; i++) { // NOCOMMIT randomize the size
-            builders.add(client().prepareIndex("idx", "type", ""+i+6).setSource(jsonBuilder()
+        for (int i = numDocs / 2; i < numDocs; i++) {
+            builders.add(client().prepareIndex("idx", "type", ""+i+1).setSource(jsonBuilder()
                     .startObject()
-                    .field("value", i + 6)
+                    .field("value", i + 1)
                     .field("tag", "tag2")
-                    .field("name", "name" + i+6)
+                    .field("name", "name" + i+1)
                     .endObject()));
         }
-        indexRandom(true, builders.toArray(new IndexRequestBuilder[builders.size()]));
+        indexRandom(true, builders);
     }
 
     @Test
@@ -90,17 +93,21 @@ public class GlobalTests extends ElasticsearchIntegrationTest {
         Global global = response.getAggregations().get("global");
         assertThat(global, notNullValue());
         assertThat(global.getName(), equalTo("global"));
-        assertThat(global.getDocCount(), equalTo(10l));
+        assertThat(global.getDocCount(), equalTo((long) numDocs));
         assertThat(global.getAggregations().asList().isEmpty(), is(false));
 
         Stats stats = global.getAggregations().get("value_stats");
         assertThat(stats, notNullValue());
         assertThat(stats.getName(), equalTo("value_stats"));
-        assertThat(stats.getAvg(), equalTo((double) (1+2+3+4+5+6+7+8+9+10) / 10));
+        long sum = 0;
+        for (int i = 0; i < numDocs; ++i) {
+            sum += i + 1;
+        }
+        assertThat(stats.getAvg(), equalTo((double) sum / numDocs));
         assertThat(stats.getMin(), equalTo(1.0));
-        assertThat(stats.getMax(), equalTo(10.0));
-        assertThat(stats.getCount(), equalTo(10l));
-        assertThat(stats.getSum(), equalTo((double) 1+2+3+4+5+6+7+8+9+10));
+        assertThat(stats.getMax(), equalTo((double) numDocs));
+        assertThat(stats.getCount(), equalTo((long) numDocs));
+        assertThat(stats.getSum(), equalTo((double) sum));
     }
 
     @Test
