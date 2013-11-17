@@ -30,14 +30,16 @@ import java.util.Iterator;
 public class LongHashTests extends ElasticsearchTestCase {
 
     public void testDuell() {
-        final Long[] values = new Long[randomIntBetween(1, 1000)];
+        final Long[] values = new Long[randomIntBetween(1, 100000)];
         for (int i = 0; i < values.length; ++i) {
             values[i] = randomLong();
         }
         final LongLongMap valueToId = new LongLongOpenHashMap();
         final long[] idToValue = new long[values.length];
-        final LongHash longHash = new LongHash(randomIntBetween(1, 100));
-        final int iters = randomInt(10000);
+        // Test high load factors to make sure that collision resolution works fine
+        final float maxLoadFactor = 0.6f + randomFloat() * 0.39f;
+        final LongHash longHash = new LongHash(randomIntBetween(0, 100), maxLoadFactor);
+        final int iters = randomInt(1000000);
         for (int i = 0; i < iters; ++i) {
             final Long value = randomFrom(values);
             if (valueToId.containsKey(value)) {

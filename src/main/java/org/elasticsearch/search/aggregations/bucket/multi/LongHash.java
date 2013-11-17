@@ -20,6 +20,7 @@
 package org.elasticsearch.search.aggregations.bucket.multi;
 
 import com.carrotsearch.hppc.hash.MurmurHash3;
+import com.google.common.base.Preconditions;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.LongArray;
 
@@ -31,19 +32,28 @@ import org.elasticsearch.common.util.LongArray;
 public final class LongHash {
 
     /** Open addressing typically requires having smaller load factors compared to linked lists because collisions may result into worse lookup performance. */
-    private static final float MAX_LOAD_FACTOR = 0.6f;
+    private static final float DEFAULT_MAX_LOAD_FACTOR = 0.6f;
 
+    private final float maxLoadFactor;
     private long size, maxSize;
     private LongArray keys;
     private LongArray ids;
     private long mask;
 
+    /** Constructor with configurable capacity and default maximum load factor. */
     public LongHash(long capacity) {
-        assert capacity >= 0;
-        long buckets = 1L + (long) (capacity / MAX_LOAD_FACTOR);
+        this(capacity, DEFAULT_MAX_LOAD_FACTOR);
+    }
+
+    /** Constructor with configurable capacity and load factor. */
+    public LongHash(long capacity, float maxLoadFactor) {
+        Preconditions.checkArgument(capacity >= 0, "capacity must be >= 0");
+        Preconditions.checkArgument(maxLoadFactor > 0 && maxLoadFactor < 1, "maxLoadFactor must be > 0 and < 1");
+        this.maxLoadFactor = maxLoadFactor;
+        long buckets = 1L + (long) (capacity / maxLoadFactor);
         buckets = Long.highestOneBit(buckets - 1) << 1; // next power of two
         assert buckets == Long.highestOneBit(buckets);
-        maxSize = (long) (buckets * MAX_LOAD_FACTOR);
+        maxSize = (long) (buckets * maxLoadFactor);
         assert maxSize >= capacity;
         size = 0;
         keys = BigArrays.newLongArray(buckets);
@@ -123,15 +133,19 @@ public final class LongHash {
     }
 
     private void grow() {
+        // The difference of this implementation of grow() compared to standard hash tables is that we are growing in-place, which makes
+        // the re-mapping of keys to slots a bit more tricky.
         assert size == maxSize;
         final long prevSize = size;
         final long buckets = keys.size();
+        // Resize arrays
         final long newBuckets = buckets << 1;
         assert newBuckets == Long.highestOneBit(newBuckets) : newBuckets; // power of 2
         keys = BigArrays.resize(keys, newBuckets);
         ids = BigArrays.resize(ids, newBuckets);
         mask = newBuckets - 1;
         size = 0;
+        // First let's remap in-place: most data will be put in its final position directly
         for (long i = 0; i < buckets; ++i) {
             final long id = ids.set(i, 0);
             if (id > 0) {
@@ -140,8 +154,24 @@ public final class LongHash {
                 assert newId == id - 1 : newId + " " + (id - 1);
             }
         }
+        // The only entries which have not been put in their final position in the previous loop are those that were stored in a slot that
+        // is < slot(key, mask). This only happens when slot(key, mask) returned a slot that was close to the end of the array and colision
+        // resolution has put it back in the first slots. This time, collision resolution will have put them at the beginning of the newly
+        // allocated slots. Let's re-add them to make sure they are in the right slot. This 2nd loop will typically exit very early.
+        for (long i = buckets; i < newBuckets; ++i) {
+            final long id = ids.set(i, 0);
+            if (id > 0) {
+                --size; // we just removed an entry
+                final long key = keys.set(i, 0);
+                final long newId = set(key, id - 1); // add it back
+                assert newId == id - 1 : newId + " " + (id - 1);
+                assert newId == get(key);
+            } else {
+                break;
+            }
+        }
         assert size == prevSize;
-        maxSize = (long) (newBuckets * MAX_LOAD_FACTOR);
+        maxSize = (long) (newBuckets * maxLoadFactor);
         assert size < maxSize;
     }
     
