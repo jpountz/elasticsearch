@@ -56,10 +56,13 @@ public class RangeTests extends ElasticsearchIntegrationTest {
                 .build();
     }
 
+    int numDocs;
+
     @Before
     public void init() throws Exception {
         createIndex("idx");
-        IndexRequestBuilder[] builders = new IndexRequestBuilder[10]; // NOCOMMIT randomize the size?
+        numDocs = randomIntBetween(10, 20);
+        IndexRequestBuilder[] builders = new IndexRequestBuilder[numDocs];
         for (int i = 0; i < builders.length; i++) {
             builders[i] = client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
@@ -108,7 +111,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5L));
     }
 
     @Test
@@ -147,7 +150,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("r3"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5L));
     }
 
     @Test
@@ -193,10 +196,14 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5l));
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
-        assertThat(sum.getValue(), equalTo(40.0)); // 6 + 7 + 8 + 9 + 10
+        long total = 0;
+        for (int i = 5; i < numDocs; ++i) {
+            total += i + 1;
+        }
+        assertThat(sum.getValue(), equalTo((double) total));
     }
 
     @Test
@@ -242,10 +249,14 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5l));
         avg = bucket.getAggregations().get("avg");
         assertThat(avg, notNullValue());
-        assertThat(avg.getValue(), equalTo(8.0)); // (6 + 7 + 8 + 9 + 10) / 5
+        long total = 0;
+        for (int i = 5; i < numDocs; ++i) {
+            total += i + 1;
+        }
+        assertThat(avg.getValue(), equalTo((double) total / (numDocs - 5))); // (6 + 7 + 8 + 9 + 10) / 5
     }
 
     @Test
@@ -285,7 +296,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(6l)); // 6, 7, 8, 9, 10, 11
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 4l));
     }
 
     /*
@@ -337,7 +348,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(6l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 4l));
     }
 
     /*
@@ -390,7 +401,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(7l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 3l));
     }
 
     /*
@@ -456,11 +467,15 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(7l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 3L));
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 5+6+6+7+7+8+8+9+9+10+10+11+11+12));
+        long total = 0;
+        for (int i = 3; i < numDocs; ++i) {
+            total += ((i + 1) + 1) + ((i + 1) + 2);
+        }
+        assertThat(sum.getValue(), equalTo((double) total));
     }
 
     @Test
@@ -499,7 +514,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5l));
     }
 
     @Test
@@ -545,10 +560,14 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5l));
         avg = bucket.getAggregations().get("avg");
         assertThat(avg, notNullValue());
-        assertThat(avg.getValue(), equalTo(8.0)); // (6 + 7 + 8 + 9 + 10) / 5
+        long total = 0;
+        for (int i = 5; i < numDocs; ++i) {
+            total += i + 1;
+        }
+        assertThat(avg.getValue(), equalTo((double) total / (numDocs - 5))); // (6 + 7 + 8 + 9 + 10) / 5
     }
 
     @Test
@@ -618,7 +637,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(6l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 4l));
     }
     
     /*
@@ -683,11 +702,15 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("r3"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(6l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 4l));
         sum = bucket.getAggregations().get("sum");
         assertThat(sum, notNullValue());
         assertThat(sum.getName(), equalTo("sum"));
-        assertThat(sum.getValue(), equalTo((double) 5+6+6+7+7+8+8+9+9+10+10+11));
+        long total = 0;
+        for (int i = 4; i < numDocs; ++i) {
+            total += (i + 1) + (i + 2);
+        }
+        assertThat(sum.getValue(), equalTo((double) total));
     }
 
     @Test
@@ -767,7 +790,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("6.0-*"));
         assertThat(bucket.getFrom(), equalTo(6.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(5l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 5l));
     }
 
     @Test
@@ -814,7 +837,7 @@ public class RangeTests extends ElasticsearchIntegrationTest {
         assertThat(bucket.getKey(), equalTo("4.0-*"));
         assertThat(bucket.getFrom(), equalTo(4.0));
         assertThat(bucket.getTo(), equalTo(Double.POSITIVE_INFINITY));
-        assertThat(bucket.getDocCount(), equalTo(8l));
+        assertThat(bucket.getDocCount(), equalTo(numDocs - 2l));
     }
 
     @Test
