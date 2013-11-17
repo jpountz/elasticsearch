@@ -17,31 +17,15 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.bucket.multi.geo.distance;
+package org.elasticsearch.search.aggregations.bucket.range.geodistance;
 
-import org.elasticsearch.common.unit.DistanceUnit;
-import org.elasticsearch.search.aggregations.Aggregation;
-
-import java.util.List;
+import org.elasticsearch.search.aggregations.bucket.multi.range.RangeBase;
 
 /**
  *
  */
-public interface GeoDistance extends Aggregation, Iterable<GeoDistance.Bucket> {
+public interface GeoDistance extends RangeBase<GeoDistance.Bucket> {
 
-    public static interface Bucket extends org.elasticsearch.search.aggregations.bucket.multi.Bucket {
+    public static interface Bucket extends RangeBase.Bucket {}
 
-        String getKey();
-
-        DistanceUnit getUnit();
-
-        double getFrom();
-
-        double getTo();
-
-    }
-
-    List<Bucket> buckets();
-
-    Bucket getByKey(String key);
 }

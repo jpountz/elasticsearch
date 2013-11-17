@@ -24,8 +24,6 @@ import org.elasticsearch.index.fielddata.GeoPointValues;
 import org.elasticsearch.search.aggregations.context.FieldDataSource;
 import org.elasticsearch.search.aggregations.context.ValuesSource;
 
-import java.io.IOException;
-
 /**
  * A source of geo points.
  */
@@ -42,7 +40,7 @@ public final class GeoPointValuesSource implements ValuesSource {
         return source.bytesValues();
     }
 
-    public final GeoPointValues values() throws IOException {
+    public final GeoPointValues values() {
         return source.geoPointValues();
     }
 

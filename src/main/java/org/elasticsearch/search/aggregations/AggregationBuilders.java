@@ -1,12 +1,12 @@
 package org.elasticsearch.search.aggregations;
 
-import org.elasticsearch.search.aggregations.bucket.multi.geo.distance.GeoDistanceBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.DateHistogramBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.HistogramBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.range.RangeBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.range.date.DateRangeBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.range.ipv4.IPv4RangeBuilder;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.TermsBuilder;
+import org.elasticsearch.search.aggregations.bucket.range.geodistance.GeoDistanceBuilder;
 import org.elasticsearch.search.aggregations.bucket.single.filter.FilterAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.single.global.GlobalBuilder;
 import org.elasticsearch.search.aggregations.bucket.single.missing.MissingBuilder;

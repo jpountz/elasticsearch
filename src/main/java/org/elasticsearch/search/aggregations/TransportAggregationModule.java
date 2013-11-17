@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations;
 
 import org.elasticsearch.common.inject.AbstractModule;
-import org.elasticsearch.search.aggregations.bucket.multi.geo.distance.InternalGeoDistance;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.InternalDateHistogram;
 import org.elasticsearch.search.aggregations.bucket.multi.histogram.InternalHistogram;
 import org.elasticsearch.search.aggregations.bucket.multi.range.InternalRange;
@@ -30,6 +29,7 @@ import org.elasticsearch.search.aggregations.bucket.multi.terms.DoubleTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.LongTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.StringTerms;
 import org.elasticsearch.search.aggregations.bucket.multi.terms.UnmappedTerms;
+import org.elasticsearch.search.aggregations.bucket.range.geodistance.InternalGeoDistance;
 import org.elasticsearch.search.aggregations.bucket.single.filter.InternalFilter;
 import org.elasticsearch.search.aggregations.bucket.single.global.InternalGlobal;
 import org.elasticsearch.search.aggregations.bucket.single.missing.InternalMissing;

@@ -17,19 +17,27 @@
  * under the License.
  */
 
-package org.elasticsearch.search.aggregations.bucket.multi.geo.distance;
+package org.elasticsearch.search.aggregations.bucket.range.geodistance;
 
 import org.elasticsearch.common.geo.GeoDistance;
 import org.elasticsearch.common.geo.GeoPoint;
 import org.elasticsearch.common.unit.DistanceUnit;
 import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.index.fielddata.IndexFieldData;
+import org.elasticsearch.index.fielddata.*;
 import org.elasticsearch.index.mapper.FieldMapper;
 import org.elasticsearch.search.SearchParseException;
+import org.elasticsearch.search.aggregations.Aggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.range.AbstractRangeBase;
+import org.elasticsearch.search.aggregations.bucket.multi.range.RangeAggregator;
+import org.elasticsearch.search.aggregations.bucket.multi.range.RangeAggregator.Unmapped;
+import org.elasticsearch.search.aggregations.context.AggregationContext;
 import org.elasticsearch.search.aggregations.context.FieldContext;
+import org.elasticsearch.search.aggregations.context.FieldDataSource;
 import org.elasticsearch.search.aggregations.context.ValuesSourceConfig;
 import org.elasticsearch.search.aggregations.context.geopoints.GeoPointValuesSource;
+import org.elasticsearch.search.aggregations.context.numeric.NumericValuesSource;
 import org.elasticsearch.search.aggregations.factory.AggregatorFactory;
+import org.elasticsearch.search.aggregations.factory.ValueSourceAggregatorFactory;
 import org.elasticsearch.search.aggregations.parser.AggregatorParser;
 import org.elasticsearch.search.internal.SearchContext;
 
@@ -47,14 +55,26 @@ public class GeoDistanceParser implements AggregatorParser {
         return InternalGeoDistance.TYPE.name();
     }
 
+    private static String key(String key, double from, double to) {
+        if (key != null) {
+            return key;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(from == 0 ? "*" : from);
+        sb.append("-");
+        sb.append(Double.isInfinite(to) ? "*" : to);
+        return sb.toString();
+    }
+
     @Override
     public AggregatorFactory parse(String aggregationName, XContentParser parser, SearchContext context) throws IOException {
 
         String field = null;
-        List<GeoDistanceAggregator.DistanceRange> ranges = null;
+        List<RangeAggregator.Range> ranges = null;
         GeoPoint origin = null;
         DistanceUnit unit = DistanceUnit.KILOMETERS;
         GeoDistance distanceType = GeoDistance.ARC;
+        boolean keyed = false;
 
         XContentParser.Token token;
         String currentFieldName = null;
@@ -72,10 +92,16 @@ public class GeoDistanceParser implements AggregatorParser {
                     origin = new GeoPoint();
                     origin.resetFromString(parser.text());
                 }
+            } else if (token == XContentParser.Token.VALUE_BOOLEAN) {
+                if ("keyed".equals(currentFieldName)) {
+                    keyed = parser.booleanValue();
+                }
             } else if (token == XContentParser.Token.START_ARRAY) {
                 if ("ranges".equals(currentFieldName)) {
-                    ranges = new ArrayList<GeoDistanceAggregator.DistanceRange>();
+                    ranges = new ArrayList<RangeAggregator.Range>();
                     while ((token = parser.nextToken()) != XContentParser.Token.END_ARRAY) {
+                        String fromAsStr = null;
+                        String toAsStr = null;
                         double from = 0.0;
                         double to = Double.POSITIVE_INFINITY;
                         String key = null;
@@ -92,10 +118,14 @@ public class GeoDistanceParser implements AggregatorParser {
                             } else if (token == XContentParser.Token.VALUE_STRING) {
                                 if ("key".equals(toOrFromOrKey)) {
                                     key = parser.text();
+                                } else if ("from".equals(toOrFromOrKey)) {
+                                    fromAsStr = parser.text();
+                                } else if ("to".equals(toOrFromOrKey)) {
+                                    toAsStr = parser.text();
                                 }
                             }
                         }
-                        ranges.add(new GeoDistanceAggregator.DistanceRange(key, from, to));
+                        ranges.add(new RangeAggregator.Range(key(key, from, to), from, fromAsStr, to, toAsStr));
                     }
                 } else if ("point".equals(currentFieldName) || "origin".equals(currentFieldName) || "center".equals(currentFieldName)) {
                     double lat = Double.NaN;
@@ -142,26 +172,116 @@ public class GeoDistanceParser implements AggregatorParser {
             throw new SearchParseException(context, "Missing [origin] in geo_distance aggregator [" + aggregationName + "]");
         }
 
-        for (GeoDistanceAggregator.DistanceRange range : ranges) {
-            range.unit = unit;
-            range.origin = origin;
-            range.distanceType = distanceType;
-        }
-
         ValuesSourceConfig<GeoPointValuesSource> config = new ValuesSourceConfig<GeoPointValuesSource>(GeoPointValuesSource.class);
 
         if (field == null) {
-            return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
+            return new GeoDistanceFactory(aggregationName, config, InternalGeoDistance.FACTORY, origin, unit, distanceType, ranges, keyed);
         }
 
         FieldMapper<?> mapper = context.smartNameFieldMapper(field);
         if (mapper == null) {
             config.unmapped(true);
-            return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
+            return new GeoDistanceFactory(aggregationName, config, InternalGeoDistance.FACTORY, origin, unit, distanceType, ranges, keyed);
         }
 
         IndexFieldData<?> indexFieldData = context.fieldData().getForField(mapper);
         config.fieldContext(new FieldContext(field, indexFieldData));
-        return new GeoDistanceAggregator.Factory(aggregationName, config, ranges);
+        return new GeoDistanceFactory(aggregationName, config, InternalGeoDistance.FACTORY, origin, unit, distanceType, ranges, keyed);
     }
+
+    private static class GeoDistanceFactory extends ValueSourceAggregatorFactory<GeoPointValuesSource> {
+
+        private final GeoPoint origin;
+        private final DistanceUnit unit;
+        private final GeoDistance distanceType;
+        private final AbstractRangeBase.Factory rangeFactory;
+        private final List<RangeAggregator.Range> ranges;
+        private final boolean keyed;
+
+        public GeoDistanceFactory(String name, ValuesSourceConfig<GeoPointValuesSource> valueSourceConfig, AbstractRangeBase.Factory rangeFactory, GeoPoint origin, DistanceUnit unit, GeoDistance distanceType, List<RangeAggregator.Range> ranges, boolean keyed) {
+            super(name, rangeFactory.type(), valueSourceConfig);
+            this.origin = origin;
+            this.unit = unit;
+            this.distanceType = distanceType;
+            this.rangeFactory = rangeFactory;
+            this.ranges = ranges;
+            this.keyed = keyed;
+        }
+
+        @Override
+        protected Aggregator createUnmapped(AggregationContext aggregationContext, Aggregator parent) {
+            return new Unmapped(name, ranges, keyed, valuesSourceConfig.formatter(), valuesSourceConfig.parser(), aggregationContext, parent, rangeFactory);
+        }
+
+        @Override
+        protected Aggregator create(final GeoPointValuesSource valuesSource, long expectedBucketsCount, AggregationContext aggregationContext, Aggregator parent) {
+            final DistanceValues distanceValues = new DistanceValues(valuesSource, distanceType, origin, unit);
+            FieldDataSource.Numeric distanceSource = new DistanceSource(distanceValues);
+            distanceSource = new FieldDataSource.Numeric.SortedAndUnique(distanceSource);
+            final NumericValuesSource numericSource = new NumericValuesSource(distanceSource, null, null);
+            return new RangeAggregator(name, factories, numericSource, rangeFactory, ranges, keyed, aggregationContext, parent);
+        }
+
+        private static class DistanceValues extends DoubleValues {
+
+            private final GeoPointValuesSource geoPointValues;
+            private GeoPointValues geoValues;
+            private final GeoDistance distanceType;
+            private final GeoPoint origin;
+            private final DistanceUnit unit;
+
+            protected DistanceValues(GeoPointValuesSource geoPointValues, GeoDistance distanceType, GeoPoint origin, DistanceUnit unit) {
+                super(true);
+                this.geoPointValues = geoPointValues;
+                this.distanceType = distanceType;
+                this.origin = origin;
+                this.unit = unit;
+            }
+
+            @Override
+            public int setDocument(int docId) {
+                geoValues = geoPointValues.values();
+                return geoValues.setDocument(docId);
+            }
+
+            @Override
+            public double nextValue() {
+                final GeoPoint target = geoValues.nextValue();
+                return distanceType.calculate(origin.getLat(), origin.getLon(), target.getLat(), target.getLon(), unit);
+            }
+
+        }
+
+        private static class DistanceSource extends FieldDataSource.Numeric {
+
+            private final DoubleValues values;
+
+            public DistanceSource(DoubleValues values) {
+                this.values = values;
+            }
+
+            @Override
+            public boolean isFloatingPoint() {
+                return true;
+            }
+
+            @Override
+            public LongValues longValues() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public DoubleValues doubleValues() {
+                return values;
+            }
+
+            @Override
+            public BytesValues bytesValues() {
+                throw new UnsupportedOperationException();
+            }
+
+        }
+
+    }
+
 }
