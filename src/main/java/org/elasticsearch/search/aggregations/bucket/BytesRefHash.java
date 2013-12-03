@@ -22,9 +22,6 @@ package org.elasticsearch.search.aggregations.bucket;
 import com.carrotsearch.hppc.hash.MurmurHash3;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.PagedBytes;
-import org.apache.lucene.util.PagedBytes.PagedBytesDataInput;
-import org.apache.lucene.util.PagedBytes.PagedBytesDataOutput;
-import org.apache.lucene.util.packed.AppendingPackedLongBuffer;
 import org.apache.lucene.util.packed.MonotonicAppendingLongBuffer;
 import org.apache.lucene.util.packed.PackedInts;
 import org.elasticsearch.common.util.BigArrays;
@@ -35,12 +32,13 @@ import org.elasticsearch.common.util.IntArray;
  *  BytesRef values to ids. Collisions are resolved with open addressing and linear
  *  probing, growth is smooth thanks to {@link BigArrays}, hashes are cached for faster
  *  re-hashing and capacity is always a multiple of 2 for faster identification of buckets.
+ *  This class is not thread-safe.
  */
 public final class BytesRefHash extends AbstractHash {
 
     private final PagedBytes bytes;
+    private final PagedBytes.PagedBytesDataInput bytesIn;
     private final MonotonicAppendingLongBuffer startOffsets;
-    private final AppendingPackedLongBuffer lengths;
     private IntArray hashes; // we cache hashes for faster re-hashing
 
     // Constructor with configurable capacity and default maximum load factor.
@@ -51,11 +49,9 @@ public final class BytesRefHash extends AbstractHash {
     //Constructor with configurable capacity and load factor.
     public BytesRefHash(long capacity, float maxLoadFactor) {
         super(capacity, maxLoadFactor);
-        bytes = new PagedBytes(14);bytes.copyUsingLengthPrefix(bytes)
+        bytes = new PagedBytes(14);
         bytesIn = bytes.getDataInput();
-        bytesOut = bytes.getDataOutput();
         startOffsets = new MonotonicAppendingLongBuffer(PackedInts.FAST);
-        lengths = new AppendingPackedLongBuffer(PackedInts.FAST);
         hashes = BigArrays.newIntArray(capacity());
     }
 
@@ -69,10 +65,9 @@ public final class BytesRefHash extends AbstractHash {
      * Return the key at <code>0 &lte; index &lte; capacity()</code>. The result is undefined if the slot is unused.
      */
     public void key(long id, BytesRef dest) {
-        final int len = (int) lengths.get(id);
         final long startOffset = startOffsets.get(id);
         bytesIn.setPosition(startOffset);
-        bytesIn.
+        final int len = bytesIn.readVInt();
     }
 
     /**
