@@ -30,6 +30,21 @@ public enum ByteUtils {
 
     public static final int MAX_BYTES_VLONG = 9;
 
+    /** Return the number of bytes used to encode <code>v</code> as a vInt. */
+    public static final int vLongBytes(long v) {
+        if (v < 0) {
+            return MAX_BYTES_VLONG;
+        }
+        final int numBits = 64 - Long.numberOfLeadingZeros(v);
+        return 1 + (numBits - 1) / 7;
+    }
+
+    /** Return the number of bytes used to encode <code>v</code> as a vInt. */
+    public static final int vIntBytes(int v) {
+        final int numBits = 32 - Integer.numberOfLeadingZeros(v);
+        return 1 + (numBits - 1) / 7;
+    }
+
     /** Zig-zag decode. */
     public static long zigZagDecode(long n) {
         return ((n >>> 1) ^ -(n & 1));

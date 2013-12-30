@@ -28,7 +28,7 @@ import java.io.IOException;
  */
 public abstract class CompressedStreamOutput<T extends CompressorContext> extends StreamOutput {
 
-    private final StreamOutput out;
+    protected final StreamOutput out;
     protected final T context;
 
     protected byte[] uncompressed;

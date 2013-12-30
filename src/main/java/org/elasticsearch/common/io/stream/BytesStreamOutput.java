@@ -50,7 +50,11 @@ public class BytesStreamOutput extends StreamOutput implements BytesStream {
     }
 
     public BytesStreamOutput(int size) {
-        this.buf = new byte[size];
+        this(new byte[size]);
+    }
+
+    public BytesStreamOutput(byte[] buf) {
+        this.buf = buf;
     }
 
     @Override

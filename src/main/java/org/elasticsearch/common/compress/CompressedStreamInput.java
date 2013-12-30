@@ -165,7 +165,7 @@ public abstract class CompressedStreamInput<T extends CompressorContext> extends
         if (closed) {
             return false;
         }
-        valid = uncompress(in, uncompressed);
+        valid = uncompress(in);
         if (valid < 0) {
             return false;
         }
@@ -178,6 +178,6 @@ public abstract class CompressedStreamInput<T extends CompressorContext> extends
     /**
      * Uncompress the data into the out array, returning the size uncompressed
      */
-    protected abstract int uncompress(StreamInput in, byte[] out) throws IOException;
+    protected abstract int uncompress(StreamInput in) throws IOException;
 
 }

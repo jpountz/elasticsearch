@@ -19,6 +19,7 @@
 package org.elasticsearch.test;
 
 import com.carrotsearch.randomizedtesting.SeedUtils;
+import com.carrotsearch.randomizedtesting.generators.RandomInts;
 import com.carrotsearch.randomizedtesting.generators.RandomPicks;
 import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
@@ -36,6 +37,8 @@ import org.elasticsearch.cluster.node.DiscoveryNode;
 import org.elasticsearch.cluster.node.DiscoveryNodes;
 import org.elasticsearch.cluster.routing.ShardRouting;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.compress.CompressorFactory;
+import org.elasticsearch.common.compress.lz4.LZ4Compressor;
 import org.elasticsearch.common.io.FileSystemUtils;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
@@ -44,6 +47,7 @@ import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.ImmutableSettings.Builder;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.TransportAddress;
+import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.env.NodeEnvironment;
 import org.elasticsearch.index.engine.IndexEngineModule;
 import org.elasticsearch.node.Node;
@@ -216,6 +220,10 @@ public final class TestCluster implements Iterable<Client> {
             builder.put(Transport.TransportSettings.TRANSPORT_TCP_COMPRESS, rarely(random));
         }
         builder.put("type", RandomPicks.randomFrom(random, CacheRecycler.Type.values()));
+        builder.put(CompressorFactory.COMPRESS_DEFAULT_TYPE_KEY, RandomPicks.randomFrom(random, Arrays.asList(CompressorFactory.LZ4.type(), CompressorFactory.LZF.type())));
+        builder.put(LZ4Compressor.IMPL_KEY, RandomPicks.randomFrom(random, LZ4Compressor.IMPL_VALUES));
+        builder.put(LZ4Compressor.CHUNK_SIZE_KEY, new ByteSizeValue(RandomInts.randomIntBetween(random, 1 << 10, 1 << 18)));
+        builder.put(LZ4Compressor.MIN_COMPRESSION_RATIO_KEY, random.nextBoolean() ? 1f : random.nextFloat());
         return builder.build();
     }
 

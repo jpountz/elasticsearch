@@ -26,6 +26,7 @@ import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.collect.MapBuilder;
+import org.elasticsearch.common.compress.lz4.LZ4Compressor;
 import org.elasticsearch.common.compress.lzf.LZFCompressor;
 import org.elasticsearch.common.io.Streams;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
@@ -42,7 +43,9 @@ import java.util.Locale;
  */
 public class CompressorFactory {
 
-    private static final LZFCompressor LZF = new LZFCompressor();
+    public static final String COMPRESS_DEFAULT_TYPE_KEY = "compress.default.type";
+    public static final LZFCompressor LZF = new LZFCompressor();
+    public static final LZ4Compressor LZ4 = new LZ4Compressor();
 
     private static final Compressor[] compressors;
     private static final ImmutableMap<String, Compressor> compressorsByType;
@@ -51,6 +54,7 @@ public class CompressorFactory {
     static {
         List<Compressor> compressorsX = Lists.newArrayList();
         compressorsX.add(LZF);
+        compressorsX.add(LZ4);
 
         compressors = compressorsX.toArray(new Compressor[compressorsX.size()]);
         MapBuilder<String, Compressor> compressorsByTypeX = MapBuilder.newMapBuilder();
@@ -66,7 +70,7 @@ public class CompressorFactory {
         for (Compressor compressor : compressors) {
             compressor.configure(settings);
         }
-        String defaultType = settings.get("compress.default.type", "lzf").toLowerCase(Locale.ENGLISH);
+        String defaultType = settings.get(COMPRESS_DEFAULT_TYPE_KEY, LZF.type()).toLowerCase(Locale.ENGLISH);
         boolean found = false;
         for (Compressor compressor : compressors) {
             if (defaultType.equalsIgnoreCase(compressor.type())) {

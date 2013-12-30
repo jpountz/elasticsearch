@@ -53,8 +53,8 @@ public class LZFCompressedStreamInput extends CompressedStreamInput<LZFCompresso
     }
 
     @Override
-    public int uncompress(StreamInput in, byte[] out) throws IOException {
-        return decoder.decodeChunk(in, inputBuffer, out);
+    public int uncompress(StreamInput in) throws IOException {
+        return decoder.decodeChunk(in, inputBuffer, uncompressed);
     }
 
     @Override

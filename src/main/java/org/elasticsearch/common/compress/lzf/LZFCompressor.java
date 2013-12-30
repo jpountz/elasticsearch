@@ -26,10 +26,10 @@ import com.ning.compress.lzf.util.ChunkDecoderFactory;
 import org.apache.lucene.store.IndexInput;
 import org.apache.lucene.util.Constants;
 import org.elasticsearch.common.bytes.BytesReference;
+import org.elasticsearch.common.compress.AbstractCompressor;
 import org.elasticsearch.common.compress.CompressedIndexInput;
 import org.elasticsearch.common.compress.CompressedStreamInput;
 import org.elasticsearch.common.compress.CompressedStreamOutput;
-import org.elasticsearch.common.compress.Compressor;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.logging.Loggers;
@@ -40,10 +40,13 @@ import java.io.IOException;
 
 /**
  */
-public class LZFCompressor implements Compressor {
+public class LZFCompressor extends AbstractCompressor {
 
     static final byte[] LUCENE_HEADER = {'L', 'Z', 'F', 0};
 
+    public static final String DECODER_KEY = "compress.lzf.decoder";
+    public static final String DECODER_VALUE_OPTIMAL = "optimal";
+    public static final String DECODER_VALUE_SAFE = "safe";
     public static final String TYPE = "lzf";
 
     private ChunkDecoder decoder;
@@ -64,12 +67,12 @@ public class LZFCompressor implements Compressor {
 
     @Override
     public void configure(Settings settings) {
-        String decoderType = settings.get("compress.lzf.decoder", null);
+        String decoderType = settings.get(DECODER_KEY, null);
         if (decoderType != null) {
-            if ("optimal".equalsIgnoreCase(decoderType)) {
+            if (DECODER_VALUE_OPTIMAL.equalsIgnoreCase(decoderType)) {
                 this.decoder = ChunkDecoderFactory.optimalInstance();
                 Loggers.getLogger(LZFCompressor.class).debug("using [{}] decoder", this.decoder.getClass().getSimpleName());
-            } else if ("safe".equalsIgnoreCase(decoderType)) {
+            } else if (DECODER_VALUE_SAFE.equalsIgnoreCase(decoderType)) {
                 this.decoder = ChunkDecoderFactory.safeInstance();
                 Loggers.getLogger(LZFCompressor.class).debug("using [{}] decoder", this.decoder.getClass().getSimpleName());
             } else {
@@ -105,19 +108,7 @@ public class LZFCompressor implements Compressor {
 
     @Override
     public boolean isCompressed(IndexInput in) throws IOException {
-        long currentPointer = in.getFilePointer();
-        // since we have some metdata before the first compressed header, we check on our specific header
-        if (in.length() - currentPointer < (LUCENE_HEADER.length)) {
-            return false;
-        }
-        for (int i = 0; i < LUCENE_HEADER.length; i++) {
-            if (in.readByte() != LUCENE_HEADER[i]) {
-                in.seek(currentPointer);
-                return false;
-            }
-        }
-        in.seek(currentPointer);
-        return true;
+        return checkHeader(in, LUCENE_HEADER);
     }
 
     @Override

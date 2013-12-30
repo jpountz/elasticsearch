@@ -21,11 +21,32 @@ package org.elasticsearch.common.util;
 
 import org.apache.lucene.store.ByteArrayDataInput;
 import org.apache.lucene.store.ByteArrayDataOutput;
+import org.apache.lucene.util._TestUtil;
 import org.elasticsearch.test.ElasticsearchTestCase;
 
 import java.io.IOException;
 
 public class ByteUtilsTests extends ElasticsearchTestCase {
+
+    public void testVIntLength() throws Exception {
+        for (int i = 0; i < 100; ++i) {
+            final int numBits = randomIntBetween(1, 32);
+            final int bits = numBits == 32 ? randomInt() : randomInt((1 << numBits) - 1);
+            final ByteArrayDataOutput out = new ByteArrayDataOutput(new byte[5]);
+            out.writeVInt(bits);
+            assertEquals(""+bits, out.getPosition(), ByteUtils.vIntBytes(bits));
+        }
+    }
+
+    public void testVLongLength() throws Exception {
+        for (int i = 0; i < 100; ++i) {
+            final int numBits = randomIntBetween(1, 64);
+            final long bits = numBits == 64 ? randomLong() : _TestUtil.nextLong(getRandom(), 0, (1L << numBits) - 1);
+            final ByteArrayDataOutput out = new ByteArrayDataOutput(new byte[10]);
+            ByteUtils.writeVLong(out, bits);
+            assertEquals(""+bits, out.getPosition(), ByteUtils.vLongBytes(bits));
+        }
+    }
 
     public void testZigZag(long l) {
         assertEquals(l, ByteUtils.zigZagDecode(ByteUtils.zigZagEncode(l)));
