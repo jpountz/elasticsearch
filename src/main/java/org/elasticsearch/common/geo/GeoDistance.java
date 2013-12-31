@@ -79,18 +79,12 @@ public enum GeoDistance {
     ARC() {
         @Override
         public double calculate(double sourceLatitude, double sourceLongitude, double targetLatitude, double targetLongitude, DistanceUnit unit) {
-            double longitudeDifference = targetLongitude - sourceLongitude;
-            double a = Math.toRadians(90D - sourceLatitude);
-            double c = Math.toRadians(90D - targetLatitude);
-            double factor = (Math.cos(a) * Math.cos(c)) + (Math.sin(a) * Math.sin(c) * Math.cos(Math.toRadians(longitudeDifference)));
-
-            if (factor < -1D) {
-                return unit.fromMeters(Math.PI * GeoUtils.EARTH_MEAN_RADIUS);
-            } else if (factor >= 1D) {
-                return 0;
-            } else {
-                return unit.fromMeters(Math.acos(factor) * GeoUtils.EARTH_MEAN_RADIUS);
-            }
+            double x1 = Math.toRadians(sourceLatitude);
+            double x2 = Math.toRadians(targetLatitude);
+            double h1 = (1 - Math.cos(x1 - x2)) / 2;
+            double h2 = (1 - Math.cos(Math.toRadians(sourceLongitude - targetLongitude))) / 2;
+            double h = h1 + Math.cos(x1) * Math.cos(x2) * h2;
+            return unit.fromMeters(GeoUtils.EARTH_MEAN_RADIUS * 2 * Math.asin(Math.min(1, Math.sqrt(h))));
         }
 
         @Override
