@@ -20,6 +20,7 @@
 package org.elasticsearch.search.aggregations.bucket.terms;
 
 import org.elasticsearch.common.text.Text;
+import org.elasticsearch.common.util.Comparators;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.support.ScriptValueType;
@@ -58,11 +59,14 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
         }
     }
 
-    static interface Bucket extends Comparable<Bucket>, org.elasticsearch.search.aggregations.bucket.Bucket {
+    static abstract class Bucket implements org.elasticsearch.search.aggregations.bucket.Bucket {
 
-        Text getKey();
+        public abstract Text getKey();
 
-        Number getKeyAsNumber();
+        public abstract Number getKeyAsNumber();
+
+        abstract int compareTerm(Terms.Bucket other);
+
     }
 
     Collection<Bucket> buckets();
@@ -81,14 +85,11 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
         public static final Order COUNT_DESC = new InternalOrder((byte) 1, "_count", false, new Comparator<Terms.Bucket>() {
             @Override
             public int compare(Terms.Bucket o1, Terms.Bucket o2) {
-                long i = o2.getDocCount() - o1.getDocCount();
-                if (i == 0) {
-                    i = o2.compareTo(o1);
-                    if (i == 0) {
-                        i = System.identityHashCode(o2) - System.identityHashCode(o1);
-                    }
+                int cmp = - Comparators.compare(o1.getDocCount(), o2.getDocCount());
+                if (cmp == 0) {
+                    cmp = o1.compareTerm(o2);
                 }
-                return i > 0 ? 1 : -1;
+                return cmp;
             }
         });
 
@@ -99,7 +100,11 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
 
             @Override
             public int compare(Terms.Bucket o1, Terms.Bucket o2) {
-                return -COUNT_DESC.comparator().compare(o1, o2);
+                int cmp = Comparators.compare(o1.getDocCount(), o2.getDocCount());
+                if (cmp == 0) {
+                    cmp = o1.compareTerm(o2);
+                }
+                return cmp;
             }
         });
 
@@ -110,7 +115,7 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
 
             @Override
             public int compare(Terms.Bucket o1, Terms.Bucket o2) {
-                return o2.compareTo(o1);
+                return - o1.compareTerm(o2);
             }
         });
 
@@ -121,7 +126,7 @@ public interface Terms extends Aggregation, Iterable<Terms.Bucket> {
 
             @Override
             public int compare(Terms.Bucket o1, Terms.Bucket o2) {
-                return -TERM_DESC.comparator().compare(o1, o2);
+                return o1.compareTerm(o2);
             }
         });
 

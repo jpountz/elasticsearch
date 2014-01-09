@@ -36,7 +36,7 @@ import java.util.*;
  */
 public abstract class InternalTerms extends InternalAggregation implements Terms, ToXContent, Streamable {
 
-    public static abstract class Bucket implements Terms.Bucket {
+    public static abstract class Bucket extends Terms.Bucket {
 
         protected long docCount;
         protected InternalAggregations aggregations;
@@ -55,20 +55,6 @@ public abstract class InternalTerms extends InternalAggregation implements Terms
         public Aggregations getAggregations() {
             return aggregations;
         }
-
-        @Override
-        public int compareTo(Terms.Bucket o) {
-            long i = compareTerm(o);
-            if (i == 0) {
-                i = docCount - o.getDocCount();
-                if (i == 0) {
-                    i = System.identityHashCode(this) - System.identityHashCode(o);
-                }
-            }
-            return i > 0 ? 1 : -1;
-        }
-
-        protected abstract int compareTerm(Terms.Bucket other);
 
         public Bucket reduce(List<? extends Bucket> buckets, CacheRecycler cacheRecycler) {
             if (buckets.size() == 1) {
