@@ -25,19 +25,20 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 
 
-
 public class RoundingTests extends ElasticsearchTestCase {
 
+    private static final double ACCEPTABLE_ERROR = 0.001;
+
     public void testInterval() {
-        final long interval = randomIntBetween(1, 100);
+        final double interval = randomDouble() * 100;
         Rounding.Interval rounding = new Rounding.Interval(interval);
-        for (int i = 0; i < 1000; ++i) {
-            long l = Math.max(randomLong(), Long.MIN_VALUE + interval);
-            final long r = rounding.round(l);
-            String message = "round(" + l + ", interval=" + interval + ") = " + r;
-            assertEquals(message, 0, r % interval);
-            assertThat(message, r, lessThanOrEqualTo(l));
-            assertThat(message, r + interval, greaterThan(l));
+        for (int i = 0; i < 10000000; ++i) {
+            double d = (randomDouble() * 2 - 1) * Math.pow(2, 43);
+            double r = rounding.round(d);
+            String message = "round(" + d + ", interval=" + interval + ") = " + r;
+            assertEquals(message, 0, r - Math.round(r / interval) * interval, ACCEPTABLE_ERROR);
+            assertThat(message, r, lessThanOrEqualTo(d + ACCEPTABLE_ERROR));
+            assertThat(message, r + interval, greaterThan(d - ACCEPTABLE_ERROR));
         }
     }
 

@@ -30,7 +30,7 @@ import java.io.IOException;
  */
 public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBuilder> {
 
-    private Long interval;
+    private Double interval;
     private HistogramBase.Order order;
     private Long minDocCount;
 
@@ -38,7 +38,7 @@ public class HistogramBuilder extends ValuesSourceAggregationBuilder<HistogramBu
         super(name, InternalHistogram.TYPE.name());
     }
 
-    public HistogramBuilder interval(long interval) {
+    public HistogramBuilder interval(double interval) {
         this.interval = interval;
         return this;
     }

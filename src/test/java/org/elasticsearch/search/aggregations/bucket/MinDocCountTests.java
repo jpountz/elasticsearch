@@ -139,7 +139,7 @@ public class MinDocCountTests extends ElasticsearchIntegrationTest {
         for (Histogram.Bucket b1 : histo1) {
             if (b1.getDocCount() >= minDocCount) {
                 final Histogram.Bucket b2 = it2.next();
-                assertEquals(b1.getKey(), b2.getKey());
+                assertEquals(b1.getKey(), b2.getKey(), 0.0001);
                 assertEquals(b1.getDocCount(), b2.getDocCount());
             }
         }
@@ -150,7 +150,7 @@ public class MinDocCountTests extends ElasticsearchIntegrationTest {
         for (DateHistogram.Bucket b1 : histo1) {
             if (b1.getDocCount() >= minDocCount) {
                 final DateHistogram.Bucket b2 = it2.next();
-                assertEquals(b1.getKey(), b2.getKey());
+                assertEquals(b1.getKey(), b2.getKey(), 0.0001);
                 assertEquals(b1.getDocCount(), b2.getDocCount());
             }
         }

@@ -49,7 +49,7 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
 
     static class Bucket extends AbstractHistogramBase.Bucket implements Histogram.Bucket {
 
-        Bucket(long key, long docCount, InternalAggregations aggregations) {
+        Bucket(double key, long docCount, InternalAggregations aggregations) {
             super(key, docCount, aggregations);
         }
 
@@ -69,7 +69,7 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
             return new InternalHistogram(name, buckets, order, minDocCount, emptyBucketInfo, formatter, keyed);
         }
 
-        public Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
+        public Bucket createBucket(double key, long docCount, InternalAggregations aggregations) {
             return new Bucket(key, docCount, aggregations);
         }
 
@@ -86,7 +86,7 @@ public class InternalHistogram extends AbstractHistogramBase<Histogram.Bucket> i
         return TYPE;
     }
 
-    protected Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
+    protected Bucket createBucket(double key, long docCount, InternalAggregations aggregations) {
         return new Bucket(key, docCount, aggregations);
     }
 }

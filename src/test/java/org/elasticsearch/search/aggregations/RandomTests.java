@@ -227,11 +227,11 @@ public class RandomTests extends ElasticsearchIntegrationTest {
 
         final int numDocs = atLeast(1000);
         final int maxNumTerms = randomIntBetween(10, 2000);
-        final int interval = randomIntBetween(1, 100);
+        final double interval = randomDouble() * 100;
 
-        final Integer[] values = new Integer[maxNumTerms];
+        final Double[] values = new Double[maxNumTerms];
         for (int i = 0; i < values.length; ++i) {
-            values[i] = randomInt(maxNumTerms * 3) - maxNumTerms;
+            values[i] = (randomDouble() - 0.3) * 10000;
         }
 
         for (int i = 0; i < numDocs; ++i) {
@@ -261,7 +261,7 @@ public class RandomTests extends ElasticsearchIntegrationTest {
         assertThat(histo, notNullValue());
         assertThat(terms.buckets().size(), equalTo(histo.buckets().size()));
         for (Terms.Bucket bucket : terms) {
-            final long key = bucket.getKeyAsNumber().longValue() * interval;
+            final double key = bucket.getKeyAsNumber().doubleValue() * interval;
             final Histogram.Bucket histoBucket = histo.getByKey(key);
             assertEquals(bucket.getDocCount(), histoBucket.getDocCount());
         }

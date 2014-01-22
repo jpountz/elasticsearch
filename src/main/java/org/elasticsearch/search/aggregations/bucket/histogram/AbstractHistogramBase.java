@@ -18,7 +18,7 @@
  */
 package org.elasticsearch.search.aggregations.bucket.histogram;
 
-import com.carrotsearch.hppc.LongObjectOpenHashMap;
+import com.carrotsearch.hppc.DoubleObjectOpenHashMap;
 import com.google.common.collect.Lists;
 import org.apache.lucene.util.CollectionUtil;
 import org.elasticsearch.cache.recycler.CacheRecycler;
@@ -48,20 +48,20 @@ import java.util.ListIterator;
  */
 abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends InternalAggregation implements HistogramBase<B>, ToXContent, Streamable {
 
-    public static class Bucket implements HistogramBase.Bucket {
+    public static abstract class Bucket implements HistogramBase.Bucket {
 
-        private long key;
+        private double key;
         private long docCount;
         private InternalAggregations aggregations;
 
-        public Bucket(long key, long docCount, InternalAggregations aggregations) {
+        public Bucket(double key, long docCount, InternalAggregations aggregations) {
             this.key = key;
             this.docCount = docCount;
             this.aggregations = aggregations;
         }
 
         @Override
-        public long getKey() {
+        public double getKey() {
             return key;
         }
 
@@ -119,12 +119,12 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
 
         AbstractHistogramBase create(String name, List<B> buckets, InternalOrder order, long minDocCount, EmptyBucketInfo emptyBucketInfo, ValueFormatter formatter, boolean keyed);
 
-        Bucket createBucket(long key, long docCount, InternalAggregations aggregations);
+        Bucket createBucket(double key, long docCount, InternalAggregations aggregations);
 
     }
 
     private List<B> buckets;
-    private LongObjectOpenHashMap<HistogramBase.Bucket> bucketsMap;
+    private DoubleObjectOpenHashMap<HistogramBase.Bucket> bucketsMap;
     private InternalOrder order;
     private ValueFormatter formatter;
     private boolean keyed;
@@ -155,9 +155,9 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
     }
 
     @Override
-    public B getByKey(long key) {
+    public B getByKey(double key) {
         if (bucketsMap == null) {
-            bucketsMap = new LongObjectOpenHashMap<HistogramBase.Bucket>(buckets.size());
+            bucketsMap = new DoubleObjectOpenHashMap<HistogramBase.Bucket>(buckets.size());
             for (HistogramBase.Bucket bucket : buckets) {
                 bucketsMap.put(bucket.getKey(), bucket);
             }
@@ -188,8 +188,8 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
                     // so we'll be able to insert elements at the right position
                     HistogramBase.Bucket nextBucket = list.get(iter.nextIndex());
                     if (prevBucket != null) {
-                        long key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
-                        while (key != nextBucket.getKey()) {
+                        double key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
+                        while (key < nextBucket.getKey()) {
                             iter.add(createBucket(key, 0, emptyBucketInfo.subAggregations));
                             key = emptyBucketInfo.rounding.nextRoundingValue(key);
                         }
@@ -214,7 +214,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
 
         AbstractHistogramBase reduced = (AbstractHistogramBase) aggregations.get(0);
 
-        Recycler.V<LongObjectOpenHashMap<List<Bucket>>> bucketsByKey = reduceContext.cacheRecycler().longObjectMap(-1);
+        Recycler.V<DoubleObjectOpenHashMap<List<Bucket>>> bucketsByKey = reduceContext.cacheRecycler().doubleObjectMap(-1);
         for (InternalAggregation aggregation : aggregations) {
             AbstractHistogramBase<B> histogram = (AbstractHistogramBase) aggregation;
             for (B bucket : histogram.buckets) {
@@ -251,8 +251,8 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
             while (iter.hasNext()) {
                 HistogramBase.Bucket nextBucket = list.get(iter.nextIndex());
                 if (prevBucket != null) {
-                    long key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
-                    while (key != nextBucket.getKey()) {
+                    double key = emptyBucketInfo.rounding.nextRoundingValue(prevBucket.getKey());
+                    while (key < nextBucket.getKey()) {
                         iter.add(createBucket(key, 0, emptyBucketInfo.subAggregations));
                         key = emptyBucketInfo.rounding.nextRoundingValue(key);
                     }
@@ -273,9 +273,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         return reduced;
     }
 
-    protected B createBucket(long key, long docCount, InternalAggregations aggregations) {
-        return (B) new Bucket(key, docCount, aggregations);
-    }
+    protected abstract B createBucket(double key, long docCount, InternalAggregations aggregations);
 
     @Override
     public void readFrom(StreamInput in) throws IOException {
@@ -290,7 +288,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         int size = in.readVInt();
         List<B> buckets = new ArrayList<B>(size);
         for (int i = 0; i < size; i++) {
-            buckets.add(createBucket(in.readLong(), in.readVLong(), InternalAggregations.readAggregations(in)));
+            buckets.add(createBucket(in.readDouble(), in.readVLong(), InternalAggregations.readAggregations(in)));
         }
         this.buckets = buckets;
         this.bucketsMap = null;
@@ -308,7 +306,7 @@ abstract class AbstractHistogramBase<B extends HistogramBase.Bucket> extends Int
         out.writeBoolean(keyed);
         out.writeVInt(buckets.size());
         for (HistogramBase.Bucket bucket : buckets) {
-            out.writeLong(((Bucket) bucket).key);
+            out.writeDouble(((Bucket) bucket).key);
             out.writeVLong(((Bucket) bucket).docCount);
             ((Bucket) bucket).aggregations.writeTo(out);
         }

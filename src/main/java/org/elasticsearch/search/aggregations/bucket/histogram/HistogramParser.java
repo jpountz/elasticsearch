@@ -56,7 +56,7 @@ public class HistogramParser implements Aggregator.Parser {
         boolean keyed = false;
         long minDocCount = 1;
         InternalOrder order = (InternalOrder) InternalOrder.KEY_ASC;
-        long interval = -1;
+        double interval = -1;
         boolean assumeSorted = false;
         String format = null;
 
@@ -79,7 +79,7 @@ public class HistogramParser implements Aggregator.Parser {
                 }
             } else if (token == XContentParser.Token.VALUE_NUMBER) {
                 if ("interval".equals(currentFieldName)) {
-                    interval = parser.longValue();
+                    interval = parser.doubleValue();
                 } else if ("min_doc_count".equals(currentFieldName) || "minDocCount".equals(currentFieldName)) {
                     minDocCount = parser.longValue();
                 } else {

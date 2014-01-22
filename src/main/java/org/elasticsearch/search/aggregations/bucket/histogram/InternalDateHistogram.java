@@ -51,7 +51,7 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
 
     static class Bucket extends AbstractHistogramBase.Bucket implements DateHistogram.Bucket {
 
-        Bucket(long key, long docCount, InternalAggregations aggregations) {
+        Bucket(double key, long docCount, InternalAggregations aggregations) {
             super(key, docCount, aggregations);
         }
 
@@ -81,7 +81,7 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
         }
 
         @Override
-        public AbstractHistogramBase.Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
+        public AbstractHistogramBase.Bucket createBucket(double key, long docCount, InternalAggregations aggregations) {
             return new Bucket(key, docCount, aggregations);
         }
     }
@@ -98,7 +98,7 @@ public class InternalDateHistogram extends AbstractHistogramBase<DateHistogram.B
     }
 
     @Override
-    protected DateHistogram.Bucket createBucket(long key, long docCount, InternalAggregations aggregations) {
+    protected DateHistogram.Bucket createBucket(double key, long docCount, InternalAggregations aggregations) {
         return new Bucket(key, docCount, aggregations);
     }
 }

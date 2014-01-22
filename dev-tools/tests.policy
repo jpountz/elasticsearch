@@ -50,4 +50,7 @@ grant {
   permission java.security.SecurityPermission "getProperty.networkaddress.cache.ttl";
   permission java.security.SecurityPermission "getProperty.networkaddress.cache.negative.ttl";
 
+  // Needed to register a Joda InstantConverter for doubles
+  permission org.joda.time.JodaTimePermission "ConverterManager.alterInstantConverters";
+
 };

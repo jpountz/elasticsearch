@@ -99,7 +99,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -137,7 +137,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 0;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i++;
         }
     }
@@ -161,7 +161,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 2;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i--;
         }
     }
@@ -185,7 +185,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 0;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i++;
         }
     }
@@ -209,7 +209,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 2;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i--;
         }
     }
@@ -229,7 +229,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -272,7 +272,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -320,7 +320,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 0;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i++;
         }
     }
@@ -345,7 +345,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 2;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i--;
         }
     }
@@ -370,7 +370,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 0;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i++;
         }
     }
@@ -395,7 +395,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         int i = 2;
         for (DateHistogram.Bucket bucket : histo.buckets()) {
-            assertThat(bucket.getKey(), equalTo(new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
+            assertThat(bucket.getKey(), equalTo((double) new DateTime(2012, i+1, 1, 0, 0, DateTimeZone.UTC).getMillis()));
             i--;
         }
     }
@@ -418,7 +418,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
 
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -460,7 +460,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(4));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -547,7 +547,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(4));
 
-        long key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -601,7 +601,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(4));
 
-        long key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 2, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -660,7 +660,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -696,7 +696,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -738,7 +738,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(4));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -789,7 +789,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(4));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));
@@ -855,7 +855,7 @@ public class DateHistogramTests extends ElasticsearchIntegrationTest {
         assertThat(histo.getName(), equalTo("histo"));
         assertThat(histo.buckets().size(), equalTo(3));
 
-        long key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
+        double key = new DateTime(2012, 1, 1, 0, 0, DateTimeZone.UTC).getMillis();
         DateHistogram.Bucket bucket = histo.getByKey(key);
         assertThat(bucket, notNullValue());
         assertThat(bucket.getKey(), equalTo(key));

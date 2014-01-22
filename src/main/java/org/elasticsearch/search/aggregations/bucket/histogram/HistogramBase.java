@@ -38,7 +38,7 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
         /**
          * @return The key associated with the bucket (all documents that fall in this bucket were rounded to this key)
          */
-        long getKey();
+        double getKey();
 
     }
 
@@ -50,7 +50,7 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
      * @param key The key of the bucket.
      * @return The bucket that is associated with the given key.
      */
-    B getByKey(long key);
+    B getByKey(double key);
 
 
     /**
@@ -61,14 +61,14 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
         public static final Order KEY_ASC = new InternalOrder((byte) 1, "_key", true, new Comparator<HistogramBase.Bucket>() {
             @Override
             public int compare(HistogramBase.Bucket b1, HistogramBase.Bucket b2) {
-                return Longs.compare(b1.getKey(), b2.getKey());
+                return Double.compare(b1.getKey(), b2.getKey());
             }
         });
 
         public static final Order KEY_DESC = new InternalOrder((byte) 2, "_key", false, new Comparator<HistogramBase.Bucket>() {
             @Override
             public int compare(HistogramBase.Bucket b1, HistogramBase.Bucket b2) {
-                return - Longs.compare(b1.getKey(), b2.getKey());
+                return - Double.compare(b1.getKey(), b2.getKey());
             }
         });
 
@@ -77,7 +77,7 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
             public int compare(HistogramBase.Bucket b1, HistogramBase.Bucket b2) {
                 int cmp = Longs.compare(b1.getDocCount(), b2.getDocCount());
                 if (cmp == 0) {
-                    cmp = Longs.compare(b1.getKey(), b2.getKey());
+                    cmp = Double.compare(b1.getKey(), b2.getKey());
                 }
                 return cmp;
             }
@@ -89,7 +89,7 @@ interface HistogramBase<B extends HistogramBase.Bucket> extends Aggregation, Ite
             public int compare(HistogramBase.Bucket b1, HistogramBase.Bucket b2) {
                 int cmp = - Longs.compare(b1.getDocCount(), b2.getDocCount());
                 if (cmp == 0) {
-                    cmp = Longs.compare(b1.getKey(), b2.getKey());
+                    cmp = Double.compare(b1.getKey(), b2.getKey());
                 }
                 return cmp;
             }

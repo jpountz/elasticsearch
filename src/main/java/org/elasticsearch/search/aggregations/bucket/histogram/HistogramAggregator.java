@@ -23,7 +23,7 @@ import org.apache.lucene.util.CollectionUtil;
 import org.elasticsearch.common.inject.internal.Nullable;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.rounding.Rounding;
-import org.elasticsearch.index.fielddata.LongValues;
+import org.elasticsearch.index.fielddata.DoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -50,7 +50,7 @@ public class HistogramAggregator extends BucketsAggregator {
     private final AbstractHistogramBase.Factory histogramFactory;
 
     private final LongHash bucketOrds;
-    private LongValues values;
+    private DoubleValues values;
 
     public HistogramAggregator(String name,
                                AggregatorFactories factories,
@@ -82,7 +82,7 @@ public class HistogramAggregator extends BucketsAggregator {
 
     @Override
     public void setNextReader(AtomicReaderContext reader) {
-        values = valuesSource.longValues();
+        values = valuesSource.doubleValues();
     }
 
     @Override
@@ -90,15 +90,15 @@ public class HistogramAggregator extends BucketsAggregator {
         assert owningBucketOrdinal == 0;
         final int valuesCount = values.setDocument(doc);
 
-        long previousKey = Long.MIN_VALUE;
+        double previousKey = Double.NEGATIVE_INFINITY;
         for (int i = 0; i < valuesCount; ++i) {
-            long value = values.nextValue();
-            long key = rounding.roundKey(value);
+            double value = values.nextValue();
+            double key = rounding.roundKey(value);
             assert key >= previousKey;
             if (key == previousKey) {
                 continue;
             }
-            long bucketOrd = bucketOrds.add(key);
+            long bucketOrd = bucketOrds.add(Double.doubleToLongBits(key));
             if (bucketOrd < 0) { // already seen
                 bucketOrd = -1 - bucketOrd;
             }
@@ -116,7 +116,7 @@ public class HistogramAggregator extends BucketsAggregator {
             if (ord < 0) {
                 continue; // slot is not allocated
             }
-            buckets.add(histogramFactory.createBucket(rounding.valueForKey(bucketOrds.key(i)), bucketDocCount(ord), bucketAggregations(ord)));
+            buckets.add(histogramFactory.createBucket(rounding.valueForKey(Double.longBitsToDouble(bucketOrds.key(i))), bucketDocCount(ord), bucketAggregations(ord)));
         }
 
 

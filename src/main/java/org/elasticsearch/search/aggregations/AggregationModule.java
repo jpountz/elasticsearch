@@ -21,6 +21,7 @@ package org.elasticsearch.search.aggregations;
 import com.google.common.collect.Lists;
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.common.inject.multibindings.Multibinder;
+import org.elasticsearch.common.joda.DoubleConverter;
 import org.elasticsearch.search.aggregations.bucket.filter.FilterParser;
 import org.elasticsearch.search.aggregations.bucket.geogrid.GeoHashGridParser;
 import org.elasticsearch.search.aggregations.bucket.global.GlobalParser;
@@ -91,6 +92,7 @@ public class AggregationModule extends AbstractModule {
         bind(AggregatorParsers.class).asEagerSingleton();
         bind(AggregationParseElement.class).asEagerSingleton();
         bind(AggregationPhase.class).asEagerSingleton();
+        DoubleConverter.register();
     }
 
 }
