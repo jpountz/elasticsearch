@@ -41,6 +41,7 @@ import org.elasticsearch.search.aggregations.metrics.percentiles.InternalPercent
 import org.elasticsearch.search.aggregations.metrics.stats.InternalStats;
 import org.elasticsearch.search.aggregations.metrics.stats.extended.InternalExtendedStats;
 import org.elasticsearch.search.aggregations.metrics.sum.InternalSum;
+import org.elasticsearch.search.aggregations.metrics.termcount.InternalTermCount;
 import org.elasticsearch.search.aggregations.metrics.valuecount.InternalValueCount;
 
 /**
@@ -60,6 +61,7 @@ public class TransportAggregationModule extends AbstractModule {
         InternalExtendedStats.registerStreams();
         InternalValueCount.registerStreams();
         InternalPercentiles.registerStreams();
+        InternalTermCount.registerStreams();
 
         // buckets
         InternalGlobal.registerStreams();

@@ -37,6 +37,7 @@ import org.elasticsearch.search.aggregations.metrics.percentiles.PercentilesBuil
 import org.elasticsearch.search.aggregations.metrics.stats.StatsBuilder;
 import org.elasticsearch.search.aggregations.metrics.stats.extended.ExtendedStatsBuilder;
 import org.elasticsearch.search.aggregations.metrics.sum.SumBuilder;
+import org.elasticsearch.search.aggregations.metrics.termcount.TermCountBuilder;
 import org.elasticsearch.search.aggregations.metrics.valuecount.ValueCountBuilder;
 
 /**
@@ -125,5 +126,9 @@ public class AggregationBuilders {
 
     public static PercentilesBuilder percentiles(String name) {
         return new PercentilesBuilder(name);
+    }
+
+    public static TermCountBuilder termCount(String name) {
+        return new TermCountBuilder(name);
     }
 }

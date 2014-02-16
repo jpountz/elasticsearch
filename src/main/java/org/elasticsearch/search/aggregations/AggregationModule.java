@@ -40,6 +40,7 @@ import org.elasticsearch.search.aggregations.metrics.percentiles.PercentilesPars
 import org.elasticsearch.search.aggregations.metrics.stats.StatsParser;
 import org.elasticsearch.search.aggregations.metrics.stats.extended.ExtendedStatsParser;
 import org.elasticsearch.search.aggregations.metrics.sum.SumParser;
+import org.elasticsearch.search.aggregations.metrics.termcount.TermCountParser;
 import org.elasticsearch.search.aggregations.metrics.valuecount.ValueCountParser;
 
 import java.util.List;
@@ -60,6 +61,7 @@ public class AggregationModule extends AbstractModule {
         parsers.add(ExtendedStatsParser.class);
         parsers.add(ValueCountParser.class);
         parsers.add(PercentilesParser.class);
+        parsers.add(TermCountParser.class);
 
         parsers.add(GlobalParser.class);
         parsers.add(MissingParser.class);
