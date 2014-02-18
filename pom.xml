@@ -22,7 +22,6 @@
         <developerConnection>scm:git:git@github.com:elasticsearch/elasticsearch.git</developerConnection>
         <url>http://github.com/elasticsearch/elasticsearch</url>
     </scm>
-
     <parent>
         <groupId>org.sonatype.oss</groupId>
         <artifactId>oss-parent</artifactId>
@@ -30,7 +29,7 @@
     </parent>
 
     <properties>
-        <lucene.version>4.6.1</lucene.version>
+        <lucene.version>4.7.0</lucene.version>
         <tests.jvms>1</tests.jvms>
         <tests.shuffle>true</tests.shuffle>
         <tests.output>onerror</tests.output>
@@ -56,12 +55,6 @@
             <artifactId>lucene-test-framework</artifactId>
             <version>${lucene.version}</version>
             <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-expressions</artifactId>
-            <version>${lucene.version}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>org.apache.httpcomponents</groupId>
