@@ -63,7 +63,7 @@ public class TermsAggregationSearchBenchmark {
 
     static long COUNT = SizeValue.parseSizeValue("10m").singles();
     static int BATCH = 1000;
-    static int QUERY_WARMUP = 10;
+    static int QUERY_WARMUP = 5;
     static int QUERY_COUNT = 100;
     static int NUMBER_OF_TERMS = (int) SizeValue.parseSizeValue("200").singles();
     static int NUMBER_OF_MULTI_VALUE_TERMS = 10;
@@ -239,12 +239,12 @@ public class TermsAggregationSearchBenchmark {
 
 
         List<StatsResult> stats = Lists.newArrayList();
-        stats.add(terms("terms_facet_s", Method.FACET, "s_value", null));
+        /*stats.add(terms("terms_facet_s", Method.FACET, "s_value", null));
         stats.add(terms("terms_facet_s_dv", Method.FACET, "s_value_dv", null));
         stats.add(terms("terms_facet_map_s", Method.FACET, "s_value", "map"));
-        stats.add(terms("terms_facet_map_s_dv", Method.FACET, "s_value_dv", "map"));
+        stats.add(terms("terms_facet_map_s_dv", Method.FACET, "s_value_dv", "map"));*/
         stats.add(terms("terms_agg_s", Method.AGGREGATION, "s_value", null));
-        stats.add(terms("terms_agg_s_global_ords_hash", Method.AGGREGATION, "s_value", "global_ordinals_hash"));
+        /*stats.add(terms("terms_agg_s_global_ords_hash", Method.AGGREGATION, "s_value", "global_ordinals_hash"));
         stats.add(terms("terms_agg_s_global_ords_direct", Method.AGGREGATION, "s_value", "global_ordinals_direct"));
         stats.add(terms("terms_agg_s_dv", Method.AGGREGATION, "s_value_dv", null));
         stats.add(terms("terms_agg_s_dv_global_ords_hash", Method.AGGREGATION, "s_value_dv", "global_ordinals_hash"));
@@ -296,7 +296,7 @@ public class TermsAggregationSearchBenchmark {
         stats.add(termsStats("terms_stats_facet_sm_l", Method.FACET, "sm_value", "l_value", null));
         stats.add(termsStats("terms_stats_facet_sm_l_dv", Method.FACET, "sm_value_dv", "l_value_dv", null));
         stats.add(termsStats("terms_stats_agg_sm_l", Method.AGGREGATION, "sm_value", "l_value", null));
-        stats.add(termsStats("terms_stats_agg_sm_l_dv", Method.AGGREGATION, "sm_value_dv", "l_value_dv", null));
+        stats.add(termsStats("terms_stats_agg_sm_l_dv", Method.AGGREGATION, "sm_value_dv", "l_value_dv", null));*/
         
         System.out.println("------------------ SUMMARY ----------------------------------------------");
         System.out.format(Locale.ENGLISH, "%35s%10s%10s%15s\n", "name", "took", "millis", "fieldata size");

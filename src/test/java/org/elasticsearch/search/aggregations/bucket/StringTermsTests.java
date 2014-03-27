@@ -59,7 +59,7 @@ public class StringTermsTests extends ElasticsearchIntegrationTest {
     private static final String SINGLE_VALUED_FIELD_NAME = "s_value";
     private static final String MULTI_VALUED_FIELD_NAME = "s_values";
 
-    public static String randomExecutionHint() {
+    public static String randomExecutionHint() {if (true) return TermsAggregatorFactory.ExecutionMode.ORDINALS.toString();
         return randomBoolean() ? null : randomFrom(TermsAggregatorFactory.ExecutionMode.values()).toString();
     }
 

@@ -76,7 +76,7 @@ public abstract class InternalAggregation implements Aggregation, ToXContent, St
         }
     }
 
-    protected static class ReduceContext {
+    public static class ReduceContext {
 
         private final List<InternalAggregation> aggregations;
         private final BigArrays bigArrays;
