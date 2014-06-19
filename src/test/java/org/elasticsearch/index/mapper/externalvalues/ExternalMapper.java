@@ -148,27 +148,22 @@ public class ExternalMapper implements Mapper {
         context.path().add(name);
 
         byte[] bytes = "Hello world".getBytes(Charset.defaultCharset());
-        context.externalValue(bytes);
-        binMapper.parse(context);
+        binMapper.parse(context.externalValue(bytes));
 
-        context.externalValue(true);
-        boolMapper.parse(context);
+        boolMapper.parse(context.externalValue(true));
 
         // Let's add a Dummy Point
         Double lat = 42.0;
         Double lng = 51.0;
         GeoPoint point = new GeoPoint(lat, lng);
-        context.externalValue(point);
-        pointMapper.parse(context);
+        pointMapper.parse(context.externalValue(point));
 
         // Let's add a Dummy Shape
         Point shape = ShapeBuilder.newPoint(-100, 45).build();
-        context.externalValue(shape);
-        shapeMapper.parse(context);
+        shapeMapper.parse(context.externalValue(shape));
 
         // Let's add a Dummy String
-        context.externalValue("dummy");
-        stringMapper.parse(context);
+        stringMapper.parse(context.externalValue("dummy"));
     }
 
     @Override

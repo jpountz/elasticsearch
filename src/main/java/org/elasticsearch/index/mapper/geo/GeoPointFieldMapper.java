@@ -540,9 +540,8 @@ public class GeoPointFieldMapper extends AbstractFieldMapper<GeoPoint> implement
         int min = enableGeohashPrefix ? 1 : geohash.length();
 
         for (int i = len; i >= min; i--) {
-            context.externalValue(geohash.substring(0, i));
             // side effect of this call is adding the field
-            geohashMapper.parse(context);
+            geohashMapper.parse(context.externalValue(geohash.substring(0, i)));
         }
     }
 
@@ -581,10 +580,8 @@ public class GeoPointFieldMapper extends AbstractFieldMapper<GeoPoint> implement
             parseGeohashField(context, geohash);
         }
         if (enableLatLon) {
-            context.externalValue(point.lat());
-            latMapper.parse(context);
-            context.externalValue(point.lon());
-            lonMapper.parse(context);
+            latMapper.parse(context.externalValue(point.lat()));
+            lonMapper.parse(context.externalValue(point.lon()));
         }
         if (hasDocValues()) {
             CustomGeoPointDocValuesField field = (CustomGeoPointDocValuesField) context.doc().getByKey(names().indexName());
