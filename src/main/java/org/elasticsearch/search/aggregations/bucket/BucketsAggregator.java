@@ -18,7 +18,12 @@
  */
 package org.elasticsearch.search.aggregations.bucket;
 
+import org.apache.lucene.util.RamUsageEstimator;
+import org.apache.lucene.util.packed.PackedInts;
+import org.apache.lucene.util.packed.PagedGrowableWriter;
+import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.lease.Releasable;
+import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.IntArray;
 import org.elasticsearch.search.aggregations.*;
 import org.elasticsearch.search.aggregations.support.AggregationContext;
@@ -37,7 +42,9 @@ public abstract class BucketsAggregator extends Aggregator {
     public BucketsAggregator(String name, BucketAggregationMode bucketAggregationMode, AggregatorFactories factories,
                              long estimatedBucketsCount, AggregationContext context, Aggregator parent) {
         super(name, bucketAggregationMode, factories, estimatedBucketsCount, context, parent);
-        docCounts = bigArrays.newIntArray(estimatedBucketsCount, true);
+        // TODO how do we expose the packing of doc counts?
+        //docCounts = bigArrays.newIntArray(estimatedBucketsCount, true);
+        docCounts = new GrowableIntArray(estimatedBucketsCount);
     }
 
     /**
@@ -47,11 +54,22 @@ public abstract class BucketsAggregator extends Aggregator {
         return docCounts.size();
     }
 
+    private void grow(long minSize) {
+        if (docCounts.size() < minSize) {
+            if (docCounts instanceof GrowableIntArray) {
+                // BigArrays cannot deal with it
+                ((GrowableIntArray) docCounts).resize(BigArrays.overSize(minSize));
+            } else {
+                docCounts = bigArrays.grow(docCounts, minSize);
+            }
+        }
+    }
+
     /**
      * Utility method to collect the given doc in the given bucket (identified by the bucket ordinal)
      */
     protected final void collectBucket(int doc, long bucketOrd) throws IOException {
-        docCounts = bigArrays.grow(docCounts, bucketOrd + 1);
+        grow(bucketOrd + 1);
         collectExistingBucket(doc, bucketOrd);
     }
 
@@ -78,7 +96,7 @@ public abstract class BucketsAggregator extends Aggregator {
      * Utility method to increment the doc counts of the given bucket (identified by the bucket ordinal)
      */
     protected final void incrementBucketDocCount(int inc, long bucketOrd) throws IOException {
-        docCounts = bigArrays.grow(docCounts, bucketOrd + 1);
+        grow(bucketOrd + 1);
         docCounts.increment(bucketOrd, inc);
     }
 
@@ -152,6 +170,63 @@ public abstract class BucketsAggregator extends Aggregator {
         try (Releasable releasable = docCounts) {
             super.close();
         }
+    }
+
+    /**
+     * {@link IntArray} impl that dynamically computes the number of bits required.
+     */
+    private static class GrowableIntArray implements IntArray {
+
+        private static final long BASE_RAM_BYTES_USED = RamUsageEstimator.shallowSizeOfInstance(GrowableIntArray.class);
+        private PagedGrowableWriter values;
+
+        GrowableIntArray(long valueCount) {
+            this.values = new PagedGrowableWriter(valueCount, 1024, 1, PackedInts.DEFAULT);
+        }
+
+        public void resize(long newSize) {
+            values = values.resize(newSize);
+        }
+
+        @Override
+        public long size() {
+            return values.size();
+        }
+
+        @Override
+        public void close() throws ElasticsearchException {
+            // no-op, this class doesn't recycle
+        }
+
+        @Override
+        public long ramBytesUsed() {
+            return BASE_RAM_BYTES_USED + values.ramBytesUsed();
+        }
+
+        @Override
+        public int get(long index) {
+            return (int) values.get(index);
+        }
+
+        @Override
+        public int set(long index, int value) {
+            final int previous = get(index);
+            values.set(index, value);
+            return previous;
+        }
+
+        @Override
+        public int increment(long index, int inc) {
+            final int previous = (int) values.get(index);
+            values.set(index, previous + inc);
+            return previous;
+        }
+
+        @Override
+        public void fill(long fromIndex, long toIndex, int value) {
+            throw new UnsupportedOperationException();
+        }
+
     }
 
 }
