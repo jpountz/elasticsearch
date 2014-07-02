@@ -18,9 +18,7 @@
  */
 package org.elasticsearch.index.fielddata.plain;
 
-import org.apache.lucene.index.AtomicReader;
-import org.apache.lucene.index.AtomicReaderContext;
-import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.*;
 import org.apache.lucene.util.*;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.settings.Settings;
@@ -40,7 +38,7 @@ import org.elasticsearch.search.MultiValueMode;
 
 /**
  */
-public class FloatArrayIndexFieldData extends AbstractIndexFieldData<FloatArrayAtomicFieldData> implements IndexNumericFieldData<FloatArrayAtomicFieldData> {
+public class FloatArrayIndexFieldData extends AbstractIndexFieldData<AtomicNumericFieldData> implements IndexNumericFieldData {
 
     private final CircuitBreakerService breakerService;
 
@@ -65,21 +63,14 @@ public class FloatArrayIndexFieldData extends AbstractIndexFieldData<FloatArrayA
     }
 
     @Override
-    public boolean valuesOrdered() {
-        // because we might have single values? we can dynamically update a flag to reflect that
-        // based on the atomic field data loaded
-        return false;
-    }
-
-    @Override
-    public FloatArrayAtomicFieldData loadDirect(AtomicReaderContext context) throws Exception {
+    public AtomicNumericFieldData loadDirect(AtomicReaderContext context) throws Exception {
         AtomicReader reader = context.reader();
         Terms terms = reader.terms(getFieldNames().indexName());
-        FloatArrayAtomicFieldData data = null;
+        AtomicNumericFieldData data = null;
         // TODO: Use an actual estimator to estimate before loading.
         NonEstimatingEstimator estimator = new NonEstimatingEstimator(breakerService.getBreaker());
         if (terms == null) {
-            data = FloatArrayAtomicFieldData.empty();
+            data = AbstractAtomicDoubleFieldData.empty();
             estimator.afterLoad(null, data.ramBytesUsed());
             return data;
         }
@@ -98,9 +89,9 @@ public class FloatArrayIndexFieldData extends AbstractIndexFieldData<FloatArrayA
             }
             values = BigArrays.NON_RECYCLING_INSTANCE.resize(values, numTerms);
             Ordinals build = builder.build(fieldDataType.getSettings());
-            BytesValues.WithOrdinals ordinals = build.ordinals();
-            if (ordinals.isMultiValued() || CommonSettings.getMemoryStorageHint(fieldDataType) == CommonSettings.MemoryStorageFormat.ORDINALS) {
-                data = new FloatArrayAtomicFieldData.WithOrdinals(values, build);
+            RandomAccessOrds ordinals = build.ordinals();
+            if (FieldData.isMultiValued(ordinals) || CommonSettings.getMemoryStorageHint(fieldDataType) == CommonSettings.MemoryStorageFormat.ORDINALS) {
+                data = new FloatArrayAtomicFieldData.WithOrdinals(values, build, reader.maxDoc());
             } else {
                 final FixedBitSet set = builder.buildDocsWithValuesSet();
 
@@ -109,7 +100,7 @@ public class FloatArrayIndexFieldData extends AbstractIndexFieldData<FloatArrayA
                 long uniqueValuesArraySize = values.ramBytesUsed();
                 long ordinalsSize = build.ramBytesUsed();
                 if (uniqueValuesArraySize + ordinalsSize < singleValuesArraySize) {
-                    data = new FloatArrayAtomicFieldData.WithOrdinals(values, build);
+                    data = new FloatArrayAtomicFieldData.WithOrdinals(values, build, reader.maxDoc());
                     success = true;
                     return data;
                 }
@@ -117,17 +108,14 @@ public class FloatArrayIndexFieldData extends AbstractIndexFieldData<FloatArrayA
                 int maxDoc = reader.maxDoc();
                 FloatArray sValues = BigArrays.NON_RECYCLING_INSTANCE.newFloatArray(maxDoc);
                 for (int i = 0; i < maxDoc; i++) {
-                    final long ordinal = ordinals.getOrd(i);
-                    if (ordinal != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+                    ordinals.setDocument(i);
+                    final long ordinal = ordinals.nextOrd();
+                    if (ordinal != SortedSetDocValues.NO_MORE_ORDS) {
                         sValues.set(i, values.get(ordinal));
                     }
                 }
                 assert sValues.size() == maxDoc;
-                if (set == null) {
-                    data = new FloatArrayAtomicFieldData.Single(sValues);
-                } else {
-                    data = new FloatArrayAtomicFieldData.SingleFixedSet(sValues, set);
-                }
+                data = new FloatArrayAtomicFieldData.Single(sValues, null);
             }
             success = true;
             return data;

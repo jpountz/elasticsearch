@@ -19,12 +19,14 @@
 
 package org.elasticsearch.index.fielddata;
 
+import org.apache.lucene.index.SortedNumericDocValues;
+
 /**
  */
-public interface AtomicNumericFieldData extends AtomicFieldData<ScriptDocValues> {
+public interface AtomicNumericFieldData extends AtomicFieldData {
 
-    LongValues getLongValues();
+    SortedNumericDocValues getLongValues();
 
-    DoubleValues getDoubleValues();
+    SortedNumericDoubleValues getDoubleValues();
 
 }

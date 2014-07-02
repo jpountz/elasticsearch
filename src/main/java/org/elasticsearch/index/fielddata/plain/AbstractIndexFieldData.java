@@ -17,7 +17,9 @@
  * under the License.
  */
 
-package org.elasticsearch.index.fielddata;
+package org.elasticsearch.index.fielddata.plain;
+
+import org.elasticsearch.index.fielddata.*;
 
 import org.apache.lucene.index.AtomicReaderContext;
 import org.apache.lucene.index.IndexReader;

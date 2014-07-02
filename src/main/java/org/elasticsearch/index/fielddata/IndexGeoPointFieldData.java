@@ -19,19 +19,8 @@
 
 package org.elasticsearch.index.fielddata;
 
-import org.apache.lucene.index.AtomicReaderContext;
 
 /**
  */
-public interface IndexGeoPointFieldData<FD extends AtomicGeoPointFieldData> extends IndexFieldData<FD> {
-
-    /**
-     * Loads the atomic field data for the reader, possibly cached.
-     */
-    FD load(AtomicReaderContext context);
-
-    /**
-     * Loads directly the atomic field data for the reader, ignoring any caching involved.
-     */
-    FD loadDirect(AtomicReaderContext context) throws Exception;
+public interface IndexGeoPointFieldData extends IndexFieldData<AtomicGeoPointFieldData> {
 }

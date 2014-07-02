@@ -16,35 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.elasticsearch.index.fielddata;
+
+import org.apache.lucene.index.IndexReader;
+
+
+
 /**
- * <code>FilterDoubleValues</code> contains another {@link DoubleValues}, which it
- * uses as its basic source of data, possibly transforming the data along the
- * way or providing additional functionality.
  */
-public abstract class FilterDoubleValues extends DoubleValues {
+public interface IndexOrdinalsFieldData extends IndexFieldData.Global<AtomicOrdinalsFieldData> {
 
-    protected final DoubleValues delegate;
+    IndexOrdinalsFieldData loadGlobal(IndexReader indexReader);
 
-    protected FilterDoubleValues(DoubleValues delegate) {
-        super(delegate.isMultiValued());
-        this.delegate = delegate;
-    }
-
-    @Override
-    public int setDocument(int docId) {
-        return delegate.setDocument(docId);
-    }
-
-    @Override
-    public double nextValue() {
-        return delegate.nextValue();
-    }
-
-    @Override
-    public AtomicFieldData.Order getOrder() {
-        return delegate.getOrder();
-    }
-
+    IndexOrdinalsFieldData localGlobalDirect(IndexReader indexReader) throws Exception;
 
 }

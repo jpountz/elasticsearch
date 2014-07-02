@@ -45,11 +45,6 @@ public class BytesBinaryDVIndexFieldData extends DocValuesIndexFieldData impleme
     }
 
     @Override
-    public boolean valuesOrdered() {
-        return false;
-    }
-
-    @Override
     public final XFieldComparatorSource comparatorSource(@Nullable Object missingValue, MultiValueMode sortMode) {
         throw new ElasticsearchIllegalArgumentException("can't sort on binary field");
     }

@@ -151,7 +151,7 @@ public class IndicesFieldDataCache extends AbstractComponent implements RemovalL
         public <FD extends AtomicFieldData, IFD extends IndexFieldData<FD>> FD load(final AtomicReaderContext context, final IFD indexFieldData) throws Exception {
             final Key key = new Key(this, context.reader().getCoreCacheKey());
             //noinspection unchecked
-            return (FD) cache.get(key, new Callable<AtomicFieldData>() {
+            final Accountable accountable = cache.get(key, new Callable<AtomicFieldData>() {
                 @Override
                 public AtomicFieldData call() throws Exception {
                     SegmentReaderUtils.registerCoreListener(context.reader(), IndexFieldCache.this);
@@ -177,13 +177,14 @@ public class IndicesFieldDataCache extends AbstractComponent implements RemovalL
                     return fieldData;
                 }
             });
+            return (FD) accountable;
         }
 
-        public <IFD extends IndexFieldData.WithOrdinals<?>> IFD load(final IndexReader indexReader, final IFD indexFieldData) throws Exception {
+        public <FD extends AtomicFieldData, IFD extends IndexFieldData.Global<FD>> IFD load(final IndexReader indexReader, final IFD indexFieldData) throws Exception {
             final Key key = new Key(this, indexReader.getCoreCacheKey());
 
             //noinspection unchecked
-            return (IFD) cache.get(key, new Callable<Accountable>() {
+            final Accountable accountable = cache.get(key, new Callable<Accountable>() {
                 @Override
                 public Accountable call() throws Exception {
                     indexReader.addReaderClosedListener(IndexFieldCache.this);
@@ -207,6 +208,7 @@ public class IndicesFieldDataCache extends AbstractComponent implements RemovalL
                     return ifd;
                 }
             });
+            return (IFD) accountable;
         }
 
         @Override

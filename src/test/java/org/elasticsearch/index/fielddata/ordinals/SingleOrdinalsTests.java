@@ -18,8 +18,10 @@
  */
 package org.elasticsearch.index.fielddata.ordinals;
 
+import org.apache.lucene.index.DocValues;
+import org.apache.lucene.index.RandomAccessOrds;
+import org.apache.lucene.index.SortedDocValues;
 import org.elasticsearch.common.settings.ImmutableSettings;
-import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.test.ElasticsearchTestCase;
 import org.junit.Test;
 
@@ -50,10 +52,12 @@ public class SingleOrdinalsTests extends ElasticsearchTestCase {
 
         Ordinals ords = builder.build(ImmutableSettings.EMPTY);
         assertThat(ords, instanceOf(SinglePackedOrdinals.class));
-        BytesValues.WithOrdinals docs = ords.ordinals();
+        RandomAccessOrds docs = ords.ordinals();
+        final SortedDocValues singleOrds = DocValues.unwrapSingleton(docs);
+        assertNotNull(singleOrds);
 
         for (Map.Entry<Integer, Long> entry : controlDocToOrdinal.entrySet()) {
-            assertThat(entry.getValue(), equalTo(docs.getOrd(entry.getKey())));
+            assertThat(entry.getValue(), equalTo((long) singleOrds.getOrd(entry.getKey())));
         }
 
     }

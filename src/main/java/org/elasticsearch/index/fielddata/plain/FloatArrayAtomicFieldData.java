@@ -18,119 +18,76 @@
  */
 package org.elasticsearch.index.fielddata.plain;
 
+import org.apache.lucene.index.DocValues;
+import org.apache.lucene.index.RandomAccessOrds;
+import org.apache.lucene.index.SortedDocValues;
 import org.apache.lucene.util.FixedBitSet;
-import org.apache.lucene.util.RamUsageEstimator;
 import org.elasticsearch.common.util.FloatArray;
-import org.elasticsearch.index.fielddata.*;
+import org.elasticsearch.index.fielddata.FieldData;
+import org.elasticsearch.index.fielddata.NumericDoubleValues;
+import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.index.fielddata.ordinals.Ordinals;
 
 /**
  */
-public abstract class FloatArrayAtomicFieldData extends AbstractAtomicNumericFieldData {
-
-    public static FloatArrayAtomicFieldData empty() {
-        return new Empty();
-    }
-
-    protected long size = -1;
-
-    public FloatArrayAtomicFieldData() {
-        super(true);
-    }
+public abstract class FloatArrayAtomicFieldData extends AbstractAtomicDoubleFieldData {
 
     @Override
     public void close() {
     }
 
-    static class Empty extends FloatArrayAtomicFieldData {
-
-        Empty() {
-            super();
-        }
-
-        @Override
-        public LongValues getLongValues() {
-            return LongValues.EMPTY;
-        }
-
-        @Override
-        public DoubleValues getDoubleValues() {
-            return DoubleValues.EMPTY;
-        }
-
-        @Override
-        public long ramBytesUsed() {
-            return 0;
-        }
-
-        @Override
-        public BytesValues getBytesValues() {
-            return BytesValues.EMPTY;
-        }
-
-        @Override
-        public ScriptDocValues getScriptValues() {
-            return ScriptDocValues.EMPTY_DOUBLES;
-        }
-    }
-
     public static class WithOrdinals extends FloatArrayAtomicFieldData {
 
-        private final Ordinals ordinals;
         private final FloatArray values;
+        private final Ordinals ordinals;
+        private final int maxDoc;
 
-        public WithOrdinals(FloatArray values, Ordinals ordinals) {
+        public WithOrdinals(FloatArray values, Ordinals ordinals, int maxDoc) {
             super();
             this.values = values;
             this.ordinals = ordinals;
+            this.maxDoc = maxDoc;
         }
 
         @Override
         public long ramBytesUsed() {
-            if (size == -1) {
-                size = RamUsageEstimator.NUM_BYTES_INT/*size*/ + values.ramBytesUsed() + ordinals.ramBytesUsed();
-            }
-            return size;
+            return values.ramBytesUsed() + ordinals.ramBytesUsed();
         }
+
 
         @Override
-        public LongValues getLongValues() {
-            return new LongValues(values, ordinals.ordinals());
-        }
+        public SortedNumericDoubleValues getDoubleValues() {
+            final RandomAccessOrds ords = ordinals.ordinals();
+            final SortedDocValues singleOrds = DocValues.unwrapSingleton(ords);
+            if (singleOrds != null) {
+                final NumericDoubleValues singleValues = new NumericDoubleValues() {
+                    @Override
+                    public double get(int docID) {
+                        ords.setDocument(docID);
+                        if (ords.cardinality() > 0) {
+                            return values.get(singleOrds.getOrd(docID));
+                        }
+                        return 0;
+                    }
+                };
+                return FieldData.singleton(singleValues, DocValues.docsWithValue(ords, maxDoc));
+            } else {
+                return new SortedNumericDoubleValues() {
+                    @Override
+                    public double valueAt(int index) {
+                        return values.get(ords.ordAt(index));
+                    }
 
-        @Override
-        public DoubleValues getDoubleValues() {
-            return new DoubleValues(values, ordinals.ordinals());
-        }
+                    @Override
+                    public void setDocument(int doc) {
+                        ords.setDocument(doc);
+                    }
 
-        static class LongValues extends org.elasticsearch.index.fielddata.LongValues.WithOrdinals {
-
-            private final FloatArray values;
-
-            LongValues(FloatArray values, BytesValues.WithOrdinals ordinals) {
-                super(ordinals);
-                this.values = values;
-            }
-
-            @Override
-            public long getValueByOrd(long ord) {
-                assert ord != BytesValues.WithOrdinals.MISSING_ORDINAL;
-                return (long) values.get(ord);
-            }
-        }
-
-        static class DoubleValues extends org.elasticsearch.index.fielddata.DoubleValues.WithOrdinals {
-
-            private final FloatArray values;
-
-            DoubleValues(FloatArray values, BytesValues.WithOrdinals ordinals) {
-                super(ordinals);
-                this.values = values;
-            }
-
-            @Override
-            public double getValueByOrd(long ord) {
-                return values.get(ord);
+                    @Override
+                    public int count() {
+                        return ords.cardinality();
+                    }
+                };
             }
         }
     }
@@ -139,12 +96,12 @@ public abstract class FloatArrayAtomicFieldData extends AbstractAtomicNumericFie
      * A single valued case, where not all values are "set", so we have a FixedBitSet that
      * indicates which values have an actual value.
      */
-    public static class SingleFixedSet extends FloatArrayAtomicFieldData {
+    public static class Single extends FloatArrayAtomicFieldData {
 
         private final FloatArray values;
         private final FixedBitSet set;
 
-        public SingleFixedSet(FloatArray values, FixedBitSet set) {
+        public Single(FloatArray values, FixedBitSet set) {
             super();
             this.values = values;
             this.set = set;
@@ -152,135 +109,18 @@ public abstract class FloatArrayAtomicFieldData extends AbstractAtomicNumericFie
 
         @Override
         public long ramBytesUsed() {
-            if (size == -1) {
-                size = RamUsageEstimator.NUM_BYTES_ARRAY_HEADER + values.ramBytesUsed() + RamUsageEstimator.sizeOf(set.getBits());
-            }
-            return size;
+            return values.ramBytesUsed() + set.ramBytesUsed();
         }
 
         @Override
-        public LongValues getLongValues() {
-            return new LongValues(values, set);
-        }
-
-        @Override
-        public DoubleValues getDoubleValues() {
-            return new DoubleValues(values, set);
-        }
-
-
-        static class LongValues extends org.elasticsearch.index.fielddata.LongValues {
-
-            private final FloatArray values;
-            private final FixedBitSet set;
-
-            LongValues(FloatArray values, FixedBitSet set) {
-                super(false);
-                this.values = values;
-                this.set = set;
-            }
-
-            @Override
-            public int setDocument(int docId) {
-                this.docId = docId;
-                return set.get(docId) ? 1 : 0;
-            }
-
-            @Override
-            public long nextValue() {
-                return (long) values.get(docId);
-            }
-        }
-
-        static class DoubleValues extends org.elasticsearch.index.fielddata.DoubleValues {
-
-            private final FloatArray values;
-            private final FixedBitSet set;
-
-            DoubleValues(FloatArray values, FixedBitSet set) {
-                super(false);
-                this.values = values;
-                this.set = set;
-            }
-
-            @Override
-            public int setDocument(int docId) {
-                this.docId = docId;
-                return set.get(docId) ? 1 : 0;
-            }
-
-            @Override
-            public double nextValue() {
-                return values.get(docId);
-            }
-        }
-
-    }
-
-    /**
-     * Assumes all the values are "set", and docId is used as the index to the value array.
-     */
-    public static class Single extends FloatArrayAtomicFieldData {
-
-        private final FloatArray values;
-
-        /**
-         * Note, here, we assume that there is no offset by 1 from docId, so position 0
-         * is the value for docId 0.
-         */
-        public Single(FloatArray values) {
-            super();
-            this.values = values;
-        }
-
-        @Override
-        public long ramBytesUsed() {
-            if (size == -1) {
-                size = RamUsageEstimator.NUM_BYTES_ARRAY_HEADER + values.ramBytesUsed();
-            }
-            return size;
-        }
-
-        @Override
-        public LongValues getLongValues() {
-            return new LongValues(values);
-        }
-
-        @Override
-        public DoubleValues getDoubleValues() {
-            return new DoubleValues(values);
-        }
-
-
-        static class LongValues extends DenseLongValues {
-
-            private final FloatArray values;
-
-            LongValues(FloatArray values) {
-                super(false);
-                this.values = values;
-            }
-
-            @Override
-            public long nextValue() {
-                return (long) values.get(docId);
-            }
-        }
-
-        static class DoubleValues extends DenseDoubleValues {
-
-            private final FloatArray values;
-
-            DoubleValues(FloatArray values) {
-                super(false);
-                this.values = values;
-            }
-
-            @Override
-            public double nextValue() {
-                return values.get(docId);
-            }
-
+        public SortedNumericDoubleValues getDoubleValues() {
+            final NumericDoubleValues values = new NumericDoubleValues() {
+                @Override
+                public double get(int docID) {
+                    return Single.this.values.get(docID);
+                }
+            };
+            return FieldData.singleton(values, set);
         }
     }
 }

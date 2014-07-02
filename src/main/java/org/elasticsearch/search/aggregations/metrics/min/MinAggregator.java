@@ -21,7 +21,7 @@ package org.elasticsearch.search.aggregations.metrics.min;
 import org.apache.lucene.index.AtomicReaderContext;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.DoubleArray;
-import org.elasticsearch.index.fielddata.DoubleValues;
+import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregator;
@@ -38,7 +38,7 @@ import java.io.IOException;
 public class MinAggregator extends NumericMetricsAggregator.SingleValue {
 
     private final ValuesSource.Numeric valuesSource;
-    private DoubleValues values;
+    private SortedNumericDoubleValues values;
 
     private DoubleArray mins;
 
@@ -64,17 +64,19 @@ public class MinAggregator extends NumericMetricsAggregator.SingleValue {
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        if (values.setDocument(doc) == 0) {
-            return;
-        }
+        values.setDocument(doc);
+        final int valueCount = values.count();
+        if (valueCount > 0) {
+            if (owningBucketOrdinal >= mins.size()) {
+                long from = mins.size();
+                mins = bigArrays.grow(mins, owningBucketOrdinal + 1);
+                mins.fill(from, mins.size(), Double.POSITIVE_INFINITY);
+            }
 
-        if (owningBucketOrdinal >= mins.size()) {
-            long from = mins.size();
-            mins = bigArrays.grow(mins, owningBucketOrdinal + 1);
-            mins.fill(from, mins.size(), Double.POSITIVE_INFINITY);
+            double min = mins.get(owningBucketOrdinal);
+            min = Math.min(min, values.valueAt(0));
+            mins.set(owningBucketOrdinal, min);
         }
-
-        mins.set(owningBucketOrdinal, Math.min(values.nextValue(), mins.get(owningBucketOrdinal)));
     }
 
     @Override

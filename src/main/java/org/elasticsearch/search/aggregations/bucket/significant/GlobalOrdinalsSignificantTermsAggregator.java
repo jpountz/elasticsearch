@@ -22,7 +22,6 @@ import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.LongHash;
-import org.elasticsearch.index.fielddata.BytesValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.bucket.terms.GlobalOrdinalsStringTermsAggregator;
@@ -68,7 +67,7 @@ public class GlobalOrdinalsSignificantTermsAggregator extends GlobalOrdinalsStri
         final int size;
         if (bucketCountThresholds.getMinDocCount() == 0) {
             // if minDocCount == 0 then we can end up with more buckets then maxBucketOrd() returns
-            size = (int) Math.min(globalValues.getMaxOrd(), bucketCountThresholds.getShardSize());
+            size = (int) Math.min(globalValues.getValueCount(), bucketCountThresholds.getShardSize());
         } else {
             size = (int) Math.min(maxBucketOrd(), bucketCountThresholds.getShardSize());
         }
@@ -77,7 +76,7 @@ public class GlobalOrdinalsSignificantTermsAggregator extends GlobalOrdinalsStri
 
         BucketSignificancePriorityQueue ordered = new BucketSignificancePriorityQueue(size);
         SignificantStringTerms.Bucket spare = null;
-        for (long globalTermOrd = BytesValues.WithOrdinals.MIN_ORDINAL; globalTermOrd < globalValues.getMaxOrd(); ++globalTermOrd) {
+        for (long globalTermOrd = 0; globalTermOrd < globalValues.getValueCount(); ++globalTermOrd) {
             if (includeExclude != null && !acceptedGlobalOrdinals.get(globalTermOrd)) {
                 continue;
             }
@@ -90,7 +89,7 @@ public class GlobalOrdinalsSignificantTermsAggregator extends GlobalOrdinalsStri
                 spare = new SignificantStringTerms.Bucket(new BytesRef(), 0, 0, 0, 0, null);
             }
             spare.bucketOrd = bucketOrd;
-            copy(globalValues.getValueByOrd(globalTermOrd), spare.termBytes);
+            copy(globalValues.lookupOrd(globalTermOrd), spare.termBytes);
             spare.subsetDf = bucketDocCount;
             spare.subsetSize = subsetSize;
             spare.supersetDf = termsAggFactory.getBackgroundFrequency(spare.termBytes);
@@ -143,7 +142,8 @@ public class GlobalOrdinalsSignificantTermsAggregator extends GlobalOrdinalsStri
         @Override
         public void collect(int doc, long owningBucketOrdinal) throws IOException {
             numCollectedDocs++;
-            final int numOrds = globalValues.setDocument(doc);
+            globalValues.setDocument(doc);
+            final int numOrds = globalValues.cardinality();
             for (int i = 0; i < numOrds; i++) {
                 final long globalOrd = globalValues.nextOrd();
                 long bucketOrd = bucketOrds.add(globalOrd);

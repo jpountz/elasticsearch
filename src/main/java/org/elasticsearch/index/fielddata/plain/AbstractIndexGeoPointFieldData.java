@@ -34,35 +34,7 @@ import org.elasticsearch.search.MultiValueMode;
 
 import java.io.IOException;
 
-abstract class AbstractGeoPointIndexFieldData extends AbstractIndexFieldData<AtomicGeoPointFieldData<ScriptDocValues>> implements IndexGeoPointFieldData<AtomicGeoPointFieldData<ScriptDocValues>> {
-
-    protected static class Empty extends AtomicGeoPointFieldData<ScriptDocValues> {
-
-        @Override
-        public long ramBytesUsed() {
-            return 0;
-        }
-
-        @Override
-        public BytesValues getBytesValues() {
-            return BytesValues.EMPTY;
-        }
-
-        @Override
-        public GeoPointValues getGeoPointValues() {
-            return GeoPointValues.EMPTY;
-        }
-
-        @Override
-        public ScriptDocValues getScriptValues() {
-            return ScriptDocValues.EMPTY_GEOPOINTS;
-        }
-
-        @Override
-        public void close() {
-            // no-op
-        }
-    }
+abstract class AbstractIndexGeoPointFieldData extends AbstractIndexFieldData<AtomicGeoPointFieldData> implements IndexGeoPointFieldData {
 
     protected static class GeoPointEnum {
 
@@ -100,20 +72,32 @@ abstract class AbstractGeoPointIndexFieldData extends AbstractIndexFieldData<Ato
 
     }
 
-    public AbstractGeoPointIndexFieldData(Index index, Settings indexSettings, Names fieldNames, FieldDataType fieldDataType, IndexFieldDataCache cache) {
+    public AbstractIndexGeoPointFieldData(Index index, Settings indexSettings, Names fieldNames, FieldDataType fieldDataType, IndexFieldDataCache cache) {
         super(index, indexSettings, fieldNames, fieldDataType, cache);
-    }
-
-    @Override
-    public boolean valuesOrdered() {
-        // because we might have single values? we can dynamically update a flag to reflect that
-        // based on the atomic field data loaded
-        return false;
     }
 
     @Override
     public final XFieldComparatorSource comparatorSource(@Nullable Object missingValue, MultiValueMode sortMode) {
         throw new ElasticsearchIllegalArgumentException("can't sort on geo_point field without using specific sorting feature, like geo_distance");
+    }
+
+    public static AtomicGeoPointFieldData empty() {
+        return new AbstractAtomicGeoPointFieldData() {
+            @Override
+            public long ramBytesUsed() {
+                return 0;
+            }
+
+            @Override
+            public MultiGeoPointValues getGeoPointValues() {
+                return FieldData.emptyMultiGeoPoints();
+            }
+
+            @Override
+            public void close() {
+                // no-op
+            }
+        };
     }
 
 }

@@ -107,7 +107,7 @@ public abstract class DocValuesIndexFieldData {
             } else if (numericType != null) {
                 return new BinaryDVNumericIndexFieldData(index, fieldNames, numericType, mapper.fieldDataType());
             } else {
-                return new SortedSetDVBytesIndexFieldData(index, cache, indexSettings, fieldNames, globalOrdinalBuilder,breakerService, mapper.fieldDataType());
+                return new SortedSetDVOrdinalsIndexFieldData(index, cache, indexSettings, fieldNames, globalOrdinalBuilder,breakerService, mapper.fieldDataType());
             }
         }
 

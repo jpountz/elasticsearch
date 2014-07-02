@@ -36,15 +36,10 @@ import org.elasticsearch.search.MultiValueMode;
 
 import java.io.IOException;
 
-public class GeoPointBinaryDVIndexFieldData extends DocValuesIndexFieldData implements IndexGeoPointFieldData<AtomicGeoPointFieldData<ScriptDocValues>> {
+public class GeoPointBinaryDVIndexFieldData extends DocValuesIndexFieldData implements IndexGeoPointFieldData {
 
     public GeoPointBinaryDVIndexFieldData(Index index, Names fieldNames, FieldDataType fieldDataType) {
         super(index, fieldNames, fieldDataType);
-    }
-
-    @Override
-    public boolean valuesOrdered() {
-        return false;
     }
 
     @Override
@@ -53,7 +48,7 @@ public class GeoPointBinaryDVIndexFieldData extends DocValuesIndexFieldData impl
     }
 
     @Override
-    public AtomicGeoPointFieldData<ScriptDocValues> load(AtomicReaderContext context) {
+    public AtomicGeoPointFieldData load(AtomicReaderContext context) {
         try {
             return new GeoPointBinaryDVAtomicFieldData(DocValues.getBinary(context.reader(), fieldNames.indexName()));
         } catch (IOException e) {
@@ -62,7 +57,7 @@ public class GeoPointBinaryDVIndexFieldData extends DocValuesIndexFieldData impl
     }
 
     @Override
-    public AtomicGeoPointFieldData<ScriptDocValues> loadDirect(AtomicReaderContext context) throws Exception {
+    public AtomicGeoPointFieldData loadDirect(AtomicReaderContext context) throws Exception {
         return load(context);
     }
 

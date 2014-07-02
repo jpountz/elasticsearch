@@ -20,15 +20,14 @@
 package org.elasticsearch.index.fielddata.ordinals;
 
 import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.RandomAccessOrds;
 import org.apache.lucene.index.XOrdinalMap;
-import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.util.packed.PackedInts;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.AbstractIndexComponent;
 import org.elasticsearch.index.Index;
-import org.elasticsearch.index.fielddata.AtomicFieldData;
-import org.elasticsearch.index.fielddata.BytesValues;
-import org.elasticsearch.index.fielddata.IndexFieldData;
+import org.elasticsearch.index.fielddata.AtomicOrdinalsFieldData;
+import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.index.settings.IndexSettings;
 import org.elasticsearch.indices.fielddata.breaker.CircuitBreakerService;
 
@@ -43,20 +42,17 @@ public class InternalGlobalOrdinalsBuilder extends AbstractIndexComponent implem
     }
 
     @Override
-    public IndexFieldData.WithOrdinals build(final IndexReader indexReader, IndexFieldData.WithOrdinals indexFieldData, Settings settings, CircuitBreakerService breakerService) throws IOException {
+    public IndexOrdinalsFieldData build(final IndexReader indexReader, IndexOrdinalsFieldData indexFieldData, Settings settings, CircuitBreakerService breakerService) throws IOException {
         assert indexReader.leaves().size() > 1;
         long startTime = System.currentTimeMillis();
 
-        final AtomicFieldData.WithOrdinals<?>[] atomicFD = new AtomicFieldData.WithOrdinals[indexReader.leaves().size()];
-        final TermsEnum[] subs = new TermsEnum[indexReader.leaves().size()];
-        final long[] weights = new long[subs.length];
+        final AtomicOrdinalsFieldData[] atomicFD = new AtomicOrdinalsFieldData[indexReader.leaves().size()];
+        final RandomAccessOrds[] subs = new RandomAccessOrds[indexReader.leaves().size()];
         for (int i = 0; i < indexReader.leaves().size(); ++i) {
             atomicFD[i] = indexFieldData.load(indexReader.leaves().get(i));
-            BytesValues.WithOrdinals v = atomicFD[i].getBytesValues();
-            subs[i] = v.getTermsEnum();
-            weights[i] = v.getMaxOrd();
+            subs[i] = atomicFD[i].getOrdinalsValues();
         }
-        final XOrdinalMap ordinalMap = XOrdinalMap.build(null, subs, weights, PackedInts.DEFAULT);
+        final XOrdinalMap ordinalMap = XOrdinalMap.build(null, subs, PackedInts.DEFAULT);
         final long memorySizeInBytes = ordinalMap.ramBytesUsed();
         breakerService.getBreaker().addWithoutBreaking(memorySizeInBytes);
 

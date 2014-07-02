@@ -19,9 +19,7 @@
 
 package org.elasticsearch.index.search.child;
 
-import org.apache.lucene.index.AtomicReaderContext;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.Term;
+import org.apache.lucene.index.*;
 import org.apache.lucene.search.*;
 import org.apache.lucene.util.Bits;
 import org.apache.lucene.util.LongBitSet;
@@ -29,10 +27,8 @@ import org.elasticsearch.common.lucene.docset.DocIdSets;
 import org.elasticsearch.common.lucene.search.ApplyAcceptedDocsFilter;
 import org.elasticsearch.common.lucene.search.NoopCollector;
 import org.elasticsearch.common.lucene.search.Queries;
-import org.elasticsearch.index.fielddata.AtomicFieldData;
-import org.elasticsearch.index.fielddata.BytesValues;
-import org.elasticsearch.index.fielddata.IndexFieldData;
-import org.elasticsearch.index.fielddata.plain.ParentChildIndexFieldData;
+import org.elasticsearch.index.fielddata.AtomicParentChildFieldData;
+import org.elasticsearch.index.fielddata.IndexParentChildFieldData;
 import org.elasticsearch.search.internal.SearchContext;
 
 import java.io.IOException;
@@ -44,7 +40,7 @@ import java.util.Set;
  */
 public class ChildrenConstantScoreQuery extends Query {
 
-    private final ParentChildIndexFieldData parentChildIndexFieldData;
+    private final IndexParentChildFieldData parentChildIndexFieldData;
     private Query originalChildQuery;
     private final String parentType;
     private final String childType;
@@ -55,7 +51,7 @@ public class ChildrenConstantScoreQuery extends Query {
     private Query rewrittenChildQuery;
     private IndexReader rewriteIndexReader;
 
-    public ChildrenConstantScoreQuery(ParentChildIndexFieldData parentChildIndexFieldData, Query childQuery, String parentType, String childType, Filter parentFilter, int shortCircuitParentDocSet, Filter nonNestedDocsFilter) {
+    public ChildrenConstantScoreQuery(IndexParentChildFieldData parentChildIndexFieldData, Query childQuery, String parentType, String childType, Filter parentFilter, int shortCircuitParentDocSet, Filter nonNestedDocsFilter) {
         this.parentChildIndexFieldData = parentChildIndexFieldData;
         this.parentFilter = parentFilter;
         this.parentType = parentType;
@@ -93,9 +89,7 @@ public class ChildrenConstantScoreQuery extends Query {
     @Override
     public Weight createWeight(IndexSearcher searcher) throws IOException {
         SearchContext sc = SearchContext.current();
-        ParentChildIndexFieldData.WithOrdinals globalIfd = parentChildIndexFieldData.getGlobalParentChild(
-                parentType, searcher.getIndexReader()
-        );
+        IndexParentChildFieldData globalIfd = parentChildIndexFieldData.loadGlobal(searcher.getIndexReader());
         assert rewrittenChildQuery != null;
         assert rewriteIndexReader == searcher.getIndexReader()  : "not equal, rewriteIndexReader=" + rewriteIndexReader + " searcher.getIndexReader()=" + searcher.getIndexReader();
 
@@ -104,9 +98,9 @@ public class ChildrenConstantScoreQuery extends Query {
         if (globalIfd == null || leaves.isEmpty()) {
             return Queries.newMatchNoDocsQuery().createWeight(searcher);
         } else {
-            AtomicFieldData.WithOrdinals afd = globalIfd.load(leaves.get(0));
-            BytesValues.WithOrdinals globalValues = afd.getBytesValues();
-            maxOrd = globalValues.getMaxOrd();
+            AtomicParentChildFieldData afd = globalIfd.load(leaves.get(0));
+            SortedDocValues globalValues = afd.getOrdinalsValues(parentType);
+            maxOrd = globalValues.getValueCount();
         }
 
         if (maxOrd == 0) {
@@ -116,7 +110,7 @@ public class ChildrenConstantScoreQuery extends Query {
         Query childQuery = rewrittenChildQuery;
         IndexSearcher indexSearcher = new IndexSearcher(searcher.getIndexReader());
         indexSearcher.setSimilarity(searcher.getSimilarity());
-        ParentOrdCollector collector = new ParentOrdCollector(globalIfd, maxOrd);
+        ParentOrdCollector collector = new ParentOrdCollector(globalIfd, maxOrd, parentType);
         indexSearcher.search(childQuery, collector);
 
         final long remaining = collector.foundParents();
@@ -177,13 +171,13 @@ public class ChildrenConstantScoreQuery extends Query {
         private final Filter parentFilter;
         private final Filter shortCircuitFilter;
         private final ParentOrdCollector collector;
-        private final IndexFieldData.WithOrdinals globalIfd;
+        private final IndexParentChildFieldData globalIfd;
 
         private long remaining;
         private float queryNorm;
         private float queryWeight;
 
-        public ParentWeight(Filter parentFilter, IndexFieldData.WithOrdinals globalIfd, Filter shortCircuitFilter, ParentOrdCollector collector, long remaining) {
+        public ParentWeight(Filter parentFilter, IndexParentChildFieldData globalIfd, Filter shortCircuitFilter, ParentOrdCollector collector, long remaining) {
             this.parentFilter = new ApplyAcceptedDocsFilter(parentFilter);
             this.globalIfd = globalIfd;
             this.shortCircuitFilter = shortCircuitFilter;
@@ -238,7 +232,7 @@ public class ChildrenConstantScoreQuery extends Query {
                 DocIdSetIterator innerIterator = parentDocIdSet.iterator();
                 if (innerIterator != null) {
                     LongBitSet parentOrds = collector.parentOrds;
-                    BytesValues.WithOrdinals globalValues = globalIfd.load(context).getBytesValues();
+                    SortedDocValues globalValues = globalIfd.load(context).getOrdinalsValues(parentType);
                     if (globalValues != null) {
                         DocIdSetIterator parentIdIterator = new ParentOrdIterator(innerIterator, parentOrds, globalValues, this);
                         return ConstantScorer.create(parentIdIterator, this, queryWeight);
@@ -253,21 +247,23 @@ public class ChildrenConstantScoreQuery extends Query {
     private final static class ParentOrdCollector extends NoopCollector {
 
         private final LongBitSet parentOrds;
-        private final ParentChildIndexFieldData.WithOrdinals indexFieldData;
+        private final IndexParentChildFieldData indexFieldData;
+        private final String parentType;
 
-        private BytesValues.WithOrdinals values;
+        private SortedDocValues values;
 
-        private ParentOrdCollector(ParentChildIndexFieldData.WithOrdinals indexFieldData, long maxOrd) {
+        private ParentOrdCollector(IndexParentChildFieldData indexFieldData, long maxOrd, String parentType) {
             // TODO: look into reusing LongBitSet#bits array
             this.parentOrds = new LongBitSet(maxOrd + 1);
             this.indexFieldData = indexFieldData;
+            this.parentType = parentType;
         }
 
         @Override
         public void collect(int doc) throws IOException {
             if (values != null) {
                 long globalOrdinal = values.getOrd(doc);
-                if (globalOrdinal != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+                if (globalOrdinal != SortedSetDocValues.NO_MORE_ORDS) {
                     parentOrds.set(globalOrdinal);
                 }
             }
@@ -275,7 +271,7 @@ public class ChildrenConstantScoreQuery extends Query {
 
         @Override
         public void setNextReader(AtomicReaderContext context) throws IOException {
-            values = indexFieldData.load(context).getBytesValues();
+            values = indexFieldData.load(context).getOrdinalsValues(parentType);
         }
 
         long foundParents() {
@@ -287,10 +283,10 @@ public class ChildrenConstantScoreQuery extends Query {
     private final static class ParentOrdIterator extends FilteredDocIdSetIterator {
 
         private final LongBitSet parentOrds;
-        private final BytesValues.WithOrdinals ordinals;
+        private final SortedDocValues ordinals;
         private final ParentWeight parentWeight;
 
-        private ParentOrdIterator(DocIdSetIterator innerIterator, LongBitSet parentOrds, BytesValues.WithOrdinals ordinals, ParentWeight parentWeight) {
+        private ParentOrdIterator(DocIdSetIterator innerIterator, LongBitSet parentOrds, SortedDocValues ordinals, ParentWeight parentWeight) {
             super(innerIterator);
             this.parentOrds = parentOrds;
             this.ordinals = ordinals;
@@ -309,7 +305,7 @@ public class ChildrenConstantScoreQuery extends Query {
             }
 
             long parentOrd = ordinals.getOrd(doc);
-            if (parentOrd != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+            if (parentOrd >= 0) {
                 boolean match = parentOrds.get(parentOrd);
                 if (match) {
                     parentWeight.remaining--;

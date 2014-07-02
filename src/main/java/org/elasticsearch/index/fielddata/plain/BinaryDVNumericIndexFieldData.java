@@ -21,9 +21,11 @@ package org.elasticsearch.index.fielddata.plain;
 
 import com.google.common.base.Preconditions;
 import org.apache.lucene.index.AtomicReaderContext;
+import org.apache.lucene.index.BinaryDocValues;
 import org.apache.lucene.index.DocValues;
 import org.elasticsearch.ElasticsearchIllegalStateException;
 import org.elasticsearch.index.Index;
+import org.elasticsearch.index.fielddata.AtomicNumericFieldData;
 import org.elasticsearch.index.fielddata.FieldDataType;
 import org.elasticsearch.index.fielddata.IndexNumericFieldData;
 import org.elasticsearch.index.fielddata.fieldcomparator.DoubleValuesComparatorSource;
@@ -34,7 +36,7 @@ import org.elasticsearch.search.MultiValueMode;
 
 import java.io.IOException;
 
-public class BinaryDVNumericIndexFieldData extends DocValuesIndexFieldData implements IndexNumericFieldData<BinaryDVNumericAtomicFieldData> {
+public class BinaryDVNumericIndexFieldData extends DocValuesIndexFieldData implements IndexNumericFieldData {
 
     private final NumericType numericType;
 
@@ -42,11 +44,6 @@ public class BinaryDVNumericIndexFieldData extends DocValuesIndexFieldData imple
         super(index, fieldNames, fieldDataType);
         Preconditions.checkArgument(numericType != null, "numericType must be non-null");
         this.numericType = numericType;
-    }
-
-    @Override
-    public boolean valuesOrdered() {
-        return false;
     }
 
     public org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource comparatorSource(final Object missingValue, final MultiValueMode sortMode) {
@@ -62,16 +59,21 @@ public class BinaryDVNumericIndexFieldData extends DocValuesIndexFieldData imple
     }
 
     @Override
-    public BinaryDVNumericAtomicFieldData load(AtomicReaderContext context) {
+    public AtomicNumericFieldData load(AtomicReaderContext context) {
         try {
-            return new BinaryDVNumericAtomicFieldData(DocValues.getBinary(context.reader(), fieldNames.indexName()), numericType);
+            final BinaryDocValues values = DocValues.getBinary(context.reader(), fieldNames.indexName());
+            if (numericType.isFloatingPoint()) {
+                return new BinaryDVDoubleAtomicFieldData(values, numericType);
+            } else {
+                return new BinaryDVLongAtomicFieldData(values);
+            }
         } catch (IOException e) {
             throw new ElasticsearchIllegalStateException("Cannot load doc values", e);
         }
     }
 
     @Override
-    public BinaryDVNumericAtomicFieldData loadDirect(AtomicReaderContext context) throws Exception {
+    public AtomicNumericFieldData loadDirect(AtomicReaderContext context) throws Exception {
         return load(context);
     }
 

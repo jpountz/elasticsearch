@@ -16,35 +16,19 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+
 package org.elasticsearch.index.fielddata;
 
+import org.apache.lucene.index.SortedDocValues;
+
+import java.util.Set;
+
 /**
- * <code>FilterLongValues</code> contains another {@link LongValues}, which it
- * uses as its basic source of data, possibly transforming the data along the
- * way or providing additional functionality.
  */
-public class FilterLongValues extends LongValues {
+public interface AtomicParentChildFieldData extends AtomicFieldData {
 
-    protected final LongValues delegate;
+    Set<String> types();
 
-    protected FilterLongValues(LongValues delegate) {
-        super(delegate.isMultiValued());
-        this.delegate = delegate;
-    }
-
-    @Override
-    public int setDocument(int docId) {
-        return delegate.setDocument(docId);
-    }
-
-    @Override
-    public long nextValue() {
-        return delegate.nextValue();
-    }
-
-    @Override
-    public AtomicFieldData.Order getOrder() {
-        return delegate.getOrder();
-    }
+    SortedDocValues getOrdinalsValues(String type);
 
 }

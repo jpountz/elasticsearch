@@ -21,7 +21,7 @@ package org.elasticsearch.index.fielddata.ordinals;
 
 import org.apache.lucene.index.IndexReader;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.index.fielddata.IndexFieldData;
+import org.elasticsearch.index.fielddata.IndexOrdinalsFieldData;
 import org.elasticsearch.indices.fielddata.breaker.CircuitBreakerService;
 
 import java.io.IOException;
@@ -30,6 +30,6 @@ import java.io.IOException;
 */
 public interface GlobalOrdinalsBuilder {
 
-    IndexFieldData.WithOrdinals build(IndexReader indexReader, IndexFieldData.WithOrdinals indexFieldData, Settings settings, CircuitBreakerService breakerService) throws IOException;
+    IndexOrdinalsFieldData build(IndexReader indexReader, IndexOrdinalsFieldData indexFieldData, Settings settings, CircuitBreakerService breakerService) throws IOException;
 
 }

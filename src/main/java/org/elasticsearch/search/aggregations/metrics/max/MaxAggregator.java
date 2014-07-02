@@ -21,7 +21,7 @@ package org.elasticsearch.search.aggregations.metrics.max;
 import org.apache.lucene.index.AtomicReaderContext;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.DoubleArray;
-import org.elasticsearch.index.fielddata.DoubleValues;
+import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.InternalAggregation;
 import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregator;
@@ -38,7 +38,7 @@ import java.io.IOException;
 public class MaxAggregator extends NumericMetricsAggregator.SingleValue {
 
     private final ValuesSource.Numeric valuesSource;
-    private DoubleValues values;
+    private SortedNumericDoubleValues values;
 
     private DoubleArray maxes;
 
@@ -64,18 +64,19 @@ public class MaxAggregator extends NumericMetricsAggregator.SingleValue {
 
     @Override
     public void collect(int doc, long owningBucketOrdinal) throws IOException {
-        if (owningBucketOrdinal >= maxes.size()) {
-            long from = maxes.size();
-            maxes = bigArrays.grow(maxes, owningBucketOrdinal + 1);
-            maxes.fill(from, maxes.size(), Double.NEGATIVE_INFINITY);
-        }
+        values.setDocument(doc);
+        final int valueCount = values.count();
+        if (valueCount > 0) {
+            if (owningBucketOrdinal >= maxes.size()) {
+                long from = maxes.size();
+                maxes = bigArrays.grow(maxes, owningBucketOrdinal + 1);
+                maxes.fill(from, maxes.size(), Double.NEGATIVE_INFINITY);
+            }
 
-        final int valueCount = values.setDocument(doc);
-        double max = maxes.get(owningBucketOrdinal);
-        for (int i = 0; i < valueCount; i++) {
-            max = Math.max(max, values.nextValue());
+            double max = maxes.get(owningBucketOrdinal);
+            max = Math.max(max, values.valueAt(valueCount - 1));
+            maxes.set(owningBucketOrdinal, max);
         }
-        maxes.set(owningBucketOrdinal, max);
     }
 
     @Override

@@ -20,10 +20,7 @@
 package org.elasticsearch.index.fielddata.plain;
 
 import com.google.common.base.Preconditions;
-import org.apache.lucene.index.AtomicReader;
-import org.apache.lucene.index.AtomicReaderContext;
-import org.apache.lucene.index.Terms;
-import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.index.*;
 import org.apache.lucene.util.*;
 import org.apache.lucene.util.packed.AppendingDeltaPackedLongBuffer;
 import org.apache.lucene.util.packed.MonotonicAppendingLongBuffer;
@@ -50,7 +47,7 @@ import java.util.EnumSet;
 /**
  * Stores numeric data into bit-packed arrays for better memory efficiency.
  */
-public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNumericFieldData> implements IndexNumericFieldData<AtomicNumericFieldData> {
+public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNumericFieldData> implements IndexNumericFieldData {
 
     public static class Builder implements IndexFieldData.Builder {
 
@@ -87,20 +84,13 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
     }
 
     @Override
-    public boolean valuesOrdered() {
-        // because we might have single values? we can dynamically update a flag to reflect that
-        // based on the atomic field data loaded
-        return false;
-    }
-
-    @Override
     public AtomicNumericFieldData loadDirect(AtomicReaderContext context) throws Exception {
         AtomicReader reader = context.reader();
         Terms terms = reader.terms(getFieldNames().indexName());
-        PackedArrayAtomicFieldData data = null;
+        AtomicNumericFieldData data = null;
         PackedArrayEstimator estimator = new PackedArrayEstimator(breakerService.getBreaker(), getNumericType(), getFieldNames().fullName());
         if (terms == null) {
-            data = PackedArrayAtomicFieldData.empty();
+            data = AbstractAtomicLongFieldData.empty();
             estimator.adjustForNoTerms(data.ramBytesUsed());
             return data;
         }
@@ -127,9 +117,9 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
             Ordinals build = builder.build(fieldDataType.getSettings());
             CommonSettings.MemoryStorageFormat formatHint = CommonSettings.getMemoryStorageHint(fieldDataType);
 
-            BytesValues.WithOrdinals ordinals = build.ordinals();
-            if (ordinals.isMultiValued() || formatHint == CommonSettings.MemoryStorageFormat.ORDINALS) {
-                data = new PackedArrayAtomicFieldData.WithOrdinals(values, build);
+            RandomAccessOrds ordinals = build.ordinals();
+            if (FieldData.isMultiValued(ordinals) || formatHint == CommonSettings.MemoryStorageFormat.ORDINALS) {
+                data = new PackedArrayAtomicFieldData.WithOrdinals(values, build, reader.maxDoc());
             } else {
                 final FixedBitSet docsWithValues = builder.buildDocsWithValuesSet();
 
@@ -183,8 +173,9 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
                         }
 
                         for (int i = 0; i < reader.maxDoc(); i++) {
-                            final long ord = ordinals.getOrd(i);
-                            if (ord != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+                            ordinals.setDocument(i);
+                            final long ord = ordinals.nextOrd();
+                            if (ord != RandomAccessOrds.NO_MORE_ORDS) {
                                 long value = values.get(ord);
                                 sValues.set(i, value - minValue);
                             }
@@ -192,30 +183,26 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
                         if (docsWithValues == null) {
                             data = new PackedArrayAtomicFieldData.Single(sValues, minValue);
                         } else {
-                            data = new PackedArrayAtomicFieldData.SingleSparse(sValues, minValue, missingValue);
+                            data = new PackedArrayAtomicFieldData.SingleSparse(sValues, minValue, missingValue, reader.maxDoc());
                         }
                         break;
                     case PAGED:
-
                         final AppendingDeltaPackedLongBuffer dpValues = new AppendingDeltaPackedLongBuffer(reader.maxDoc() / pageSize + 1, pageSize, acceptableOverheadRatio);
 
                         long lastValue = 0;
                         for (int i = 0; i < reader.maxDoc(); i++) {
-                            final long ord = ordinals.getOrd(i);
-                            if (ord != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+                            ordinals.setDocument(i);
+                            final long ord = ordinals.nextOrd();
+                            if (ord != RandomAccessOrds.NO_MORE_ORDS) {
                                 lastValue = values.get(ord);
                             }
                             dpValues.add(lastValue);
                         }
                         dpValues.freeze();
-                        if (docsWithValues == null) {
-                            data = new PackedArrayAtomicFieldData.PagedSingle(dpValues);
-                        } else {
-                            data = new PackedArrayAtomicFieldData.PagedSingleSparse(dpValues, docsWithValues);
-                        }
+                        data = new PackedArrayAtomicFieldData.PagedSingle(dpValues, docsWithValues);
                         break;
                     case ORDINALS:
-                        data = new PackedArrayAtomicFieldData.WithOrdinals(values, build);
+                        data = new PackedArrayAtomicFieldData.WithOrdinals(values, build, reader.maxDoc());
                         break;
                     default:
                         throw new ElasticsearchException("unknown memory format: " + formatHint);
@@ -238,7 +225,7 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
 
     }
 
-    protected CommonSettings.MemoryStorageFormat chooseStorageFormat(AtomicReader reader, MonotonicAppendingLongBuffer values, Ordinals build, BytesValues.WithOrdinals ordinals,
+    protected CommonSettings.MemoryStorageFormat chooseStorageFormat(AtomicReader reader, MonotonicAppendingLongBuffer values, Ordinals build, RandomAccessOrds ordinals,
                                                                      long minValue, long maxValue, float acceptableOverheadRatio, int pageSize) {
 
         CommonSettings.MemoryStorageFormat format;
@@ -259,8 +246,9 @@ public class PackedArrayIndexFieldData extends AbstractIndexFieldData<AtomicNume
         long pageMinOrdinal = Long.MAX_VALUE;
         long pageMaxOrdinal = Long.MIN_VALUE;
         for (int i = 1; i < reader.maxDoc(); ++i, pageIndex = (pageIndex + 1) % pageSize) {
-            long ordinal = ordinals.getOrd(i);
-            if (ordinal != BytesValues.WithOrdinals.MISSING_ORDINAL) {
+            ordinals.setDocument(i);
+            long ordinal = ordinals.nextOrd();
+            if (ordinal != SortedSetDocValues.NO_MORE_ORDS) {
                 pageMaxOrdinal = Math.max(ordinal, pageMaxOrdinal);
                 pageMinOrdinal = Math.min(ordinal, pageMinOrdinal);
             }

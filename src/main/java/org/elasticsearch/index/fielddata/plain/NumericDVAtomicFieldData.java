@@ -22,23 +22,20 @@ package org.elasticsearch.index.fielddata.plain;
 import org.apache.lucene.index.AtomicReader;
 import org.apache.lucene.index.DocValues;
 import org.apache.lucene.index.NumericDocValues;
+import org.apache.lucene.index.SortedNumericDocValues;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.ElasticsearchIllegalStateException;
-import org.elasticsearch.index.fielddata.AbstractAtomicNumericFieldData;
 import org.elasticsearch.index.fielddata.AtomicFieldData;
-import org.elasticsearch.index.fielddata.DoubleValues;
-import org.elasticsearch.index.fielddata.LongValues;
 
 import java.io.IOException;
 
 /** {@link AtomicFieldData} impl on top of Lucene's numeric doc values. */
-public class NumericDVAtomicFieldData extends AbstractAtomicNumericFieldData {
+public class NumericDVAtomicFieldData extends AbstractAtomicLongFieldData {
 
     private final AtomicReader reader;
     private final String field;
 
     public NumericDVAtomicFieldData(AtomicReader reader, String field) {
-        super(false);
         this.reader = reader;
         this.field = field;
     }
@@ -76,41 +73,9 @@ public class NumericDVAtomicFieldData extends AbstractAtomicNumericFieldData {
     }
 
     @Override
-    public LongValues getLongValues() {
+    public SortedNumericDocValues getLongValues() {
         final DocValuesAndBits docValues = getDocValues();
-
-        return new LongValues(false) {
-            @Override
-            public int setDocument(int docId) {
-                this.docId = docId;
-                return docValues.docsWithField.get(docId) ? 1 : 0;
-            }
-
-            @Override
-            public long nextValue() {
-                return docValues.values.get(docId);
-            }
-        };
-    }
-
-    @Override
-    public DoubleValues getDoubleValues() {
-        final DocValuesAndBits docValues = getDocValues();
-
-        return new DoubleValues(false) {
-
-            @Override
-            public int setDocument(int docId) {
-                this.docId = docId;
-                return docValues.docsWithField.get(docId) ? 1 : 0;
-            }
-
-            @Override
-            public double nextValue() {
-                return docValues.values.get(docId);
-            }
-
-        };
+        return DocValues.singleton(docValues.values, docValues.docsWithField);
     }
 
 }

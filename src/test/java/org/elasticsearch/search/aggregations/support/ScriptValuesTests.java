@@ -114,9 +114,10 @@ public class ScriptValuesTests extends ElasticsearchTestCase {
         FakeSearchScript script = new FakeSearchScript(values);
         ScriptLongValues scriptValues = new ScriptLongValues(script);
         for (int i = 0; i < values.length; ++i) {
-            assertEquals(values[i].length, scriptValues.setDocument(i));
+            scriptValues.setDocument(i);
+            assertEquals(values[i].length, scriptValues.count());
             for (int j = 0; j < values[i].length; ++j) {
-                assertEquals(values[i][j], scriptValues.nextValue());
+                assertEquals(values[i][j], scriptValues.valueAt(j));
             }
         }
     }
@@ -133,9 +134,10 @@ public class ScriptValuesTests extends ElasticsearchTestCase {
         FakeSearchScript script = new FakeSearchScript(values);
         ScriptDoubleValues scriptValues = new ScriptDoubleValues(script);
         for (int i = 0; i < values.length; ++i) {
-            assertEquals(values[i].length, scriptValues.setDocument(i));
+            scriptValues.setDocument(i);
+            assertEquals(values[i].length, scriptValues.count());
             for (int j = 0; j < values[i].length; ++j) {
-                assertEquals(values[i][j], scriptValues.nextValue());
+                assertEquals(values[i][j], scriptValues.valueAt(j));
             }
         }
     }
@@ -152,9 +154,10 @@ public class ScriptValuesTests extends ElasticsearchTestCase {
         FakeSearchScript script = new FakeSearchScript(values);
         ScriptBytesValues scriptValues = new ScriptBytesValues(script);
         for (int i = 0; i < values.length; ++i) {
-            assertEquals(values[i].length, scriptValues.setDocument(i));
+            scriptValues.setDocument(i);
+            assertEquals(values[i].length, scriptValues.count());
             for (int j = 0; j < values[i].length; ++j) {
-                assertEquals(new BytesRef(values[i][j]), scriptValues.nextValue());
+                assertEquals(new BytesRef(values[i][j]), scriptValues.valueAt(j));
             }
         }
     }

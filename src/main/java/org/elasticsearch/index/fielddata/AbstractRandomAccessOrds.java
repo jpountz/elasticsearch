@@ -16,22 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.elasticsearch.index.fielddata.plain;
 
-import org.elasticsearch.index.fielddata.LongValues;
+package org.elasticsearch.index.fielddata;
+
+import org.apache.lucene.index.RandomAccessOrds;
 
 /**
- * Package private base class for dense long values.
+ * Base implementation of a {@link RandomAccessOrds} instance.
  */
-abstract class DenseLongValues extends LongValues {
+// TODO: should it be merged into Lucene's RandomAccessOrds?
+public abstract class AbstractRandomAccessOrds extends RandomAccessOrds {
 
-    protected DenseLongValues(boolean multiValued) {
-        super(multiValued);
+    int i = 0;
+
+    protected abstract void doSetDocument(int docID);
+
+    @Override
+    public final void setDocument(int docID) {
+        doSetDocument(docID);
+        i = 0;
     }
 
     @Override
-    public final int setDocument(int docId) {
-        this.docId = docId;
-        return 1;
+    public long nextOrd() {
+        return ordAt(i++);
     }
+
 }

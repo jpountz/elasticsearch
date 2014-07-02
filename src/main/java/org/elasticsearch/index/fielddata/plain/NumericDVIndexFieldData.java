@@ -24,18 +24,13 @@ import org.elasticsearch.index.Index;
 import org.elasticsearch.index.fielddata.FieldDataType;
 import org.elasticsearch.index.fielddata.IndexNumericFieldData;
 import org.elasticsearch.index.fielddata.fieldcomparator.LongValuesComparatorSource;
-import org.elasticsearch.search.MultiValueMode;
 import org.elasticsearch.index.mapper.FieldMapper.Names;
+import org.elasticsearch.search.MultiValueMode;
 
-public class NumericDVIndexFieldData extends DocValuesIndexFieldData implements IndexNumericFieldData<NumericDVAtomicFieldData> {
+public class NumericDVIndexFieldData extends DocValuesIndexFieldData implements IndexNumericFieldData {
 
     public NumericDVIndexFieldData(Index index, Names fieldNames, FieldDataType fieldDataType) {
         super(index, fieldNames, fieldDataType);
-    }
-
-    @Override
-    public boolean valuesOrdered() {
-        return false;
     }
 
     @Override
