@@ -76,8 +76,8 @@ import org.elasticsearch.discovery.zen.elect.ElectMasterService;
 import org.elasticsearch.index.codec.CodecService;
 import org.elasticsearch.index.fielddata.FieldDataType;
 import org.elasticsearch.index.mapper.DocumentMapper;
-import org.elasticsearch.index.mapper.FieldMapper.Loading;
 import org.elasticsearch.index.mapper.FieldMapper;
+import org.elasticsearch.index.mapper.FieldMapper.Loading;
 import org.elasticsearch.index.mapper.internal.FieldNamesFieldMapper;
 import org.elasticsearch.index.mapper.internal.IdFieldMapper;
 import org.elasticsearch.index.merge.policy.*;
@@ -350,7 +350,7 @@ public abstract class ElasticsearchIntegrationTest extends ElasticsearchTestCase
                         .field("match_mapping_type", "string")
                         .startObject("mapping")
                         .startObject("fielddata")
-                        .field(FieldDataType.FORMAT_KEY, randomFrom("paged_bytes", "fst")) // unfortunately doc values only work on not_analyzed fields
+                        .field(FieldDataType.FORMAT_KEY, randomFrom("paged_bytes", "fst", "doc_values"))
                         .field(Loading.KEY, randomLoadingValues())
                         .endObject()
                         .endObject()

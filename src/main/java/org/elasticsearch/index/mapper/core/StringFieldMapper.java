@@ -20,6 +20,8 @@
 package org.elasticsearch.index.mapper.core;
 
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.TermToBytesRefAttribute;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.SortedSetDocValuesField;
@@ -29,6 +31,7 @@ import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchIllegalArgumentException;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.io.FastStringReader;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
@@ -42,6 +45,7 @@ import org.elasticsearch.index.mapper.internal.AllFieldMapper;
 import org.elasticsearch.index.similarity.SimilarityProvider;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.util.List;
 import java.util.Map;
 
@@ -200,9 +204,6 @@ public class StringFieldMapper extends AbstractFieldMapper<String> implements Al
                                 Settings indexSettings, MultiFields multiFields, CopyTo copyTo) {
         super(names, boost, fieldType, docValues, indexAnalyzer, searchAnalyzer, postingsFormat, docValuesFormat, 
                 similarity, normsLoading, fieldDataSettings, indexSettings, multiFields, copyTo);
-        if (fieldType.tokenized() && fieldType.indexed() && hasDocValues()) {
-            throw new MapperParsingException("Field [" + names.fullName() + "] cannot be analyzed and have doc values");
-        }
         this.defaultFieldType = defaultFieldType;
         this.nullValue = nullValue;
         this.positionOffsetGap = positionOffsetGap;
@@ -288,7 +289,24 @@ public class StringFieldMapper extends AbstractFieldMapper<String> implements Al
             fields.add(field);
         }
         if (hasDocValues()) {
-            fields.add(new SortedSetDocValuesField(names.indexName(), new BytesRef(valueAndBoost.value())));
+            if (fieldType.indexed() && fieldType.tokenized()) {
+                // TODO: this is slow
+                Analyzer analyzer = indexAnalyzer();
+                if (analyzer == null) {
+                    analyzer = context.analysisService().defaultIndexAnalyzer();
+                }
+                try (final Reader reader = new FastStringReader(valueAndBoost.value());
+                     final TokenStream tk = analyzer.tokenStream(names().indexName(), reader)) {
+                    final TermToBytesRefAttribute termAtt = tk.addAttribute(TermToBytesRefAttribute.class);
+                    tk.reset();
+                    while (tk.incrementToken()) {
+                        termAtt.fillBytesRef();
+                        fields.add(new SortedSetDocValuesField(names.indexName(), BytesRef.deepCopyOf(termAtt.getBytesRef())));
+                    }
+                }
+            } else {
+                fields.add(new SortedSetDocValuesField(names.indexName(), new BytesRef(valueAndBoost.value())));
+            }
         }
         if (fields.isEmpty()) {
             context.ignoredValue(names.indexName(), valueAndBoost.value());
