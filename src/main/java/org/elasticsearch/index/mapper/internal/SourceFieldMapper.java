@@ -409,21 +409,19 @@ public class SourceFieldMapper extends AbstractFieldMapper<byte[]> implements In
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         SourceFieldMapper sourceMergeWith = (SourceFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (sourceMergeWith.compress != null) {
-                this.compress = sourceMergeWith.compress;
-            }
-            if (sourceMergeWith.compressThreshold != -1) {
-                this.compressThreshold = sourceMergeWith.compressThreshold;
-            }
-            if (sourceMergeWith.includes != null) {
-                this.includes = sourceMergeWith.includes;
-            }
-            if (sourceMergeWith.excludes != null) {
-                this.excludes = sourceMergeWith.excludes;
-            }
+        if (sourceMergeWith.compress != null) {
+            this.compress = sourceMergeWith.compress;
+        }
+        if (sourceMergeWith.compressThreshold != -1) {
+            this.compressThreshold = sourceMergeWith.compressThreshold;
+        }
+        if (sourceMergeWith.includes != null) {
+            this.includes = sourceMergeWith.includes;
+        }
+        if (sourceMergeWith.excludes != null) {
+            this.excludes = sourceMergeWith.excludes;
         }
     }
 }

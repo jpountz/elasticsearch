@@ -172,12 +172,10 @@ public class SizeFieldMapper extends IntegerFieldMapper implements RootMapper {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         SizeFieldMapper sizeFieldMapperMergeWith = (SizeFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (sizeFieldMapperMergeWith.enabledState != enabledState && !sizeFieldMapperMergeWith.enabledState.unset()) {
-                this.enabledState = sizeFieldMapperMergeWith.enabledState;
-            }
+        if (sizeFieldMapperMergeWith.enabledState != enabledState && !sizeFieldMapperMergeWith.enabledState.unset()) {
+            this.enabledState = sizeFieldMapperMergeWith.enabledState;
         }
     }
 }

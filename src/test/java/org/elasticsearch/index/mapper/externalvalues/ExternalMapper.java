@@ -206,7 +206,7 @@ public class ExternalMapper extends AbstractFieldMapper<Object> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         // ignore this for now
     }
 

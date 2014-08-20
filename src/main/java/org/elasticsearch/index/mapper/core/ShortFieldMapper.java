@@ -331,15 +331,10 @@ public class ShortFieldMapper extends NumberFieldMapper<Short> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((ShortFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((ShortFieldMapper) mergeWith).nullValueAsString;
-        }
+        this.nullValue = ((ShortFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((ShortFieldMapper) mergeWith).nullValueAsString;
     }
 
     @Override

@@ -330,15 +330,13 @@ public class ByteFieldMapper extends NumberFieldMapper<Byte> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
         if (!this.getClass().equals(mergeWith.getClass())) {
             return;
         }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((ByteFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((ByteFieldMapper) mergeWith).nullValueAsString;
-        }
+        this.nullValue = ((ByteFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((ByteFieldMapper) mergeWith).nullValueAsString;
     }
 
     @Override

@@ -35,7 +35,7 @@ import static org.elasticsearch.index.mapper.MapperBuilders.analyzer;
 /**
  *
  */
-public class AnalyzerMapper implements Mapper, InternalMapper, RootMapper {
+public class AnalyzerMapper extends AbstractMapper implements Mapper, InternalMapper, RootMapper {
 
     public static final String NAME = "_analyzer";
     public static final String CONTENT_TYPE = "_analyzer";
@@ -91,6 +91,11 @@ public class AnalyzerMapper implements Mapper, InternalMapper, RootMapper {
 
     @Override
     public String name() {
+        return CONTENT_TYPE;
+    }
+
+    @Override
+    protected String contentType() {
         return CONTENT_TYPE;
     }
 
@@ -155,7 +160,7 @@ public class AnalyzerMapper implements Mapper, InternalMapper, RootMapper {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    public void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
     }
 
     @Override

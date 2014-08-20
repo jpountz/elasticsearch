@@ -238,20 +238,15 @@ public class BinaryFieldMapper extends AbstractFieldMapper<BytesReference> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
 
         BinaryFieldMapper sourceMergeWith = (BinaryFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (sourceMergeWith.compress != null) {
-                this.compress = sourceMergeWith.compress;
-            }
-            if (sourceMergeWith.compressThreshold != -1) {
-                this.compressThreshold = sourceMergeWith.compressThreshold;
-            }
+        if (sourceMergeWith.compress != null) {
+            this.compress = sourceMergeWith.compress;
+        }
+        if (sourceMergeWith.compressThreshold != -1) {
+            this.compressThreshold = sourceMergeWith.compressThreshold;
         }
     }
 

@@ -216,12 +216,10 @@ public class IndexFieldMapper extends AbstractFieldMapper<String> implements Int
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         IndexFieldMapper indexFieldMapperMergeWith = (IndexFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (indexFieldMapperMergeWith.enabledState != enabledState && !indexFieldMapperMergeWith.enabledState.unset()) {
-                this.enabledState = indexFieldMapperMergeWith.enabledState;
-            }
+        if (indexFieldMapperMergeWith.enabledState != enabledState && !indexFieldMapperMergeWith.enabledState.unset()) {
+            this.enabledState = indexFieldMapperMergeWith.enabledState;
         }
     }
 

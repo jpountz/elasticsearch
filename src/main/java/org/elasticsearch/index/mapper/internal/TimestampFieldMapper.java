@@ -277,12 +277,10 @@ public class TimestampFieldMapper extends DateFieldMapper implements InternalMap
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         TimestampFieldMapper timestampFieldMapperMergeWith = (TimestampFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (timestampFieldMapperMergeWith.enabledState != enabledState && !timestampFieldMapperMergeWith.enabledState.unset()) {
-                this.enabledState = timestampFieldMapperMergeWith.enabledState;
-            }
+        if (timestampFieldMapperMergeWith.enabledState != enabledState && !timestampFieldMapperMergeWith.enabledState.unset()) {
+            this.enabledState = timestampFieldMapperMergeWith.enabledState;
         }
     }
 }

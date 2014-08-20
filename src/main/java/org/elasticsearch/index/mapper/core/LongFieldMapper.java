@@ -315,15 +315,10 @@ public class LongFieldMapper extends NumberFieldMapper<Long> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((LongFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((LongFieldMapper) mergeWith).nullValueAsString;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.nullValue = ((LongFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((LongFieldMapper) mergeWith).nullValueAsString;
     }
 
     @Override

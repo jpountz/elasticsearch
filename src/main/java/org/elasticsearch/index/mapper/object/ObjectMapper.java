@@ -30,7 +30,7 @@ import org.elasticsearch.ElasticsearchIllegalStateException;
 import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.collect.UpdateInPlaceMap;
+import org.elasticsearch.common.collect.CopyOnWriteHashMap;
 import org.elasticsearch.common.joda.FormatDateTimeFormatter;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.ToXContent;
@@ -54,7 +54,7 @@ import static org.elasticsearch.index.mapper.core.TypeParsers.parsePathType;
 /**
  *
  */
-public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
+public class ObjectMapper extends AbstractMapper implements Mapper, AllFieldMapper.IncludeInAll {
 
     public static final String CONTENT_TYPE = "object";
     public static final String NESTED_CONTENT_TYPE = "nested";
@@ -311,7 +311,7 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
 
     private Boolean includeInAll;
 
-    private final UpdateInPlaceMap<String, Mapper> mappers;
+    private CopyOnWriteHashMap<String, Mapper> mappers;
 
     private final Object mutex = new Object();
 
@@ -322,11 +322,11 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
         this.nested = nested;
         this.dynamic = dynamic;
         this.pathType = pathType;
-        this.mappers = UpdateInPlaceMap.of(MapperService.getFieldMappersCollectionSwitch(settings));
+        this.mappers = new CopyOnWriteHashMap<>();
         if (mappers != null) {
-            UpdateInPlaceMap<String, Mapper>.Mutator mappersMutator = this.mappers.mutator();
-            mappersMutator.putAll(mappers);
-            mappersMutator.close();
+            for (Map.Entry<String, Mapper> entry : mappers.entrySet()) {
+                this.mappers = this.mappers.put(entry.getKey(), entry.getValue());
+            }
         }
         this.nestedTypePathAsString = "__" + fullPath;
         this.nestedTypePathAsBytes = new BytesRef(nestedTypePathAsString);
@@ -389,9 +389,7 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
             ((AllFieldMapper.IncludeInAll) mapper).includeInAllIfNotSet(includeInAll);
         }
         synchronized (mutex) {
-            UpdateInPlaceMap<String, Mapper>.Mutator mappingMutator = this.mappers.mutator();
-            mappingMutator.put(mapper.name(), mapper);
-            mappingMutator.close();
+            mappers = mappers.put(mapper.name(), mapper);
         }
         return this;
     }
@@ -401,6 +399,10 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
         for (Mapper mapper : mappers.values()) {
             mapper.traverse(fieldMapperListener);
         }
+    }
+
+    public Iterable<Mapper> mappers() {
+        return mappers.values();
     }
 
     @Override
@@ -593,8 +595,8 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
         String arrayFieldName = lastFieldName;
         Mapper mapper = mappers.get(lastFieldName);
         if (mapper != null) {
-            // There is a concrete mapper for this field already. Need to check if the mapper 
-            // expects an array, if so we pass the context straight to the mapper and if not 
+            // There is a concrete mapper for this field already. Need to check if the mapper
+            // expects an array, if so we pass the context straight to the mapper and if not
             // we serialize the array components
             if (mapper instanceof ArrayValueMapperParser) {
                 mapper.parse(context);
@@ -628,12 +630,11 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
                             serializeNonDynamicArray(context, lastFieldName, arrayFieldName);
                         }
                     } else {
-                        
                         serializeNonDynamicArray(context, lastFieldName, arrayFieldName);
                     }
                 }
             } else {
-                
+
                 serializeNonDynamicArray(context, lastFieldName, arrayFieldName);
             }
         }
@@ -793,19 +794,19 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
                     }
                     // DON'T do automatic ip detection logic, since it messes up with docs that have hosts and ips
                     // check if its an ip
-//                if (!resolved && text.indexOf('.') != -1) {
-//                    try {
-//                        IpFieldMapper.ipToLong(text);
-//                        XContentMapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "ip");
-//                        if (builder == null) {
-//                            builder = ipField(currentFieldName);
-//                        }
-//                        mapper = builder.build(builderContext);
-//                        resolved = true;
-//                    } catch (Exception e) {
-//                        // failure to parse, not ip...
-//                    }
-//                }
+    //                if (!resolved && text.indexOf('.') != -1) {
+    //                    try {
+    //                        IpFieldMapper.ipToLong(text);
+    //                        XContentMapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "ip");
+    //                        if (builder == null) {
+    //                            builder = ipField(currentFieldName);
+    //                        }
+    //                        mapper = builder.build(builderContext);
+    //                        resolved = true;
+    //                    } catch (Exception e) {
+    //                        // failure to parse, not ip...
+    //                    }
+    //                }
                     if (!resolved) {
                         Mapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "string");
                         if (builder == null) {
@@ -903,11 +904,12 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
     }
 
     @Override
-    public void merge(final Mapper mergeWith, final MergeContext mergeContext) throws MergeMappingException {
-        if (!(mergeWith instanceof ObjectMapper)) {
-            mergeContext.addConflict("Can't merge a non object mapping [" + mergeWith.name() + "] with an object mapping [" + name() + "]");
-            return;
-        }
+    protected String contentType() {
+        return CONTENT_TYPE;
+    }
+
+    @Override
+    protected void doMerge(final Mapper mergeWith, final MergeContext mergeContext) throws MergeMappingException {
         ObjectMapper mergeWithObject = (ObjectMapper) mergeWith;
 
         if (nested().isNested()) {
@@ -922,48 +924,35 @@ public class ObjectMapper implements Mapper, AllFieldMapper.IncludeInAll {
             }
         }
 
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (mergeWithObject.dynamic != null) {
-                this.dynamic = mergeWithObject.dynamic;
-            }
+        if (mergeWithObject.dynamic != null) {
+            this.dynamic = mergeWithObject.dynamic;
         }
-
-        doMerge(mergeWithObject, mergeContext);
 
         List<Mapper> mappersToPut = new ArrayList<>();
         FieldMapperListener.Aggregator newFieldMappers = new FieldMapperListener.Aggregator();
         ObjectMapperListener.Aggregator newObjectMappers = new ObjectMapperListener.Aggregator();
-        synchronized (mutex) {
-            for (Mapper mapper : mergeWithObject.mappers.values()) {
-                Mapper mergeWithMapper = mapper;
-                Mapper mergeIntoMapper = mappers.get(mergeWithMapper.name());
-                if (mergeIntoMapper == null) {
-                    // no mapping, simply add it if not simulating
-                    if (!mergeContext.mergeFlags().simulate()) {
-                        mappersToPut.add(mergeWithMapper);
-                        mergeWithMapper.traverse(newFieldMappers);
-                        mergeWithMapper.traverse(newObjectMappers);
-                    }
-                } else {
-                    mergeIntoMapper.merge(mergeWithMapper, mergeContext);
-                }
-            }
-            if (!newFieldMappers.mappers.isEmpty()) {
-                mergeContext.docMapper().addFieldMappers(newFieldMappers.mappers);
-            }
-            if (!newObjectMappers.mappers.isEmpty()) {
-                mergeContext.docMapper().addObjectMappers(newObjectMappers.mappers);
-            }
-            // and the mappers only after the administration have been done, so it will not be visible to parser (which first try to read with no lock)
-            for (Mapper mapper : mappersToPut) {
-                putMapper(mapper);
+        for (Mapper mapper : mergeWithObject.mappers.values()) {
+            Mapper mergeWithMapper = mapper;
+            Mapper mergeIntoMapper = mappers.get(mergeWithMapper.name());
+            if (mergeIntoMapper == null) {
+                // no mapping, simply add it if not simulating
+                mappersToPut.add(mergeWithMapper);
+                mergeWithMapper.traverse(newFieldMappers);
+                mergeWithMapper.traverse(newObjectMappers);
+            } else {
+                mappersToPut.add(mergeIntoMapper.merge(mergeWithMapper, mergeContext));
             }
         }
-
-    }
-
-    protected void doMerge(ObjectMapper mergeWith, MergeContext mergeContext) {
-
+        if (!newFieldMappers.mappers.isEmpty()) {
+            mergeContext.docMapper().addFieldMappers(newFieldMappers.mappers);
+        }
+        if (!newObjectMappers.mappers.isEmpty()) {
+            mergeContext.docMapper().addObjectMappers(newObjectMappers.mappers);
+        }
+        // and the mappers only after the administration have been done, so it will not be visible to parser (which first try to read with no lock)
+        for (Mapper mapper : mappersToPut) {
+            putMapper(mapper);
+        }
     }
 
     @Override

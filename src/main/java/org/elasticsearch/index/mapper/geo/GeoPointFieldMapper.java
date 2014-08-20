@@ -609,11 +609,8 @@ public class GeoPointFieldMapper extends AbstractFieldMapper<GeoPoint> implement
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
         GeoPointFieldMapper fieldMergeWith = (GeoPointFieldMapper) mergeWith;
 
         if (this.enableLatLon != fieldMergeWith.enableLatLon) {
@@ -638,11 +635,8 @@ public class GeoPointFieldMapper extends AbstractFieldMapper<GeoPoint> implement
             mergeContext.addConflict("mapper [" + names.fullName() + "] has different precision_step");
         }
 
-
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.validateLat = fieldMergeWith.validateLat;
-            this.validateLon = fieldMergeWith.validateLon;
-        }
+        this.validateLat = fieldMergeWith.validateLat;
+        this.validateLon = fieldMergeWith.validateLon;
     }
 
     @Override

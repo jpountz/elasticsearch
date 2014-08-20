@@ -368,21 +368,19 @@ public abstract class NumberFieldMapper<T extends Number> extends AbstractFieldM
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
         if (!this.getClass().equals(mergeWith.getClass())) {
             return;
         }
-        if (!mergeContext.mergeFlags().simulate()) {
-            NumberFieldMapper nfmMergeWith = (NumberFieldMapper) mergeWith;
-            this.precisionStep = nfmMergeWith.precisionStep;
-            this.includeInAll = nfmMergeWith.includeInAll;
-            if (nfmMergeWith.ignoreMalformed.explicit()) {
-                this.ignoreMalformed = nfmMergeWith.ignoreMalformed;
-            }
-            if (nfmMergeWith.coerce.explicit()) {
-                this.coerce = nfmMergeWith.coerce;
-            }
+        NumberFieldMapper nfmMergeWith = (NumberFieldMapper) mergeWith;
+        this.precisionStep = nfmMergeWith.precisionStep;
+        this.includeInAll = nfmMergeWith.includeInAll;
+        if (nfmMergeWith.ignoreMalformed.explicit()) {
+            this.ignoreMalformed = nfmMergeWith.ignoreMalformed;
+        }
+        if (nfmMergeWith.coerce.explicit()) {
+            this.coerce = nfmMergeWith.coerce;
         }
     }
 

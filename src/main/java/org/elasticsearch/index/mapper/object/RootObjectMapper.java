@@ -252,25 +252,24 @@ public class RootObjectMapper extends ObjectMapper {
     }
 
     @Override
-    protected void doMerge(ObjectMapper mergeWith, MergeContext mergeContext) {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) {
+        super.doMerge(mergeWith, mergeContext);
         RootObjectMapper mergeWithObject = (RootObjectMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            // merge them
-            List<DynamicTemplate> mergedTemplates = Lists.newArrayList(Arrays.asList(this.dynamicTemplates));
-            for (DynamicTemplate template : mergeWithObject.dynamicTemplates) {
-                boolean replaced = false;
-                for (int i = 0; i < mergedTemplates.size(); i++) {
-                    if (mergedTemplates.get(i).name().equals(template.name())) {
-                        mergedTemplates.set(i, template);
-                        replaced = true;
-                    }
-                }
-                if (!replaced) {
-                    mergedTemplates.add(template);
+        // merge them
+        List<DynamicTemplate> mergedTemplates = Lists.newArrayList(Arrays.asList(this.dynamicTemplates));
+        for (DynamicTemplate template : mergeWithObject.dynamicTemplates) {
+            boolean replaced = false;
+            for (int i = 0; i < mergedTemplates.size(); i++) {
+                if (mergedTemplates.get(i).name().equals(template.name())) {
+                    mergedTemplates.set(i, template);
+                    replaced = true;
                 }
             }
-            this.dynamicTemplates = mergedTemplates.toArray(new DynamicTemplate[mergedTemplates.size()]);
+            if (!replaced) {
+                mergedTemplates.add(template);
+            }
         }
+        this.dynamicTemplates = mergedTemplates.toArray(new DynamicTemplate[mergedTemplates.size()]);
     }
 
     @Override

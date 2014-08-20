@@ -248,14 +248,11 @@ public class UidFieldMapper extends AbstractFieldMapper<Uid> implements Internal
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         AbstractFieldMapper<?> fieldMergeWith = (AbstractFieldMapper<?>) mergeWith;
         // do nothing here, no merging, but also no exception
-        if (!mergeContext.mergeFlags().simulate()) {
-            // apply changeable values
-            if (fieldMergeWith.postingsFormatProvider() != null) {
-                this.postingsFormat = fieldMergeWith.postingsFormatProvider();
-            }
+        if (fieldMergeWith.postingsFormatProvider() != null) {
+            this.postingsFormat = fieldMergeWith.postingsFormatProvider();
         }
     }
 }

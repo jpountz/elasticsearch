@@ -479,8 +479,8 @@ public class CompletionFieldMapper extends AbstractFieldMapper<String> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
         CompletionFieldMapper fieldMergeWith = (CompletionFieldMapper) mergeWith;
         if (payloads != fieldMergeWith.payloads) {
             mergeContext.addConflict("mapper [" + names.fullName() + "] has different payload values");
@@ -494,9 +494,7 @@ public class CompletionFieldMapper extends AbstractFieldMapper<String> {
         if(!ContextMapping.mappingsAreEqual(getContextMapping(), fieldMergeWith.getContextMapping())) {
             mergeContext.addConflict("mapper [" + names.fullName() + "] has different 'context_mapping' values");
         }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.maxInputLength = fieldMergeWith.maxInputLength;
-        }
+        this.maxInputLength = fieldMergeWith.maxInputLength;
     }
 
     // this should be package private but our tests don't allow it.

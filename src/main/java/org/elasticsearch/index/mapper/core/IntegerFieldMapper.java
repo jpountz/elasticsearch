@@ -333,15 +333,10 @@ public class IntegerFieldMapper extends NumberFieldMapper<Integer> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((IntegerFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((IntegerFieldMapper) mergeWith).nullValueAsString;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.nullValue = ((IntegerFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((IntegerFieldMapper) mergeWith).nullValueAsString;
     }
 
     @Override

@@ -527,15 +527,10 @@ public class DateFieldMapper extends NumberFieldMapper<Long> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((DateFieldMapper) mergeWith).nullValue;
-            this.dateTimeFormatter = ((DateFieldMapper) mergeWith).dateTimeFormatter;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.nullValue = ((DateFieldMapper) mergeWith).nullValue;
+        this.dateTimeFormatter = ((DateFieldMapper) mergeWith).dateTimeFormatter;
     }
 
     @Override

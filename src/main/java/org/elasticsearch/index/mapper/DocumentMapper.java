@@ -20,6 +20,7 @@
 package org.elasticsearch.index.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.lucene.analysis.Analyzer;
@@ -54,8 +55,6 @@ import org.elasticsearch.script.ScriptService.ScriptType;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
-
-import static com.google.common.collect.Lists.newArrayList;
 
 /**
  *
@@ -269,11 +268,11 @@ public class DocumentMapper implements ToXContent {
 
     private volatile CompressedString mappingSource;
 
-    private final RootObjectMapper rootObjectMapper;
+    private volatile RootObjectMapper rootObjectMapper;
 
-    private final ImmutableMap<Class<? extends RootMapper>, RootMapper> rootMappers;
-    private final RootMapper[] rootMappersOrdered;
-    private final RootMapper[] rootMappersNotIncludedInObject;
+    private volatile ImmutableMap<Class<? extends RootMapper>, RootMapper> rootMappers;
+    private volatile RootMapper[] rootMappersOrdered;
+    private volatile RootMapper[] rootMappersNotIncludedInObject;
 
     private final NamedAnalyzer indexAnalyzer;
 
@@ -310,15 +309,7 @@ public class DocumentMapper implements ToXContent {
         this.rootObjectMapper = rootObjectMapper;
         this.sourceTransforms = sourceTransforms;
 
-        this.rootMappers = ImmutableMap.copyOf(rootMappers);
-        this.rootMappersOrdered = rootMappers.values().toArray(new RootMapper[rootMappers.values().size()]);
-        List<RootMapper> rootMappersNotIncludedInObjectLst = newArrayList();
-        for (RootMapper rootMapper : rootMappersOrdered) {
-            if (!rootMapper.includeInObject()) {
-                rootMappersNotIncludedInObjectLst.add(rootMapper);
-            }
-        }
-        this.rootMappersNotIncludedInObject = rootMappersNotIncludedInObjectLst.toArray(new RootMapper[rootMappersNotIncludedInObjectLst.size()]);
+        resetRootMappers(rootMappers);
 
         this.indexAnalyzer = indexAnalyzer;
         this.searchAnalyzer = searchAnalyzer;
@@ -363,6 +354,18 @@ public class DocumentMapper implements ToXContent {
         }
 
         refreshSource();
+    }
+
+    private void resetRootMappers(Map<Class<? extends RootMapper>, RootMapper> rootMappers) {
+        this.rootMappers = ImmutableMap.copyOf(rootMappers);
+        this.rootMappersOrdered = rootMappers.values().toArray(new RootMapper[rootMappers.values().size()]);
+        List<RootMapper> rootMappersNotIncludedInObjectLst = Lists.newArrayList();
+        for (RootMapper rootMapper : rootMappersOrdered) {
+            if (!rootMapper.includeInObject()) {
+                rootMappersNotIncludedInObjectLst.add(rootMapper);
+            }
+        }
+        this.rootMappersNotIncludedInObject = rootMappersNotIncludedInObjectLst.toArray(new RootMapper[rootMappersNotIncludedInObjectLst.size()]);
     }
 
     public String type() {
@@ -667,19 +670,31 @@ public class DocumentMapper implements ToXContent {
         MergeContext mergeContext = new MergeContext(this, mergeFlags);
         assert rootMappers.size() == mergeWith.rootMappers.size();
 
-        rootObjectMapper.merge(mergeWith.rootObjectMapper, mergeContext);
+        final RootObjectMapper mergedRoot = (RootObjectMapper) rootObjectMapper.merge(mergeWith.rootObjectMapper, mergeContext);
+        final ImmutableMap.Builder<Class<? extends RootMapper>, RootMapper> mergedRootMappers = ImmutableMap.builder();
+
+        for (Mapper mapper : mergedRoot.mappers()) {
+            if (mapper instanceof RootMapper) {
+                RootMapper rootMapper = (RootMapper) mapper;
+                mergedRootMappers.put(rootMapper.getClass(), rootMapper);
+            }
+        }
+
         for (Map.Entry<Class<? extends RootMapper>, RootMapper> entry : rootMappers.entrySet()) {
-            // root mappers included in root object will get merge in the rootObjectMapper
+            // root mappers included in root object got merged in the rootObjectMapper
             if (entry.getValue().includeInObject()) {
                 continue;
             }
             RootMapper mergeWithRootMapper = mergeWith.rootMappers.get(entry.getKey());
             if (mergeWithRootMapper != null) {
-                entry.getValue().merge(mergeWithRootMapper, mergeContext);
+                RootMapper merged = (RootMapper) entry.getValue().merge(mergeWithRootMapper, mergeContext);
+                mergedRootMappers.put(merged.getClass(), merged);
             }
         }
 
         if (!mergeFlags.simulate()) {
+            this.rootObjectMapper = mergedRoot;
+            resetRootMappers(mergedRootMappers.build());
             // let the merge with attributes to override the attributes
             meta = mergeWith.meta();
             // update the source of the merged one

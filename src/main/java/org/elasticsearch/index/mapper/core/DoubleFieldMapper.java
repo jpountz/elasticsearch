@@ -336,15 +336,10 @@ public class DoubleFieldMapper extends NumberFieldMapper<Double> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((DoubleFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((DoubleFieldMapper) mergeWith).nullValueAsString;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.nullValue = ((DoubleFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((DoubleFieldMapper) mergeWith).nullValueAsString;
     }
 
     @Override

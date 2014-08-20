@@ -341,15 +341,10 @@ public class FloatFieldMapper extends NumberFieldMapper<Float> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.nullValue = ((FloatFieldMapper) mergeWith).nullValue;
-            this.nullValueAsString = ((FloatFieldMapper) mergeWith).nullValueAsString;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.nullValue = ((FloatFieldMapper) mergeWith).nullValue;
+        this.nullValueAsString = ((FloatFieldMapper) mergeWith).nullValueAsString;
     }
 
 

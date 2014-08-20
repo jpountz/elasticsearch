@@ -185,10 +185,7 @@ public class VersionFieldMapper extends AbstractFieldMapper<Long> implements Int
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        if (mergeContext.mergeFlags().simulate()) {
-            return;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         AbstractFieldMapper<?> fieldMergeWith = (AbstractFieldMapper<?>) mergeWith;
         if (fieldMergeWith.docValuesFormatProvider() != null) {
             this.docValuesFormat = fieldMergeWith.docValuesFormatProvider();

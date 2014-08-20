@@ -379,7 +379,7 @@ public class IdFieldMapper extends AbstractFieldMapper<String> implements Intern
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         // do nothing here, no merging, but also no exception
     }
 }

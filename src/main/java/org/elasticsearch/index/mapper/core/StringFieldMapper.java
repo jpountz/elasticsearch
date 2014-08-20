@@ -340,16 +340,11 @@ public class StringFieldMapper extends AbstractFieldMapper<String> implements Al
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        super.merge(mergeWith, mergeContext);
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            return;
-        }
-        if (!mergeContext.mergeFlags().simulate()) {
-            this.includeInAll = ((StringFieldMapper) mergeWith).includeInAll;
-            this.nullValue = ((StringFieldMapper) mergeWith).nullValue;
-            this.ignoreAbove = ((StringFieldMapper) mergeWith).ignoreAbove;
-        }
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        super.doMerge(mergeWith, mergeContext);
+        this.includeInAll = ((StringFieldMapper) mergeWith).includeInAll;
+        this.nullValue = ((StringFieldMapper) mergeWith).nullValue;
+        this.ignoreAbove = ((StringFieldMapper) mergeWith).ignoreAbove;
     }
 
     @Override

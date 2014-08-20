@@ -65,7 +65,7 @@ import java.util.*;
 /**
  *
  */
-public abstract class AbstractFieldMapper<T> implements FieldMapper<T> {
+public abstract class AbstractFieldMapper<T> extends AbstractMapper implements FieldMapper<T> {
 
     public static class Defaults {
         public static final FieldType FIELD_TYPE = new FieldType();
@@ -554,17 +554,8 @@ public abstract class AbstractFieldMapper<T> implements FieldMapper<T> {
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
-        if (!this.getClass().equals(mergeWith.getClass())) {
-            String mergedType = mergeWith.getClass().getSimpleName();
-            if (mergeWith instanceof AbstractFieldMapper) {
-                mergedType = ((AbstractFieldMapper) mergeWith).contentType();
-            }
-            mergeContext.addConflict("mapper [" + names.fullName() + "] of different type, current_type [" + contentType() + "], merged_type [" + mergedType + "]");
-            // different types, return
-            return;
-        }
-        AbstractFieldMapper fieldMergeWith = (AbstractFieldMapper) mergeWith;
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+        AbstractFieldMapper<?> fieldMergeWith = (AbstractFieldMapper<?>) mergeWith;
         if (this.fieldType().indexed() != fieldMergeWith.fieldType().indexed() || this.fieldType().tokenized() != fieldMergeWith.fieldType().tokenized()) {
             mergeContext.addConflict("mapper [" + names.fullName() + "] has different index values");
         }
@@ -618,30 +609,28 @@ public abstract class AbstractFieldMapper<T> implements FieldMapper<T> {
         }
         multiFields.merge(mergeWith, mergeContext);
 
-        if (!mergeContext.mergeFlags().simulate()) {
-            // apply changeable values
-            this.fieldType = new FieldType(this.fieldType);
-            this.fieldType.setOmitNorms(fieldMergeWith.fieldType.omitNorms());
-            this.fieldType.freeze();
-            this.boost = fieldMergeWith.boost;
-            this.normsLoading = fieldMergeWith.normsLoading;
-            this.copyTo = fieldMergeWith.copyTo;
-            if (fieldMergeWith.postingsFormat != null) {
-                this.postingsFormat = fieldMergeWith.postingsFormat;
-            }
-            if (fieldMergeWith.docValuesFormat != null) {
-                this.docValuesFormat = fieldMergeWith.docValuesFormat;
-            }
-            if (fieldMergeWith.searchAnalyzer != null) {
-                this.searchAnalyzer = fieldMergeWith.searchAnalyzer;
-            }
-            if (fieldMergeWith.customFieldDataSettings != null) {
-                if (!Objects.equal(fieldMergeWith.customFieldDataSettings, this.customFieldDataSettings)) {
-                    this.customFieldDataSettings = fieldMergeWith.customFieldDataSettings;
-                    this.fieldDataType = new FieldDataType(defaultFieldDataType().getType(),
-                            ImmutableSettings.builder().put(defaultFieldDataType().getSettings()).put(this.customFieldDataSettings)
-                    );
-                }
+        // apply changeable values
+        this.fieldType = new FieldType(this.fieldType);
+        this.fieldType.setOmitNorms(fieldMergeWith.fieldType.omitNorms());
+        this.fieldType.freeze();
+        this.boost = fieldMergeWith.boost;
+        this.normsLoading = fieldMergeWith.normsLoading;
+        this.copyTo = fieldMergeWith.copyTo;
+        if (fieldMergeWith.postingsFormat != null) {
+            this.postingsFormat = fieldMergeWith.postingsFormat;
+        }
+        if (fieldMergeWith.docValuesFormat != null) {
+            this.docValuesFormat = fieldMergeWith.docValuesFormat;
+        }
+        if (fieldMergeWith.searchAnalyzer != null) {
+            this.searchAnalyzer = fieldMergeWith.searchAnalyzer;
+        }
+        if (fieldMergeWith.customFieldDataSettings != null) {
+            if (!Objects.equal(fieldMergeWith.customFieldDataSettings, this.customFieldDataSettings)) {
+                this.customFieldDataSettings = fieldMergeWith.customFieldDataSettings;
+                this.fieldDataType = new FieldDataType(defaultFieldDataType().getType(),
+                        ImmutableSettings.builder().put(defaultFieldDataType().getSettings()).put(this.customFieldDataSettings)
+                );
             }
         }
     }
@@ -820,9 +809,6 @@ public abstract class AbstractFieldMapper<T> implements FieldMapper<T> {
             return "not_analyzed";
         }
     }
-
-
-    protected abstract String contentType();
 
     @Override
     public void close() {

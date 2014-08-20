@@ -236,15 +236,13 @@ public class TTLFieldMapper extends LongFieldMapper implements InternalMapper, R
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         TTLFieldMapper ttlMergeWith = (TTLFieldMapper) mergeWith;
-        if (!mergeContext.mergeFlags().simulate()) {
-            if (ttlMergeWith.defaultTTL != -1) {
-                this.defaultTTL = ttlMergeWith.defaultTTL;
-            }
-            if (ttlMergeWith.enabledState != enabledState && !ttlMergeWith.enabledState.unset()) {
-                this.enabledState = ttlMergeWith.enabledState;
-            }
+        if (ttlMergeWith.defaultTTL != -1) {
+            this.defaultTTL = ttlMergeWith.defaultTTL;
+        }
+        if (ttlMergeWith.enabledState != enabledState && !ttlMergeWith.enabledState.unset()) {
+            this.enabledState = ttlMergeWith.enabledState;
         }
     }
 }

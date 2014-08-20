@@ -341,12 +341,11 @@ public class ParentFieldMapper extends AbstractFieldMapper<Uid> implements Inter
     }
 
     @Override
-    public void merge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
+    protected void doMerge(Mapper mergeWith, MergeContext mergeContext) throws MergeMappingException {
         ParentFieldMapper other = (ParentFieldMapper) mergeWith;
         if (active() == other.active()) {
             return;
         }
-
         if (active() != other.active() || !type.equals(other.type)) {
             mergeContext.addConflict("The _parent field can't be added or updated");
         }
