@@ -51,12 +51,23 @@ public final class CopyOnWriteHashMap<K, V> {
     /**
      * Insert <code>o</code> into <code>array</code> at <code>pos</code>.
      */
-    private static <T> T[] insert(T[] array, int pos, T o) {
+    private static <T> T[] insertAt(T[] array, int pos, T o) {
         @SuppressWarnings("unchecked")
         final T[] result = (T[]) Array.newInstance(array.getClass().getComponentType(), array.length + 1);
         System.arraycopy(array, 0, result, 0, pos);
         result[pos] = o;
         System.arraycopy(array, pos, result, pos + 1, array.length - pos);
+        return result;
+    }
+
+    /**
+     * Remove the entry at position <code>pos</code> from <code>array</code>.
+     */
+    private static <T> T[] removeAt(T[] array, int pos) {
+        @SuppressWarnings("unchecked")
+        final T[] result = (T[]) Array.newInstance(array.getClass().getComponentType(), array.length - 1);
+        System.arraycopy(array, 0, result, 0, pos);
+        System.arraycopy(array, pos + 1, result, pos, result.length - pos);
         return result;
     }
 
@@ -79,10 +90,20 @@ public final class CopyOnWriteHashMap<K, V> {
         abstract Node<K, V> put(K key, int hash, int hashBits, V value);
 
         /**
+         * Recursively remove an entry from this node.
+         */
+        abstract Node<K, V> remove(K key, int hash);
+
+        /**
          * For the current node only, append entries that are stored on this
          * node to <code>entries</code> and sub nodes to <code>nodes</code>.
          */
         abstract void visit(Deque<Map.Entry<K, V>> entries, Deque<Node<K, V>> nodes);
+
+        /**
+         * Whether this node stores nothing under it.
+         */
+        abstract boolean isEmpty();
 
     }
 
@@ -150,6 +171,11 @@ public final class CopyOnWriteHashMap<K, V> {
         }
 
         @Override
+        boolean isEmpty() {
+            return keys.length == 0;
+        }
+
+        @Override
         void visit(Deque<Map.Entry<K, V>> entries, Deque<Node<K, V>> nodes) {
             for (int i = 0; i < keys.length; ++i) {
                 entries.add(new Entry<K, V>(keys[i], values[i]));
@@ -196,7 +222,18 @@ public final class CopyOnWriteHashMap<K, V> {
             values2 = Arrays.copyOf(values, newLength);
             keys2[index] = key;
             values2[index] = value;
-            return new Leaf<K, V>(keys2, values2);
+            return new Leaf<>(keys2, values2);
+        }
+
+        @Override
+        Leaf<K, V> remove(K key, int hash) {
+            final int slot = slot(key);
+            if (slot < 0) {
+                return this;
+            }
+            final K[] keys2 = removeAt(keys, slot);
+            final V[] values2 = removeAt(values, slot);
+            return new Leaf<>(keys2, values2);
         }
     }
 
@@ -235,6 +272,7 @@ public final class CopyOnWriteHashMap<K, V> {
             return true;
         }
 
+        @Override
         boolean isEmpty() {
             return mask == 0;
         }
@@ -333,14 +371,14 @@ public final class CopyOnWriteHashMap<K, V> {
                 keys2[slot] = null;
                 subNodes2[slot] = subNode;
             }
-            return new InnerNode<K, V>(mask, keys2, subNodes2);
+            return new InnerNode<>(mask, keys2, subNodes2);
         }
 
         private InnerNode<K, V> putNew(K key, int hash6, int slot, V value) {
             final long mask2 = mask | (1L << hash6);
-            final K[] keys2 = insert(keys, slot, key);
-            final Object[] subNodes2 = insert(subNodes, slot, value);
-            return new InnerNode<K, V>(mask2, keys2, subNodes2);
+            final K[] keys2 = insertAt(keys, slot, key);
+            final Object[] subNodes2 = insertAt(subNodes, slot, value);
+            return new InnerNode<>(mask2, keys2, subNodes2);
         }
 
         @Override
@@ -354,6 +392,45 @@ public final class CopyOnWriteHashMap<K, V> {
                 return putExisting(key, hash, hashBits, slot, value);
             } else {
                 return putNew(key, hash6, slot, value);
+            }
+        }
+
+        private InnerNode<K, V> removeSlot(int hash6, int slot) {
+            final long mask2 = mask  & ~(1L << hash6);
+            final K[] keys2 = removeAt(keys, slot);
+            final Object[] subNodes2 = removeAt(subNodes, slot);
+            return new InnerNode<>(mask2, keys2, subNodes2);
+        }
+
+        @Override
+        InnerNode<K, V> remove(K key, int hash) {
+            final int hash6 = hash & HASH_MASK;
+            if (!exists(hash6)) {
+                return this;
+            }
+            final int slot = slot(hash6);
+            final Object previousValue = subNodes[slot];
+            if (previousValue instanceof Node) {
+                @SuppressWarnings("unchecked")
+                final Node<K, V> subNode = (Node<K, V>) previousValue;
+                final Node<K, V> removed = subNode.remove(key, hash >>> HASH_BITS);
+                if (removed == subNode) {
+                    // not in sub-nodes
+                    return this;
+                }
+                if (removed.isEmpty()) {
+                    return removeSlot(hash6, slot);
+                }
+                final K[] keys2 = Arrays.copyOf(keys, keys.length);
+                final Object[] subNodes2 = Arrays.copyOf(subNodes, subNodes.length);
+                subNodes2[slot] = removed;
+                return new InnerNode<>(mask, keys2, subNodes2);
+            } else if (keys[slot].equals(key)) {
+                // remove entry
+                return removeSlot(hash6, slot);
+            } else {
+                // hash collision, nothing to remove
+                return this;
             }
         }
 
@@ -427,6 +504,20 @@ public final class CopyOnWriteHashMap<K, V> {
         Preconditions.checkArgument(value != null, "null values are not supported");
         final int hash = key.hashCode();
         return new CopyOnWriteHashMap<>(root.put(key, hash, TOTAL_HASH_BITS, value));
+    }
+
+    /**
+     * Remove the given key from this map. The current hash table is not modified.
+     */
+    public CopyOnWriteHashMap<K, V> remove(K key) {
+        Preconditions.checkArgument(key != null, "null keys are not supported");
+        final int hash = key.hashCode();
+        final InnerNode<K, V> newRoot = root.remove(key, hash);
+        if (root == newRoot) {
+            return this;
+        } else {
+            return new CopyOnWriteHashMap<>(newRoot);
+        }
     }
 
     /**

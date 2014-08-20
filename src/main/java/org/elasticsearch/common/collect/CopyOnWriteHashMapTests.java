@@ -66,7 +66,7 @@ public class CopyOnWriteHashMapTests extends ElasticsearchTestCase {
     public void testDuel() {
         final int iters = scaledRandomIntBetween(2, 5);
         for (int iter = 0; iter < iters; ++iter) {
-            final int numAdds = randomInt(2000);
+            final int numOps = randomInt(5000);
             final int valueBits = randomIntBetween(1, 30);
             final int hashBits = randomInt(valueBits);
 
@@ -74,19 +74,32 @@ public class CopyOnWriteHashMapTests extends ElasticsearchTestCase {
             CopyOnWriteHashMap<O, Integer> map = new CopyOnWriteHashMap<>();
             assertEquals(ref, map);
             final int hashBase = randomInt();
-            for (int i = 0; i < numAdds; ++i) {
+            for (int i = 0; i < numOps; ++i) {
                 final int v = randomInt(1 << valueBits);
                 final int h = (v & ((1 << hashBits) - 1)) ^ hashBase;
                 O key = new O(v, h);
-                Integer value = v;
 
                 Map<O, Integer> newRef = new HashMap<>(ref);
-                newRef.put(key, value);
+                final CopyOnWriteHashMap<O, Integer> newMap;
 
-                CopyOnWriteHashMap<O, Integer> newMap = map.put(key, value);
+                if (randomBoolean()) {
+                    // ADD
+                    Integer value = v;
+                    newRef.put(key, value);
+                    newMap = map.put(key, value);
+                } else {
+                    // REMOVE
+                    final Integer removed = newRef.remove(key);
+                    newMap = map.remove(key);
+                    if (removed == null) {
+                        assertSame(map, newMap);
+                    }
+                }
 
                 assertEquals(ref, map); // make sure that the old copy has not been modified
                 assertEquals(newRef, newMap);
+                assertEquals(ref.isEmpty(), map.isEmpty());
+                assertEquals(newRef.isEmpty(), newMap.isEmpty());
 
                 ref = newRef;
                 map = newMap;
