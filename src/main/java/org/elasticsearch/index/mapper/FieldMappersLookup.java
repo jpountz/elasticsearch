@@ -19,152 +19,111 @@
 
 package org.elasticsearch.index.mapper;
 
-import com.google.common.collect.*;
+import com.google.common.collect.Sets;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.collect.ImmutableOpenMap;
-import org.elasticsearch.common.collect.UpdateInPlaceMap;
+import org.elasticsearch.common.collect.CopyOnWriteHashMap;
+import org.elasticsearch.common.collect.CopyOnWriteHashSet;
 import org.elasticsearch.common.regex.Regex;
-import org.elasticsearch.common.settings.Settings;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
  * A class that holds a map of field mappers from name, index name, and full name.
  */
-public class FieldMappersLookup implements Iterable<FieldMapper> {
+public final class FieldMappersLookup implements Iterable<FieldMapper<?>> {
 
-    private volatile FieldMapper[] mappers;
-    private volatile List<FieldMapper> mappersAsList;
-    private final UpdateInPlaceMap<String, FieldMappers> name;
-    private final UpdateInPlaceMap<String, FieldMappers> indexName;
-    private final UpdateInPlaceMap<String, FieldMappers> fullName;
+    private final CopyOnWriteHashSet<FieldMapper<?>> mappers;
+    private final CopyOnWriteHashMap<String, FieldMappers> name;
+    private final CopyOnWriteHashMap<String, FieldMappers> indexName;
+    private final CopyOnWriteHashMap<String, FieldMappers> fullName;
 
-    public FieldMappersLookup(Settings settings) {
-        this.mappers = new FieldMapper[0];
-        this.mappersAsList = ImmutableList.of();
-        this.fullName = UpdateInPlaceMap.of(MapperService.getFieldMappersCollectionSwitch(settings));
-        this.name = UpdateInPlaceMap.of(MapperService.getFieldMappersCollectionSwitch(settings));
-        this.indexName = UpdateInPlaceMap.of(MapperService.getFieldMappersCollectionSwitch(settings));
+    public FieldMappersLookup() {
+        this(new CopyOnWriteHashSet<FieldMapper<?>>(), new CopyOnWriteHashMap<String, FieldMappers>(),
+                new CopyOnWriteHashMap<String, FieldMappers>(), new CopyOnWriteHashMap<String, FieldMappers>());
+    }
+
+    private FieldMappersLookup(CopyOnWriteHashSet<FieldMapper<?>> mappers, CopyOnWriteHashMap<String, FieldMappers> name,
+            CopyOnWriteHashMap<String, FieldMappers> indexName, CopyOnWriteHashMap<String, FieldMappers> fullName) {
+        this.mappers = mappers;
+        this.name = name;
+        this.indexName = indexName;
+        this.fullName = fullName;
+    }
+
+    private static CopyOnWriteHashMap<String, FieldMappers> add(CopyOnWriteHashMap<String, FieldMappers> map, String name, FieldMapper<?> mapper) {
+        final FieldMappers mappers = map.get(name);
+        final FieldMappers newMappers;
+        if (mappers == null) {
+            newMappers = new FieldMappers(mapper);
+        } else {
+            newMappers = mappers.concat(mapper);
+        }
+        return map.put(name, newMappers);
+    }
+
+    private static CopyOnWriteHashMap<String, FieldMappers> remove(CopyOnWriteHashMap<String, FieldMappers> map, String name, FieldMapper<?> mapper) {
+        final FieldMappers mappers = map.get(name);
+        if (mappers != null) {
+            final FieldMappers newMappers = mappers.remove(mapper);
+            if (newMappers.isEmpty()) {
+                return map.remove(name);
+            } else {
+                return map.put(name, newMappers);
+            }
+        } else {
+            return map;
+        }
     }
 
     /**
      * Adds a new set of mappers.
      */
-    public void addNewMappers(List<FieldMapper> newMappers) {
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorName = name.mutator();
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorIndexName = indexName.mutator();
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorFullName = fullName.mutator();
+    public FieldMappersLookup addNewMappers(Iterable<FieldMapper<?>> newMappers) {
+        CopyOnWriteHashSet<FieldMapper<?>> mappers = this.mappers;
+        CopyOnWriteHashMap<String, FieldMappers> name = this.name;
+        CopyOnWriteHashMap<String, FieldMappers> indexName = this.indexName;
+        CopyOnWriteHashMap<String, FieldMappers> fullName = this.fullName;
 
-        for (FieldMapper fieldMapper : newMappers) {
-            FieldMappers mappers = mutatorName.get(fieldMapper.names().name());
-            if (mappers == null) {
-                mappers = new FieldMappers(fieldMapper);
-            } else {
-                mappers = mappers.concat(fieldMapper);
-            }
-            mutatorName.put(fieldMapper.names().name(), mappers);
-
-            mappers = mutatorIndexName.get(fieldMapper.names().indexName());
-            if (mappers == null) {
-                mappers = new FieldMappers(fieldMapper);
-            } else {
-                mappers = mappers.concat(fieldMapper);
-            }
-            mutatorIndexName.put(fieldMapper.names().indexName(), mappers);
-
-            mappers = mutatorFullName.get(fieldMapper.names().fullName());
-            if (mappers == null) {
-                mappers = new FieldMappers(fieldMapper);
-            } else {
-                mappers = mappers.concat(fieldMapper);
-            }
-            mutatorFullName.put(fieldMapper.names().fullName(), mappers);
+        for (FieldMapper<?> mapper : newMappers) {
+            mappers = mappers.add(mapper);
+            name = add(name, mapper.names().name(), mapper);
+            indexName = add(indexName, mapper.names().indexName(), mapper);
+            fullName = add(fullName, mapper.names().fullName(), mapper);
         }
-        FieldMapper[] tempMappers = new FieldMapper[this.mappers.length + newMappers.size()];
-        System.arraycopy(mappers, 0, tempMappers, 0, mappers.length);
-        int counter = 0;
-        for (int i = mappers.length; i < tempMappers.length; i++) {
-            tempMappers[i] = newMappers.get(counter++);
-        }
-        this.mappers = tempMappers;
-        this.mappersAsList = Arrays.asList(this.mappers);
 
-        mutatorName.close();
-        mutatorIndexName.close();
-        mutatorFullName.close();
+        return new FieldMappersLookup(mappers, name, indexName, fullName);
     }
 
     /**
      * Removes the set of mappers.
      */
-    public void removeMappers(Iterable<FieldMapper> mappersToRemove) {
-        List<FieldMapper> tempMappers = Lists.newArrayList(this.mappers);
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorName = name.mutator();
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorIndexName = indexName.mutator();
-        final UpdateInPlaceMap<String, FieldMappers>.Mutator mutatorFullName = fullName.mutator();
+    public FieldMappersLookup removeMappers(Iterable<FieldMapper<?>> mappersToRemove) {
+        CopyOnWriteHashSet<FieldMapper<?>> mappers = this.mappers;
+        CopyOnWriteHashMap<String, FieldMappers> name = this.name;
+        CopyOnWriteHashMap<String, FieldMappers> indexName = this.indexName;
+        CopyOnWriteHashMap<String, FieldMappers> fullName = this.fullName;
 
-        for (FieldMapper mapper : mappersToRemove) {
-            FieldMappers mappers = mutatorName.get(mapper.names().name());
-            if (mappers != null) {
-                mappers = mappers.remove(mapper);
-                if (mappers.isEmpty()) {
-                    mutatorName.remove(mapper.names().name());
-                } else {
-                    mutatorName.put(mapper.names().name(), mappers);
-                }
-            }
-
-            mappers = mutatorIndexName.get(mapper.names().indexName());
-            if (mappers != null) {
-                mappers = mappers.remove(mapper);
-                if (mappers.isEmpty()) {
-                    mutatorIndexName.remove(mapper.names().indexName());
-                } else {
-                    mutatorIndexName.put(mapper.names().indexName(), mappers);
-                }
-            }
-
-            mappers = mutatorFullName.get(mapper.names().fullName());
-            if (mappers != null) {
-                mappers = mappers.remove(mapper);
-                if (mappers.isEmpty()) {
-                    mutatorFullName.remove(mapper.names().fullName());
-                } else {
-                    mutatorFullName.put(mapper.names().fullName(), mappers);
-                }
-            }
-
-            tempMappers.remove(mapper);
+        for (FieldMapper<?> mapper : mappersToRemove) {
+            mappers = mappers.remove(mapper);
+            name = remove(name, mapper.names().name(), mapper);
+            indexName = remove(indexName, mapper.names().indexName(), mapper);
+            fullName = remove(fullName, mapper.names().fullName(), mapper);
         }
 
-
-        this.mappers = tempMappers.toArray(new FieldMapper[tempMappers.size()]);
-        this.mappersAsList = Arrays.asList(this.mappers);
-        mutatorName.close();
-        mutatorIndexName.close();
-        mutatorFullName.close();
+        return new FieldMappersLookup(mappers, name, indexName, fullName);
     }
 
     @Override
-    public UnmodifiableIterator<FieldMapper> iterator() {
-        return Iterators.unmodifiableIterator(mappersAsList.iterator());
+    public Iterator<FieldMapper<?>> iterator() {
+        return mappers.iterator();
     }
 
     /**
      * The list of all mappers.
      */
-    public List<FieldMapper> mappers() {
-        return this.mappersAsList;
-    }
-
-    /**
-     * Is there a mapper (based on unique {@link FieldMapper} identity)?
-     */
-    public boolean hasMapper(FieldMapper fieldMapper) {
-        return mappersAsList.contains(fieldMapper);
+    public Set<FieldMapper<?>> mappers() {
+        return mappers.asSet();
     }
 
     /**
@@ -193,7 +152,7 @@ public class FieldMappersLookup implements Iterable<FieldMapper> {
      */
     public Set<String> simpleMatchToIndexNames(String pattern) {
         Set<String> fields = Sets.newHashSet();
-        for (FieldMapper fieldMapper : mappers) {
+        for (FieldMapper<?> fieldMapper : mappers) {
             if (Regex.simpleMatch(pattern, fieldMapper.names().fullName())) {
                 fields.add(fieldMapper.names().indexName());
             } else if (Regex.simpleMatch(pattern, fieldMapper.names().indexName())) {
@@ -210,7 +169,7 @@ public class FieldMappersLookup implements Iterable<FieldMapper> {
      */
     public Set<String> simpleMatchToFullName(String pattern) {
         Set<String> fields = Sets.newHashSet();
-        for (FieldMapper fieldMapper : mappers) {
+        for (FieldMapper<?> fieldMapper : mappers) {
             if (Regex.simpleMatch(pattern, fieldMapper.names().fullName())) {
                 fields.add(fieldMapper.names().fullName());
             } else if (Regex.simpleMatch(pattern, fieldMapper.names().indexName())) {
@@ -244,7 +203,7 @@ public class FieldMappersLookup implements Iterable<FieldMapper> {
      * by {@link #name(String)} and return the first mapper for it (see {@link org.elasticsearch.index.mapper.FieldMappers#mapper()}).
      */
     @Nullable
-    public FieldMapper smartNameFieldMapper(String name) {
+    public FieldMapper<?> smartNameFieldMapper(String name) {
         FieldMappers fieldMappers = smartName(name);
         if (fieldMappers == null) {
             return null;

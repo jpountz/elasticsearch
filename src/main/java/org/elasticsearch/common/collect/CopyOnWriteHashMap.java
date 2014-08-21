@@ -20,7 +20,7 @@
 package org.elasticsearch.common.collect;
 
 import com.google.common.base.Function;
-import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.UnmodifiableIterator;
 import org.elasticsearch.common.Preconditions;
 
@@ -87,7 +87,7 @@ public final class CopyOnWriteHashMap<K, V> {
          * reaches a number that is less than or equal to <tt>0</tt>, a leaf
          * node needs to be created since it means that a collision occurred.
          */
-        abstract Node<K, V> put(K key, int hash, int hashBits, V value);
+        abstract Node<K, V> put(K key, int hash, int hashBits, V value, MutableBoolean newValue);
 
         /**
          * Recursively remove an entry from this node.
@@ -202,7 +202,7 @@ public final class CopyOnWriteHashMap<K, V> {
         }
 
         @Override
-        Leaf<K, V> put(K key, int hash, int hashBits, V value) {
+        Leaf<K, V> put(K key, int hash, int hashBits, V value, MutableBoolean newValue) {
             assert hashBits <= 0 : hashBits;
             final int slot = slot(key);
 
@@ -213,6 +213,7 @@ public final class CopyOnWriteHashMap<K, V> {
                 // append
                 newLength = keys.length + 1;
                 index = newLength - 1;
+                newValue.value = true;
             } else {
                 // replace
                 newLength = keys.length;
@@ -349,7 +350,7 @@ public final class CopyOnWriteHashMap<K, V> {
             }
         }
 
-        private InnerNode<K, V> putExisting(K key, int hash, int hashBits, int slot, V value) {
+        private InnerNode<K, V> putExisting(K key, int hash, int hashBits, int slot, V value, MutableBoolean newValue) {
             final K[] keys2 = Arrays.copyOf(keys, keys.length);
             final Object[] subNodes2 = Arrays.copyOf(subNodes, subNodes.length);
 
@@ -357,7 +358,7 @@ public final class CopyOnWriteHashMap<K, V> {
             if (previousValue instanceof Node) {
                 // insert recursively
                 assert keys[slot] == null;
-                subNodes2[slot] = ((Node<K, V>) previousValue).put(key, hash, hashBits, value);
+                subNodes2[slot] = ((Node<K, V>) previousValue).put(key, hash, hashBits, value, newValue);
             } else if (keys[slot].equals(key)) {
                 // replace the existing entry
                 subNodes2[slot] = value;
@@ -366,8 +367,8 @@ public final class CopyOnWriteHashMap<K, V> {
                 final K previousKey = keys[slot];
                 final int previousHash = previousKey.hashCode() >>> (TOTAL_HASH_BITS - hashBits);
                 Node<K, V> subNode = newSubNode(hashBits);
-                subNode = subNode.put(previousKey, previousHash, hashBits, (V) previousValue);
-                subNode = subNode.put(key, hash, hashBits, value);
+                subNode = subNode.put(previousKey, previousHash, hashBits, (V) previousValue, newValue);
+                subNode = subNode.put(key, hash, hashBits, value, newValue);
                 keys2[slot] = null;
                 subNodes2[slot] = subNode;
             }
@@ -382,15 +383,16 @@ public final class CopyOnWriteHashMap<K, V> {
         }
 
         @Override
-        InnerNode<K, V> put(K key, int hash, int hashBits, V value) {
+        InnerNode<K, V> put(K key, int hash, int hashBits, V value, MutableBoolean newValue) {
             final int hash6 = hash & HASH_MASK;
             final int slot = slot(hash6);
 
             if (exists(hash6)) {
                 hash >>>= HASH_BITS;
                 hashBits -= HASH_BITS;
-                return putExisting(key, hash, hashBits, slot, value);
+                return putExisting(key, hash, hashBits, slot, value, newValue);
             } else {
+                newValue.value = true;
                 return putNew(key, hash6, slot, value);
             }
         }
@@ -467,16 +469,18 @@ public final class CopyOnWriteHashMap<K, V> {
     }
 
     private final InnerNode<K, V> root;
+    private final int size;
 
     /**
      * Create a new empty map.
      */
     public CopyOnWriteHashMap() {
-        this(new InnerNode<K, V>());
+        this(new InnerNode<K, V>(), 0);
     }
 
-    private CopyOnWriteHashMap(InnerNode<K, V> root) {
+    private CopyOnWriteHashMap(InnerNode<K, V> root, int size) {
         this.root = root;
+        this.size = size;
     }
 
     /**
@@ -496,6 +500,13 @@ public final class CopyOnWriteHashMap<K, V> {
     }
 
     /**
+     * Returns the number of entries in this map.
+     */
+    public int size() {
+        return size;
+    }
+
+    /**
      * Associate <code>key</code> with <code>value</code> and return a new copy
      * of the hash table. The current hash table is not modified.
      */
@@ -503,7 +514,10 @@ public final class CopyOnWriteHashMap<K, V> {
         Preconditions.checkArgument(key != null, "null keys are not supported");
         Preconditions.checkArgument(value != null, "null values are not supported");
         final int hash = key.hashCode();
-        return new CopyOnWriteHashMap<>(root.put(key, hash, TOTAL_HASH_BITS, value));
+        final MutableBoolean newValue = new MutableBoolean();
+        final InnerNode<K, V> newRoot = root.put(key, hash, TOTAL_HASH_BITS, value, newValue);
+        final int newSize = size + (newValue.value ? 1 : 0);
+        return new CopyOnWriteHashMap<>(newRoot, newSize);
     }
 
     /**
@@ -516,44 +530,78 @@ public final class CopyOnWriteHashMap<K, V> {
         if (root == newRoot) {
             return this;
         } else {
-            return new CopyOnWriteHashMap<>(newRoot);
+            return new CopyOnWriteHashMap<>(newRoot, size - 1);
         }
     }
 
     /**
      * Return an {@link Iterable} over the entries in this hash map.
      */
-    public Iterable<Map.Entry<K, V>> entrySet() {
-        return new Iterable<Map.Entry<K, V>>() {
+    public Set<Map.Entry<K, V>> entrySet() {
+        return new AbstractSet<Map.Entry<K, V>>() {
+
             @Override
             public Iterator<java.util.Map.Entry<K, V>> iterator() {
                 return new EntryIterator<>(root);
+            }
+
+            @Override
+            public int size() {
+                return CopyOnWriteHashMap.this.size();
             }
         };
     }
 
     /**
-     * Return an {@link Iterable} over the keys in this hash map.
+     * Return a {@link Set} over the keys in this hash map.
      */
-    public Iterable<K> keySet() {
-        return Iterables.transform(entrySet(), new Function<Map.Entry<K, V>, K>() {
+    public Set<K> keySet() {
+        return new AbstractSet<K>() {
+
             @Override
-            public K apply(java.util.Map.Entry<K, V> input) {
-                return input.getKey();
+            public Iterator<K> iterator() {
+                return Iterators.transform(entrySet().iterator(), new Function<Map.Entry<K, V>, K>() {
+                    @Override
+                    public K apply(java.util.Map.Entry<K, V> input) {
+                        return input.getKey();
+                    }
+                });
             }
-        });
+
+            @Override
+            public int size() {
+                return CopyOnWriteHashMap.this.size();
+            }
+
+        };
     }
 
     /**
-     * Return an {@link Iterable} over the values in this hash map.
+     * Return a {@link Collection} over the values in this hash map.
      */
-    public Iterable<V> values() {
-        return Iterables.transform(entrySet(), new Function<Map.Entry<K, V>, V>() {
+    public Collection<V> values() {
+        return new AbstractCollection<V>() {
+
             @Override
-            public V apply(java.util.Map.Entry<K, V> input) {
-                return input.getValue();
+            public Iterator<V> iterator() {
+                return Iterators.transform(entrySet().iterator(), new Function<Map.Entry<K, V>, V>() {
+                    @Override
+                    public V apply(java.util.Map.Entry<K, V> input) {
+                        return input.getValue();
+                    }
+                });
             }
-        });
+
+            @Override
+            public int size() {
+                return CopyOnWriteHashMap.this.size();
+            }
+
+        };
+    }
+
+    private static class MutableBoolean {
+        boolean value;
     }
 
 }

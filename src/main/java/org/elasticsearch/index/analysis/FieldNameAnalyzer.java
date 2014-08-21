@@ -21,25 +21,32 @@ package org.elasticsearch.index.analysis;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.SimpleAnalyzerWrapper;
-import org.elasticsearch.common.collect.UpdateInPlaceMap;
+import org.elasticsearch.common.collect.CopyOnWriteHashMap;
 
 /**
- *
+ * Lookup structure for analyzers.
  */
 public final class FieldNameAnalyzer extends SimpleAnalyzerWrapper {
 
-    private final UpdateInPlaceMap<String, Analyzer> analyzers;
+    private final CopyOnWriteHashMap<String, Analyzer> analyzers;
     private final Analyzer defaultAnalyzer;
 
-    public FieldNameAnalyzer(UpdateInPlaceMap<String, Analyzer> analyzers, Analyzer defaultAnalyzer) {
+    public FieldNameAnalyzer(Analyzer defaultAnalyzer) {
+        this(new CopyOnWriteHashMap<String, Analyzer>(), defaultAnalyzer);
+    }
+
+    public FieldNameAnalyzer(CopyOnWriteHashMap<String, Analyzer> analyzers, Analyzer defaultAnalyzer) {
         this.analyzers = analyzers;
         this.defaultAnalyzer = defaultAnalyzer;
     }
 
-    public UpdateInPlaceMap<String, Analyzer> analyzers() {
+    public CopyOnWriteHashMap<String, Analyzer> analyzers() {
         return analyzers;
     }
 
+    /**
+     * Return the default analyzer.
+     */
     public Analyzer defaultAnalyzer() {
         return defaultAnalyzer;
     }

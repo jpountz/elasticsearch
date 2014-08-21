@@ -19,15 +19,10 @@
 
 package org.elasticsearch.index.mapper;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.UnmodifiableIterator;
 import org.apache.lucene.analysis.Analyzer;
-import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.collect.ImmutableOpenMap;
-import org.elasticsearch.common.collect.UpdateInPlaceMap;
-import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.collect.CopyOnWriteHashMap;
 import org.elasticsearch.index.analysis.FieldNameAnalyzer;
-import org.elasticsearch.index.settings.IndexSettings;
 
 import java.util.List;
 import java.util.Set;
@@ -35,45 +30,45 @@ import java.util.Set;
 /**
  *
  */
-public class DocumentFieldMappers implements Iterable<FieldMapper> {
+public class DocumentFieldMappers implements Iterable<FieldMapper<?>> {
 
     private final DocumentMapper docMapper;
     private final FieldMappersLookup fieldMappers;
 
-    private final FieldNameAnalyzer indexAnalyzer;
-    private final FieldNameAnalyzer searchAnalyzer;
-    private final FieldNameAnalyzer searchQuoteAnalyzer;
+    private volatile FieldNameAnalyzer indexAnalyzer;
+    private volatile FieldNameAnalyzer searchAnalyzer;
+    private volatile FieldNameAnalyzer searchQuoteAnalyzer;
 
-    public DocumentFieldMappers(@Nullable @IndexSettings Settings settings, DocumentMapper docMapper) {
+    public DocumentFieldMappers(DocumentMapper docMapper) {
         this.docMapper = docMapper;
-        this.fieldMappers = new FieldMappersLookup(settings);
-        this.indexAnalyzer = new FieldNameAnalyzer(UpdateInPlaceMap.<String, Analyzer>of(MapperService.getFieldMappersCollectionSwitch(settings)), docMapper.indexAnalyzer());
-        this.searchAnalyzer = new FieldNameAnalyzer(UpdateInPlaceMap.<String, Analyzer>of(MapperService.getFieldMappersCollectionSwitch(settings)), docMapper.searchAnalyzer());
-        this.searchQuoteAnalyzer = new FieldNameAnalyzer(UpdateInPlaceMap.<String, Analyzer>of(MapperService.getFieldMappersCollectionSwitch(settings)), docMapper.searchQuotedAnalyzer());
+        this.fieldMappers = new FieldMappersLookup();
+        this.indexAnalyzer = new FieldNameAnalyzer(docMapper.indexAnalyzer());
+        this.searchAnalyzer = new FieldNameAnalyzer(docMapper.searchAnalyzer());
+        this.searchQuoteAnalyzer = new FieldNameAnalyzer(docMapper.searchQuotedAnalyzer());
     }
 
-    public void addNewMappers(List<FieldMapper> newMappers) {
+    public void addNewMappers(List<FieldMapper<?>> newMappers) {
         fieldMappers.addNewMappers(newMappers);
 
-        final UpdateInPlaceMap<String, Analyzer>.Mutator indexAnalyzersMutator = this.indexAnalyzer.analyzers().mutator();
-        final UpdateInPlaceMap<String, Analyzer>.Mutator searchAnalyzersMutator = this.searchAnalyzer.analyzers().mutator();
-        final UpdateInPlaceMap<String, Analyzer>.Mutator searchQuoteAnalyzersMutator = this.searchQuoteAnalyzer.analyzers().mutator();
+        CopyOnWriteHashMap<String, Analyzer> indexAnalyzers = indexAnalyzer.analyzers();
+        CopyOnWriteHashMap<String, Analyzer> searchAnalyzers = searchAnalyzer.analyzers();
+        CopyOnWriteHashMap<String, Analyzer> searchQuoteAnalyzers = searchQuoteAnalyzer.analyzers();
 
-        for (FieldMapper fieldMapper : newMappers) {
+        for (FieldMapper<?> fieldMapper : newMappers) {
             if (fieldMapper.indexAnalyzer() != null) {
-                indexAnalyzersMutator.put(fieldMapper.names().indexName(), fieldMapper.indexAnalyzer());
+                indexAnalyzers = indexAnalyzers.put(fieldMapper.names().indexName(), fieldMapper.indexAnalyzer());
             }
             if (fieldMapper.searchAnalyzer() != null) {
-                searchAnalyzersMutator.put(fieldMapper.names().indexName(), fieldMapper.searchAnalyzer());
+                searchAnalyzers = searchAnalyzers.put(fieldMapper.names().indexName(), fieldMapper.searchAnalyzer());
             }
             if (fieldMapper.searchQuoteAnalyzer() != null) {
-                searchQuoteAnalyzersMutator.put(fieldMapper.names().indexName(), fieldMapper.searchQuoteAnalyzer());
+                searchQuoteAnalyzers = searchQuoteAnalyzers.put(fieldMapper.names().indexName(), fieldMapper.searchQuoteAnalyzer());
             }
         }
 
-        indexAnalyzersMutator.close();
-        searchAnalyzersMutator.close();
-        searchQuoteAnalyzersMutator.close();
+        indexAnalyzer = new FieldNameAnalyzer(indexAnalyzers, indexAnalyzer.defaultAnalyzer());
+        searchAnalyzer = new FieldNameAnalyzer(searchAnalyzers, searchAnalyzer.defaultAnalyzer());
+        searchQuoteAnalyzer = new FieldNameAnalyzer(searchQuoteAnalyzers, searchQuoteAnalyzer.defaultAnalyzer());
     }
 
     @Override

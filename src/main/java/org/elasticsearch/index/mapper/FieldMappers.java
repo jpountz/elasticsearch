@@ -19,71 +19,63 @@
 
 package org.elasticsearch.index.mapper;
 
-import java.util.ArrayList;
-import java.util.Arrays;
+import org.elasticsearch.common.collect.CopyOnWriteHashSet;
+
 import java.util.Iterator;
-import java.util.List;
+import java.util.Set;
 
 /**
  * A holder for several {@link FieldMapper}.
  */
-public class FieldMappers implements Iterable<FieldMapper> {
+public final class FieldMappers implements Iterable<FieldMapper<?>> {
 
-    private final FieldMapper[] fieldMappers;
-    private final List<FieldMapper> fieldMappersAsList;
+    private final CopyOnWriteHashSet<FieldMapper<?>> fieldMappers;
 
     public FieldMappers() {
-        this.fieldMappers = new FieldMapper[0];
-        this.fieldMappersAsList = Arrays.asList(fieldMappers);
+        this(new CopyOnWriteHashSet<FieldMapper<?>>());
     }
 
-    public FieldMappers(FieldMapper fieldMapper) {
-        this.fieldMappers = new FieldMapper[]{fieldMapper};
-        this.fieldMappersAsList = Arrays.asList(this.fieldMappers);
+    public FieldMappers(FieldMapper<?> fieldMapper) {
+        this(new CopyOnWriteHashSet<FieldMapper<?>>().add(fieldMapper));
     }
 
-    private FieldMappers(FieldMapper[] fieldMappers) {
+    private FieldMappers(CopyOnWriteHashSet<FieldMapper<?>> fieldMappers) {
         this.fieldMappers = fieldMappers;
-        this.fieldMappersAsList = Arrays.asList(this.fieldMappers);
     }
 
-    public FieldMapper mapper() {
-        if (fieldMappers.length == 0) {
+    /**
+     * Return any of the wrapped {@link FieldMapper}s.
+     */
+    public FieldMapper<?> mapper() {
+        final Iterator<FieldMapper<?>> it = fieldMappers.iterator();
+        if (it.hasNext()) {
+            return it.next();
+        } else {
             return null;
         }
-        return fieldMappers[0];
     }
 
     public boolean isEmpty() {
-        return fieldMappers.length == 0;
+        return fieldMappers.isEmpty();
     }
 
-    public List<FieldMapper> mappers() {
-        return this.fieldMappersAsList;
+    public Set<FieldMapper<?>> mappers() {
+        return fieldMappers.asSet();
     }
 
     @Override
-    public Iterator<FieldMapper> iterator() {
-        return fieldMappersAsList.iterator();
+    public Iterator<FieldMapper<?>> iterator() {
+        return mappers().iterator();
     }
 
     /**
      * Concats and returns a new {@link FieldMappers}.
      */
-    public FieldMappers concat(FieldMapper mapper) {
-        FieldMapper[] newMappers = new FieldMapper[fieldMappers.length + 1];
-        System.arraycopy(fieldMappers, 0, newMappers, 0, fieldMappers.length);
-        newMappers[fieldMappers.length] = mapper;
-        return new FieldMappers(newMappers);
+    public FieldMappers concat(FieldMapper<?> mapper) {
+        return new FieldMappers(fieldMappers.add(mapper));
     }
 
-    public FieldMappers remove(FieldMapper mapper) {
-        ArrayList<FieldMapper> list = new ArrayList<>(fieldMappers.length);
-        for (FieldMapper fieldMapper : fieldMappers) {
-            if (!fieldMapper.equals(mapper)) { // identify equality
-                list.add(fieldMapper);
-            }
-        }
-        return new FieldMappers(list.toArray(new FieldMapper[list.size()]));
+    public FieldMappers remove(FieldMapper<?> mapper) {
+        return new FieldMappers(fieldMappers.remove(mapper));
     }
 }

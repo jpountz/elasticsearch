@@ -100,6 +100,8 @@ public class CopyOnWriteHashMapTests extends ElasticsearchTestCase {
                 assertEquals(newRef, newMap);
                 assertEquals(ref.isEmpty(), map.isEmpty());
                 assertEquals(newRef.isEmpty(), newMap.isEmpty());
+                assertEquals(ref.size(), map.size());
+                assertEquals(newRef.size(), newMap.size());
 
                 ref = newRef;
                 map = newMap;
