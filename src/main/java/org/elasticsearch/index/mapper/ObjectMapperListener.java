@@ -19,28 +19,36 @@
 
 package org.elasticsearch.index.mapper;
 
+import com.google.common.collect.ImmutableList;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collection;
 
 /**
  *
  */
 public abstract class ObjectMapperListener {
 
-    public static class Aggregator extends ObjectMapperListener {
-        public final List<ObjectMapper> mappers = new ArrayList<>();
-
-        @Override
-        public void objectMapper(ObjectMapper objectMapper) {
-            mappers.add(objectMapper);
-        }
+    /**
+     * Get the list of object mappers that are under <code>mapper</code>.
+     */
+    public static Collection<ObjectMapper> getObjectMappers(Mapper mapper) {
+        final ImmutableList.Builder<ObjectMapper> mappers = ImmutableList.builder();
+        mapper.traverse(new ObjectMapperListener() {
+            @Override
+            public void objectMapper(ObjectMapper objectMapper) {
+                mappers.add(objectMapper);
+            }
+        });
+        return mappers.build();
     }
 
+    /**
+     * Callback for when an object mapper is traversed.
+     */
     public abstract void objectMapper(ObjectMapper objectMapper);
 
-    public void objectMappers(ObjectMapper... objectMappers) {
+    public final void objectMappers(ObjectMapper... objectMappers) {
         for (ObjectMapper objectMapper : objectMappers) {
             objectMapper(objectMapper);
         }

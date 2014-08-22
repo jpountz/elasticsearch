@@ -19,7 +19,9 @@
 
 package org.elasticsearch.index.mapper;
 
-import java.util.ArrayList;
+import com.google.common.collect.ImmutableList;
+
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -27,19 +29,27 @@ import java.util.List;
  */
 public abstract class FieldMapperListener {
 
-    public static class Aggregator extends FieldMapperListener {
-        public final List<FieldMapper> mappers = new ArrayList<>();
-
-        @Override
-        public void fieldMapper(FieldMapper fieldMapper) {
-            mappers.add(fieldMapper);
-        }
+    /**
+     * Get the list of field mappers that are under <code>mapper</code>.
+     */
+    public static Collection<FieldMapper<?>> getFieldMappers(Mapper mapper) {
+        final ImmutableList.Builder<FieldMapper<?>> mappers = ImmutableList.builder();
+        mapper.traverse(new FieldMapperListener() {
+            @Override
+            public void fieldMapper(FieldMapper<?> fieldMapper) {
+                mappers.add(fieldMapper);
+            }
+        });
+        return mappers.build();
     }
 
-    public abstract void fieldMapper(FieldMapper fieldMapper);
+    /**
+     * Callback for when a field mapper is traversed.
+     */
+    public abstract void fieldMapper(FieldMapper<?> fieldMapper);
 
-    public void fieldMappers(List<FieldMapper>  fieldMappers) {
-        for (FieldMapper mapper : fieldMappers) {
+    public final void fieldMappers(List<FieldMapper<?>>  fieldMappers) {
+        for (FieldMapper<?> mapper : fieldMappers) {
             fieldMapper(mapper);
         }
     }

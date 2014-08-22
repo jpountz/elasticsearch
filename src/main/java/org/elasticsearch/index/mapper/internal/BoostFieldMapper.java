@@ -241,13 +241,13 @@ public class BoostFieldMapper extends NumberFieldMapper<Float> implements Intern
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         // we override parse since we want to handle cases where it is not indexed and not stored (the default)
         float value = parseFloatValue(context);
         if (!Float.isNaN(value)) {
             context.docBoost(value);
         }
-        super.parse(context);
+        return super.parse(context);
     }
 
     @Override

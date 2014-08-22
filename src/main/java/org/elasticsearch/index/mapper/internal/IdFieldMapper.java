@@ -287,11 +287,6 @@ public class IdFieldMapper extends AbstractFieldMapper<String> implements Intern
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
-        super.parse(context);
-    }
-
-    @Override
     public boolean includeInObject() {
         return true;
     }

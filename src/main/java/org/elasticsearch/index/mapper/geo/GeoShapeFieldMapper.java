@@ -223,19 +223,19 @@ public class GeoShapeFieldMapper extends AbstractFieldMapper<String> {
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         try {
             Shape shape = context.parseExternalValue(Shape.class);
             if (shape == null) {
                 ShapeBuilder shapeBuilder = ShapeBuilder.parse(context.parser());
                 if (shapeBuilder == null) {
-                    return;
+                    return null;
                 }
                 shape = shapeBuilder.build();
             }
             Field[] fields = defaultStrategy.createIndexableFields(shape);
             if (fields == null || fields.length == 0) {
-                return;
+                return null;
             }
             for (Field field : fields) {
                 if (!customBoost()) {
@@ -245,9 +245,11 @@ public class GeoShapeFieldMapper extends AbstractFieldMapper<String> {
                     context.doc().add(field);
                 }
             }
+            
         } catch (Exception e) {
             throw new MapperParsingException("failed to parse [" + names.fullName() + "]", e);
         }
+        return null;
     }
 
     @Override

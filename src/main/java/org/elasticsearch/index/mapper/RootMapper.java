@@ -27,13 +27,16 @@ import java.io.IOException;
  */
 public interface RootMapper extends Mapper {
 
-    void preParse(ParseContext context) throws IOException;
+    RootMapper preParse(ParseContext context) throws IOException;
 
-    void postParse(ParseContext context) throws IOException;
+    RootMapper postParse(ParseContext context) throws IOException;
 
     /**
      * Should the mapper be included in the root {@link org.elasticsearch.index.mapper.object.ObjectMapper}.
      */
     boolean includeInObject();
+
+    @Override
+    RootMapper merge(Mapper mergeWith, MergeContext mergeContext);
 
 }

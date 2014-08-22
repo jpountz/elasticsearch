@@ -174,31 +174,6 @@ public abstract class ParseContext {
         }
 
         @Override
-        public boolean mappingsModified() {
-            return in.mappingsModified();
-        }
-
-        @Override
-        public void setMappingsModified() {
-            in.setMappingsModified();
-        }
-
-        @Override
-        public void setWithinNewMapper() {
-            in.setWithinNewMapper();
-        }
-
-        @Override
-        public void clearWithinNewMapper() {
-            in.clearWithinNewMapper();
-        }
-
-        @Override
-        public boolean isWithinNewMapper() {
-            return in.isWithinNewMapper();
-        }
-
-        @Override
         public boolean isWithinCopyTo() {
             return in.isWithinCopyTo();
         }
@@ -608,16 +583,6 @@ public abstract class ParseContext {
     public abstract boolean flyweight();
 
     public abstract DocumentMapperParser docMapperParser();
-
-    public abstract boolean mappingsModified();
-
-    public abstract void setMappingsModified();
-
-    public abstract void setWithinNewMapper();
-
-    public abstract void clearWithinNewMapper();
-
-    public abstract boolean isWithinNewMapper();
 
     /**
      * Return a new context that will be within a copy-to operation.

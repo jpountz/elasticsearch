@@ -398,7 +398,7 @@ public abstract class AbstractFieldMapper<T> extends AbstractMapper implements F
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         final List<Field> fields = FIELD_LIST.get();
         assert fields.isEmpty();
         try {
@@ -420,6 +420,7 @@ public abstract class AbstractFieldMapper<T> extends AbstractMapper implements F
         if (copyTo != null) {
             copyTo.parse(context);
         }
+        return null;
     }
 
     /**
@@ -929,31 +930,23 @@ public abstract class AbstractFieldMapper<T> extends AbstractMapper implements F
                 Mapper mergeWithMapper = cursor.value;
                 Mapper mergeIntoMapper = mappers.get(mergeWithMapper.name());
                 if (mergeIntoMapper == null) {
-                    // no mapping, simply add it if not simulating
-                    if (!mergeContext.mergeFlags().simulate()) {
-                        // we disable the all in multi-field mappers
-                        if (mergeWithMapper instanceof AllFieldMapper.IncludeInAll) {
-                            ((AllFieldMapper.IncludeInAll) mergeWithMapper).unsetIncludeInAll();
+                    // we disable the all in multi-field mappers
+                    if (mergeWithMapper instanceof AllFieldMapper.IncludeInAll) {
+                        ((AllFieldMapper.IncludeInAll) mergeWithMapper).unsetIncludeInAll();
+                    }
+                    if (newMappersBuilder == null) {
+                        newMappersBuilder = ImmutableOpenMap.builder(mappers);
+                    }
+                    newMappersBuilder.put(mergeWithMapper.name(), mergeWithMapper);
+                    if (mergeWithMapper instanceof AbstractFieldMapper) {
+                        if (newFieldMappers == null) {
+                            newFieldMappers = new ArrayList<>(2);
                         }
-                        if (newMappersBuilder == null) {
-                            newMappersBuilder = ImmutableOpenMap.builder(mappers);
-                        }
-                        newMappersBuilder.put(mergeWithMapper.name(), mergeWithMapper);
-                        if (mergeWithMapper instanceof AbstractFieldMapper) {
-                            if (newFieldMappers == null) {
-                                newFieldMappers = new ArrayList<>(2);
-                            }
-                            newFieldMappers.add((FieldMapper) mergeWithMapper);
-                        }
+                        newFieldMappers.add((FieldMapper) mergeWithMapper);
                     }
                 } else {
                     mergeIntoMapper.merge(mergeWithMapper, mergeContext);
                 }
-            }
-
-            // first add all field mappers
-            if (newFieldMappers != null) {
-                mergeContext.docMapper().addFieldMappers(newFieldMappers);
             }
             // now publish mappers
             if (newMappersBuilder != null) {
@@ -1087,36 +1080,10 @@ public abstract class AbstractFieldMapper<T> extends AbstractMapper implements F
 
                     context.path().add(objectPath);
 
-                    // We might be in dynamically created field already, so need to clean withinNewMapper flag
-                    // and then restore it, so we wouldn't miss new mappers created from copy_to fields
-                    boolean origWithinNewMapper = context.isWithinNewMapper();
-                    context.clearWithinNewMapper();
-
-                    try {
-                        mapper.parseDynamicValue(context, fieldPath, context.parser().currentToken());
-                    } finally {
-                        if (origWithinNewMapper) {
-                            context.setWithinNewMapper();
-                        } else {
-                            context.clearWithinNewMapper();
-                        }
-                    }
+                    mapper.parseDynamicValue(context, fieldPath, context.parser().currentToken());
 
                 } else {
-                    // We might be in dynamically created field already, so need to clean withinNewMapper flag
-                    // and then restore it, so we wouldn't miss new mappers created from copy_to fields
-                    boolean origWithinNewMapper = context.isWithinNewMapper();
-                    context.clearWithinNewMapper();
-                    try {
-                        context.docMapper().root().parseDynamicValue(context, field, context.parser().currentToken());
-                    } finally {
-                        if (origWithinNewMapper) {
-                            context.setWithinNewMapper();
-                        } else {
-                            context.clearWithinNewMapper();
-                        }
-                    }
-
+                    context.docMapper().root().parseDynamicValue(context, field, context.parser().currentToken());
                 }
             }
         }

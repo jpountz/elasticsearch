@@ -24,6 +24,7 @@ import org.elasticsearch.Version;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.common.lease.Releasable;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.index.analysis.AnalysisService;
@@ -37,7 +38,7 @@ import java.util.Map;
 /**
  *
  */
-public interface Mapper extends ToXContent {
+public interface Mapper extends ToXContent, Releasable {
 
     public static final Mapper[] EMPTY_ARRAY = new Mapper[0];
 
@@ -142,13 +143,16 @@ public interface Mapper extends ToXContent {
 
     String name();
 
-    void parse(ParseContext context) throws IOException;
+    /**
+     * Parse and return a mapping update in case dynamic mappings modified the current mapper.
+     * A return value of <tt>null</tt> indicates that mappings have not been modified due to
+     * the parsing.
+     */
+    Mapper parse(ParseContext context) throws IOException;
 
     Mapper merge(Mapper mergeWith, MergeContext mergeContext);
 
     void traverse(FieldMapperListener fieldMapperListener);
 
     void traverse(ObjectMapperListener objectMapperListener);
-
-    void close();
 }

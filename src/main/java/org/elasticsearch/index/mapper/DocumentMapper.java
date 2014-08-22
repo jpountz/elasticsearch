@@ -20,7 +20,6 @@
 package org.elasticsearch.index.mapper;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import org.apache.lucene.analysis.Analyzer;
@@ -84,30 +83,6 @@ public class DocumentMapper implements ToXContent {
          */
         public String[] conflicts() {
             return this.conflicts;
-        }
-    }
-
-    public static class MergeFlags {
-
-        public static MergeFlags mergeFlags() {
-            return new MergeFlags();
-        }
-
-        private boolean simulate = true;
-
-        public MergeFlags() {
-        }
-
-        /**
-         * A simulation run, don't perform actual modifications to the mapping.
-         */
-        public boolean simulate() {
-            return simulate;
-        }
-
-        public MergeFlags simulate(boolean simulate) {
-            this.simulate = simulate;
-            return this;
         }
     }
 
@@ -264,15 +239,9 @@ public class DocumentMapper implements ToXContent {
 
     private final DocumentMapperParser docMapperParser;
 
-    private volatile ImmutableMap<String, Object> meta;
-
     private volatile CompressedString mappingSource;
 
-    private volatile RootObjectMapper rootObjectMapper;
-
-    private volatile ImmutableMap<Class<? extends RootMapper>, RootMapper> rootMappers;
-    private volatile RootMapper[] rootMappersOrdered;
-    private volatile RootMapper[] rootMappersNotIncludedInObject;
+    private final MapperService mapperService = null; // nocommit
 
     private final NamedAnalyzer indexAnalyzer;
 
@@ -354,18 +323,6 @@ public class DocumentMapper implements ToXContent {
         }
 
         refreshSource();
-    }
-
-    private void resetRootMappers(Map<Class<? extends RootMapper>, RootMapper> rootMappers) {
-        this.rootMappers = ImmutableMap.copyOf(rootMappers);
-        this.rootMappersOrdered = rootMappers.values().toArray(new RootMapper[rootMappers.values().size()]);
-        List<RootMapper> rootMappersNotIncludedInObjectLst = Lists.newArrayList();
-        for (RootMapper rootMapper : rootMappersOrdered) {
-            if (!rootMapper.includeInObject()) {
-                rootMappersNotIncludedInObjectLst.add(rootMapper);
-            }
-        }
-        this.rootMappersNotIncludedInObject = rootMappersNotIncludedInObjectLst.toArray(new RootMapper[rootMappersNotIncludedInObjectLst.size()]);
     }
 
     public String type() {

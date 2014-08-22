@@ -195,8 +195,9 @@ public class AllFieldMapper extends AbstractFieldMapper<String> implements Inter
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         // we parse in post parse
+        return null;
     }
 
     @Override
@@ -216,7 +217,7 @@ public class AllFieldMapper extends AbstractFieldMapper<String> implements Inter
         // sure to update the flag, and notify mappings on change
         if (!autoBoost && context.allEntries().customBoost()) {
             autoBoost = true;
-            context.setMappingsModified();
+            // nocommit mappings modified
         }
 
         Analyzer analyzer = findAnalyzer(context);

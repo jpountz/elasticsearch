@@ -116,8 +116,9 @@ public class VersionFieldMapper extends AbstractFieldMapper<Long> implements Int
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         // _version added in preparse
+        return null;
     }
 
     @Override

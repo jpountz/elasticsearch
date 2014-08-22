@@ -231,7 +231,7 @@ public class CompletionFieldMapper extends AbstractFieldMapper<String> {
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public Mapper parse(ParseContext context) throws IOException {
         XContentParser parser = context.parser();
         XContentParser.Token token = parser.currentToken();
 
@@ -339,6 +339,7 @@ public class CompletionFieldMapper extends AbstractFieldMapper<String> {
                 context.doc().add(getCompletionField(ctx, input, suggestPayload));
             }
         }
+        return null;
     }
 
     /**

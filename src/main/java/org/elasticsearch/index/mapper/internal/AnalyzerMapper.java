@@ -156,7 +156,8 @@ public class AnalyzerMapper extends AbstractMapper implements Mapper, InternalMa
     }
 
     @Override
-    public void parse(ParseContext context) throws IOException {
+    public AnalyzerMapper parse(ParseContext context) throws IOException {
+        return null;
     }
 
     @Override
