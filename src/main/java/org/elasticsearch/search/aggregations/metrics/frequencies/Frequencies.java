@@ -28,7 +28,7 @@ public interface Frequencies extends NumericMetricsAggregation.MultiValue, Itera
     /**
      * Return the value associated with the provided frequency.
      */
-    double cardinality(long minFrequency);
+    long cardinality(long minFrequency);
 
     /**
      * Return the value associated with the provided frequency as a String.

@@ -44,25 +44,27 @@ import java.util.Map;
  */
 public class FrequenciesAggregator extends NumericMetricsAggregator.MultiValue {
 
+    private final long[] frequencies;
     private final int d, lgW, lgMaxFreq;
     private final boolean rehash;
     private final ValuesSource valuesSource;
 
     // Expensive to initialize, so we only initialize it when we have an actual value source
     @Nullable
-    private CountMinSketch frequencies;
+    private CountMinSketch sketch;
 
     private ValueFormatter formatter;
 
-    public FrequenciesAggregator(String name, ValuesSource valuesSource, boolean rehash, int d, int lgW, int lgMaxFreq, @Nullable ValueFormatter formatter,
+    public FrequenciesAggregator(String name, ValuesSource valuesSource, long[] frequencies, boolean rehash, int d, int lgW, int lgMaxFreq, @Nullable ValueFormatter formatter,
                                  AggregationContext context, Aggregator parent, Map<String, Object> metaData) throws IOException {
         super(name, context, parent, metaData);
         this.valuesSource = valuesSource;
+        this.frequencies = frequencies;
         this.rehash = rehash;
         this.d = d;
         this.lgW = lgW;
         this.lgMaxFreq = lgMaxFreq;
-        this.frequencies = valuesSource == null ? null : new CountMinSketch(d, lgW, lgMaxFreq, context.bigArrays());
+        this.sketch = valuesSource == null ? null : new CountMinSketch(d, lgW, lgMaxFreq, context.bigArrays());
         this.formatter = formatter;
     }
 
@@ -82,16 +84,16 @@ public class FrequenciesAggregator extends NumericMetricsAggregator.MultiValue {
         // so we can just work with the original value source as is
         if (!rehash) {
             MurmurHash3Values hashValues = MurmurHash3Values.cast(((ValuesSource.Numeric) valuesSource).longValues(ctx));
-            return new DirectCollector(frequencies, hashValues);
+            return new DirectCollector(sketch, hashValues);
         }
 
         if (valuesSource instanceof ValuesSource.Numeric) {
             ValuesSource.Numeric source = (ValuesSource.Numeric) valuesSource;
             MurmurHash3Values hashValues = source.isFloatingPoint() ? MurmurHash3Values.hash(source.doubleValues(ctx)) : MurmurHash3Values.hash(source.longValues(ctx));
-            return new DirectCollector(frequencies, hashValues);
+            return new DirectCollector(sketch, hashValues);
         }
 
-        return new DirectCollector(frequencies, MurmurHash3Values.hash(valuesSource.bytesValues(ctx)));
+        return new DirectCollector(sketch, MurmurHash3Values.hash(valuesSource.bytesValues(ctx)));
     }
 
     @Override
@@ -106,24 +108,24 @@ public class FrequenciesAggregator extends NumericMetricsAggregator.MultiValue {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (frequencies == null || owningBucketOrdinal >= frequencies.maxBucket()) {
+        if (sketch == null || owningBucketOrdinal >= sketch.maxBucket()) {
             return buildEmptyAggregation();
         }
         // We need to build a copy because the returned Aggregation needs remain usable after
         // this Aggregator (and its HLL++ counters) is released.
         CountMinSketch copy = new CountMinSketch(d, lgW, lgMaxFreq, context.bigArrays());
-        copy.merge(0, frequencies, owningBucketOrdinal);
-        return new InternalFrequencies(name, copy, formatter, metaData());
+        copy.merge(0, sketch, owningBucketOrdinal);
+        return new InternalFrequencies(name, frequencies, copy, keyed, formatter, metaData());
     }
 
     @Override
     public InternalAggregation buildEmptyAggregation() {
-        return new InternalFrequencies(name, null, formatter, metaData());
+        return new InternalFrequencies(name, frequencies, null, keyed, formatter, metaData());
     }
 
     @Override
     protected void doClose() {
-        Releasables.close(frequencies);
+        Releasables.close(sketch);
     }
 
     private static class DirectCollector extends LeafBucketCollector {

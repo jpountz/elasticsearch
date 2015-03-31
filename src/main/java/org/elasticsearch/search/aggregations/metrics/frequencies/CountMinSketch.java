@@ -134,8 +134,7 @@ public final class CountMinSketch implements Releasable {
         collect(bucket, hash, 1);
     }
 
-    private long[] cardinalities(long bucket, int d, long... frequencies) {
-        long[] cardinalities = new long[frequencies.length];
+    private long cardinality(long bucket, int d, long frequency) {
         final long baseIndex = baseAddress(bucket) + d * (1L << lgW);
 
         // Since we use a good hash function, the minimum freq in the table
@@ -147,6 +146,7 @@ public final class CountMinSketch implements Releasable {
             noise = Math.min(freq, noise);
         }
 
+        long cardinality = 0;
         for (long i = 0; i < 1L << lgW; ++i) {
             long freq = freqs.get(baseIndex + i);
             // try to remove some noise
@@ -157,47 +157,11 @@ public final class CountMinSketch implements Releasable {
                     freq -= noise / 2;
                 }
             }
-            int index = Arrays.binarySearch(frequencies, freq);
-            if (index < 0) {
-                index = -2 - index;
-            }
-            if (index >= 0) {
-                cardinalities[index] += 1;
+            if (freq >= frequency) {
+                cardinality += 1;
             }
         }
-        for (int i = cardinalities.length - 2; i >= 0; --i) {
-            cardinalities[i] += cardinalities[i + 1];
-        }
-        return cardinalities;
-    }
-
-    private long[] merge(long[][] cardinalities, long[] frequencies) {
-        final long[] merged = Arrays.copyOf(cardinalities[0], cardinalities[0].length);
-        for (int i = 1; i < d; ++i) {
-            final long[] c = cardinalities[i];
-            for (int j = 0; j < merged.length; ++j) {
-                merged[j] = Math.min(merged[j], c[j]);
-            }
-        }
-
-        final int index1 = Arrays.binarySearch(frequencies, 1L);
-        if (index1 >= 0) {
-            final double w = 1L << lgW;
-            final double[] uniqueValueCounts = new double[d];
-            for (int i = 0; i < d; ++i) {
-                final double zeros = w - cardinalities[i][index1];
-                uniqueValueCounts[i] = w * Math.log(w / zeros);
-            }
-            // Then we take the median
-            Arrays.sort(uniqueValueCounts);
-            if ((d & 1) == 1) {
-                merged[index1] = Math.round(uniqueValueCounts[d >>> 1]);
-            } else {
-                merged[index1] = Math.round((uniqueValueCounts[(d >>> 1) - 1] + uniqueValueCounts[d >>> 1]) / 2);
-            }
-        }
-
-        return merged;
+        return cardinality;
     }
 
     public void merge(long thisBucket, CountMinSketch other, long otherBucket) {
@@ -212,30 +176,69 @@ public final class CountMinSketch implements Releasable {
         }
     }
 
-    public long[] cardinalities(long bucket, long... frequencies) {
-        for (long frequency : frequencies) {
-            if (frequency <= 0) {
-                throw new ElasticsearchIllegalArgumentException("Frequencies must be >= 0");
-            }
-            if (frequency > maxFreq) {
-                throw new ElasticsearchIllegalArgumentException("Cannot request cardinalities for frequencies that are greater than maxFreq");
-            }
+    public long cardinality(long bucket, long frequency) {
+        if (frequency <= 0) {
+            throw new ElasticsearchIllegalArgumentException("Frequency must be >= 0");
         }
-        for (int i = 1; i < frequencies.length; ++i) {
-            if (frequencies[i] <= frequencies[i - 1]) {
-                throw new ElasticsearchIllegalArgumentException("Frequencies must be in strict ascending order");
-            }
+        if (frequency > maxFreq) {
+            throw new ElasticsearchIllegalArgumentException("Cannot request cardinalities for frequencies that are greater than maxFreq");
         }
 
         if (freqs.size() < baseAddress(bucket + 1)) {
-            return new long[frequencies.length]; // empty
+            return 0L;
         }
 
-        final long[][] cardinalities = new long[d][];
+        final long[] cardinalities = new long[d];
         for (int i = 0; i < d; ++i) {
-            cardinalities[i] = cardinalities(bucket, i, frequencies);
+            cardinalities[i] = cardinality(bucket, i, frequency);
         }
-        return merge(cardinalities, frequencies);
+
+        // TODO: we only specialize 1 here and it works pretty well
+        // Can we generalize it to other frequencies?
+        if (frequency ==  -1) {
+            // use linear counting to improve estimation
+            final double w = 1L << lgW;
+            for (int i = 0; i < d; ++i) {
+                if (cardinalities[i] == 1L << lgW) {
+                    cardinalities[i] = -1;
+                } else {
+                    cardinalities[i] = Math.round(w * Math.log(w / (w - cardinalities[i])));
+                }
+            }
+        } else if (frequency == -2) {
+            final double w = 1L << lgW;
+            final long uniqueCount = cardinality(bucket, 1);
+            for (int i = 0; i < d; ++i) {
+                final long h2 = cardinalities[i];
+                if (h2 == Long.MAX_VALUE) {
+                    continue;
+                }
+                final long h1 = cardinality(bucket, i, 1);
+                final long collisions = uniqueCount - h1;
+                // 
+                cardinalities[i] = Math.round(w * Math.log(w / (w - cardinalities[i])));
+            }
+        } else {
+            for (int i = 0; i < d; ++i) {
+                if (cardinalities[i] >= 1L << (lgW - 1)) {
+                    // more than half hashes are taken, estimation is going to be terrible
+                    cardinalities[i] = -1;
+                }
+            }
+        }
+
+        // and take the median
+        Arrays.sort(cardinalities);
+        if ((d & 1) == 1) {
+            return cardinalities[d / 2];
+        } else {
+            final long c1 = cardinalities[d / 2 - 1];
+            final long c2 = cardinalities[d / 2];
+            if (c1 == Long.MAX_VALUE || c2 == Long.MAX_VALUE) {
+                return Long.MAX_VALUE;
+            }
+            return (c1 + c2) >>> 1;
+        }
     }
 
     @Override
@@ -331,7 +334,7 @@ public final class CountMinSketch implements Releasable {
     // nocommit: for testing
     public static void main(String[] args) {
         long[] actualFreqs = new long[1024];
-        final CountMinSketch sketch = new CountMinSketch(3, 8, 25, BigArrays.NON_RECYCLING_INSTANCE);
+        final CountMinSketch sketch = new CountMinSketch(3, 10, 25, BigArrays.NON_RECYCLING_INSTANCE);
         Random r = new Random(0);
         for (int i = 0; i < 10000; ++i) {
             final int rint = r.nextInt(1 << r.nextInt(10));
@@ -350,7 +353,11 @@ public final class CountMinSketch implements Releasable {
             actualFreqTable[i] = c;
         }
         System.out.println(Arrays.toString(actualFreqTable));
-        System.out.println(Arrays.toString(sketch.cardinalities(0, frequencies)));
+        long[] estimatedFreqTable = new long[frequencies.length];
+        for (int i = 0; i < frequencies.length; ++i) {
+            estimatedFreqTable[i] = sketch.cardinality(0, frequencies[i]);
+        }
+        System.out.println(Arrays.toString(estimatedFreqTable));
     }
 
 }

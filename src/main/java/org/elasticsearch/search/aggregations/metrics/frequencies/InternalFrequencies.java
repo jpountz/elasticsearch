@@ -31,6 +31,8 @@ import org.elasticsearch.search.aggregations.support.format.ValueFormatter;
 import org.elasticsearch.search.aggregations.support.format.ValueFormatterStreams;
 
 import java.io.IOException;
+import java.util.AbstractList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -51,11 +53,15 @@ public final class InternalFrequencies extends InternalNumericMetricsAggregation
         AggregationStreams.registerStream(STREAM, TYPE.stream());
     }
 
-    private CountMinSketch frequencies;
+    private long[] frequencies;
+    private boolean keyed;
+    private CountMinSketch sketch;
 
-    InternalFrequencies(String name, CountMinSketch frequencies, @Nullable ValueFormatter formatter, Map<String, Object> metaData) {
+    InternalFrequencies(String name, long[] frequencies, CountMinSketch sketch, boolean keyed, @Nullable ValueFormatter formatter, Map<String, Object> metaData) {
         super(name, metaData);
+        this.sketch = sketch;
         this.frequencies = frequencies;
+        this.keyed = keyed;
         this.valueFormatter = formatter;
     }
 
@@ -69,20 +75,24 @@ public final class InternalFrequencies extends InternalNumericMetricsAggregation
 
     @Override
     protected void doReadFrom(StreamInput in) throws IOException {
+        keyed = in.readBoolean();
         valueFormatter = ValueFormatterStreams.readOptional(in);
+        frequencies = in.readLongArray();
         if (in.readBoolean()) {
-            frequencies = CountMinSketch.readFrom(in, BigArrays.NON_RECYCLING_INSTANCE);
+            sketch = CountMinSketch.readFrom(in, BigArrays.NON_RECYCLING_INSTANCE);
         } else {
-            frequencies = null;
+            sketch = null;
         }
     }
 
     @Override
     protected void doWriteTo(StreamOutput out) throws IOException {
+        out.writeBoolean(keyed);
         ValueFormatterStreams.writeOptional(valueFormatter, out);
-        if (frequencies != null) {
+        out.writeLongArray(frequencies);
+        if (sketch != null) {
             out.writeBoolean(true);
-            frequencies.writeTo(0, out);
+            sketch.writeTo(0, out);
         } else {
             out.writeBoolean(false);
         }
@@ -94,13 +104,13 @@ public final class InternalFrequencies extends InternalNumericMetricsAggregation
         InternalFrequencies reduced = null;
         for (InternalAggregation aggregation : aggregations) {
             final InternalFrequencies frequencies = (InternalFrequencies) aggregation;
-            if (frequencies.frequencies != null) {
+            if (frequencies.sketch != null) {
                 if (reduced == null) {
-                    reduced = new InternalFrequencies(name, new CountMinSketch(
-                            frequencies.frequencies.d(),
-                            frequencies.frequencies.lgW(),
-                            frequencies.frequencies.lgMaxFreq(),
-                            BigArrays.NON_RECYCLING_INSTANCE), this.valueFormatter, getMetaData());
+                    reduced = new InternalFrequencies(name, this.frequencies, new CountMinSketch(
+                            frequencies.sketch.d(),
+                            frequencies.sketch.lgW(),
+                            frequencies.sketch.lgMaxFreq(),
+                            BigArrays.NON_RECYCLING_INSTANCE), keyed, this.valueFormatter, getMetaData());
                 }
                 reduced.merge(frequencies);
             }
@@ -114,18 +124,90 @@ public final class InternalFrequencies extends InternalNumericMetricsAggregation
     }
 
     public void merge(InternalFrequencies other) {
-        assert frequencies != null && other != null;
-        frequencies.merge(0, other.frequencies, 0);
+        assert sketch != null && other != null;
+        sketch.merge(0, other.sketch, 0);
+    }
+
+    public long value(long frequency) {
+        return cardinality(frequency);
+    }
+
+    @Override
+    public double value(String name) {
+        return value(Long.parseLong(name));
     }
 
     @Override
     public XContentBuilder doXContentBody(XContentBuilder builder, Params params) throws IOException {
-        final long cardinality = getValue();
-        builder.field(CommonFields.VALUE, cardinality);
-        if (valueFormatter != null) {
-            builder.field(CommonFields.VALUE_AS_STRING, valueFormatter.format(cardinality));
+        if (keyed) {
+            builder.startObject(CommonFields.VALUES);
+            for(int i = 0; i < frequencies.length; ++i) {
+                String key = String.valueOf(frequencies[i]);
+                long value = value(frequencies[i]);
+                builder.field(key, value);
+                if (valueFormatter != null) {
+                    builder.field(key + "_as_string", valueFormatter.format(value));
+                }
+            }
+            builder.endObject();
+        } else {
+            builder.startArray(CommonFields.VALUES);
+            for (int i = 0; i < frequencies.length; i++) {
+                double value = value(frequencies[i]);
+                builder.startObject();
+                builder.field(CommonFields.KEY, frequencies[i]);
+                builder.field(CommonFields.VALUE, value);
+                if (valueFormatter != null) {
+                    builder.field(CommonFields.VALUE_AS_STRING, valueFormatter.format(value));
+                }
+                builder.endObject();
+            }
+            builder.endArray();
         }
         return builder;
+    }
+
+    @Override
+    public Iterator<Frequency> iterator() {
+        return new AbstractList<Frequency>() {
+
+            @Override
+            public Frequency get(final int index) {
+                return new Frequency() {
+
+                    @Override
+                    public long getMinFrequency() {
+                        return frequencies[index];
+                    }
+
+                    @Override
+                    public long getCardinality() {
+                        return cardinality(getMinFrequency());
+                    }
+
+                };
+            }
+
+            @Override
+            public int size() {
+                return frequencies.length;
+            }
+
+        }.iterator();
+    }
+
+    @Override
+    public long cardinality(long minFrequency) {
+        return sketch == null ? 0L : sketch.cardinality(0, minFrequency);
+    }
+
+    @Override
+    public String cardinalityAsString(long minFrequency) {
+        ValueFormatter valueFormatter = this.valueFormatter;
+        if (valueFormatter == null) {
+            valueFormatter = ValueFormatter.RAW;
+        }
+        return valueFormatter.format(cardinality(minFrequency));
     }
 
 }
