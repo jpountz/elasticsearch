@@ -19,7 +19,9 @@
 
 package org.elasticsearch.search.aggregations.metrics.frequencies;
 
-import org.apache.lucene.util.packed.PackedInts;
+import com.carrotsearch.hppc.hash.MurmurHash3;
+import com.google.common.base.Preconditions;
+
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.ElasticsearchIllegalArgumentException;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -30,15 +32,17 @@ import org.elasticsearch.common.util.PackedArray;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Random;
 
 /**
  * Implementation of the count-min sketch data-structure that can be used for
- * frequency estimation.
+ * frequency estimation. This implementation uses conservative adds in order
+ * to reduce noise.
  */
 public final class CountMinSketch implements Releasable {
 
     final int d;
-    final int lgW;
+    final int lgW, lgMaxFreq;
     final long maxFreq;
     final PackedArray freqs;
 
@@ -48,52 +52,107 @@ public final class CountMinSketch implements Releasable {
      * @param d the number of hash functions to use
      * @param lgW the log in base 2 of the number of bits per
      */
-    public CountMinSketch(int d, int lgW, long maxFreq, BigArrays bigArrays) {
+    public CountMinSketch(int d, int lgW, int lgMaxFreq, BigArrays bigArrays) {
         if (d < 1) {
             throw new ElasticsearchIllegalArgumentException("Must use at least one hash function");
         }
         if (lgW < 1) {
             throw new ElasticsearchIllegalArgumentException("Must use at least 2 buckets per hash");
         }
-        if (maxFreq <= 1) {
-            throw new ElasticsearchIllegalArgumentException("maxFreq must be at least 1");
+        if (lgMaxFreq <= 1) {
+            throw new ElasticsearchIllegalArgumentException("lgMaxFreq must be at least 1");
         }
         this.d = d;
         this.lgW = lgW;
-        this.maxFreq = maxFreq;
-        this.freqs = new PackedArray(bigArrays, PackedInts.bitsRequired(maxFreq), 0L);
+        this.lgMaxFreq = lgMaxFreq;
+        this.maxFreq = 1L << lgMaxFreq;
+        this.freqs = new PackedArray(bigArrays, lgMaxFreq, 0L);
     }
 
+    public int d() {
+        return d;
+    }
+    
+    public int lgW() {
+        return lgW;
+    }
+    
+    public int lgMaxFreq() {
+        return lgMaxFreq;
+    }
+    
     long baseAddress(long bucket) {
         return d * (bucket << lgW);
+    }
+
+    private long address(long base, int d, long hash) {
+        return base                           // base address for the bucket
+                + d * (1L << lgW)             // base address for the hash
+                + (hash & ((1L << lgW) - 1)); // hash remainder
     }
 
     private void grow(long numBuckets) {
         freqs.grow(baseAddress(numBuckets));
     }
 
-    public void collect(long bucket, long hash) {
-        grow(bucket + 1);
+    private long freq(long bucket, long hash) {
         final long bucketBaseIndex = baseAddress(bucket);
-        for (int i = 0; i < d; ++i) {
-            // same as Random.next
-            hash = hash * 0x5DEECE66DL + 0xBL;
-            final long index = bucketBaseIndex    // base address for the bucket
-                    + i * (1L << lgW)             // base address for the hash
-                    + (hash & ((1L << lgW) - 1)); // hash remainder
+        long minFreq = Long.MAX_VALUE;
+        for (int i = 0; i < d; ++i, hash = hash * 0x5DEECE66DL + 0xBL) {
+            final long index = address(bucketBaseIndex, i, hash);
             final long freq = freqs.get(index);
             assert freq <= maxFreq;
-            if (freq < maxFreq) {
-                freqs.set(index, freq + 1);
+            minFreq = Math.min(freq, minFreq);
+        }
+        return minFreq;
+    }
+
+    private void updateFreq(long bucket, long hash, long newFreq) {
+        final long bucketBaseIndex = baseAddress(bucket);
+        for (int i = 0; i < d; ++i, hash = hash * 0x5DEECE66DL + 0xBL) {
+            final long index = address(bucketBaseIndex, i, hash);
+            final long freq = freqs.get(index);
+            if (newFreq > freq) {
+                freqs.set(index, newFreq);
             }
         }
+    }
+
+    public void collect(long bucket, long hash, long inc) {
+        grow(bucket + 1);
+        final long freq = freq(bucket, hash);
+        if (freq < maxFreq) {
+            updateFreq(bucket, hash, Math.min(maxFreq, freq + inc));
+        }
+    }
+
+    public void collect(long bucket, long hash) {
+        collect(bucket, hash, 1);
     }
 
     private long[] cardinalities(long bucket, int d, long... frequencies) {
         long[] cardinalities = new long[frequencies.length];
         final long baseIndex = baseAddress(bucket) + d * (1L << lgW);
-        for (long i = 0; i < 1L << lgW; ++i) {
+
+        // Since we use a good hash function, the minimum freq in the table
+        // is almost noise for sure. We can use it to fix the actual frequency
+        // of heavy hitters
+        long noise = Long.MAX_VALUE;
+        for (long i = 0; noise != 0 && i < 1L << lgW; ++i) {
             final long freq = freqs.get(baseIndex + i);
+            noise = Math.min(freq, noise);
+        }
+
+        for (long i = 0; i < 1L << lgW; ++i) {
+            long freq = freqs.get(baseIndex + i);
+            // try to remove some noise
+            if (freq < maxFreq) {
+                if (freq / 2 >= noise) {
+                    freq -= noise;
+                } else if (freq >= noise) {
+                    freq -= noise / 2;
+                }
+            }
             int index = Arrays.binarySearch(frequencies, freq);
             if (index < 0) {
                 index = -2 - index;
@@ -108,15 +167,45 @@ public final class CountMinSketch implements Releasable {
         return cardinalities;
     }
 
-    private static long[] merge(long[][] cardinalities) {
+    private long[] merge(long[][] cardinalities, long[] frequencies) {
         final long[] merged = Arrays.copyOf(cardinalities[0], cardinalities[0].length);
-        for (int i = 1; i < cardinalities.length; ++i) {
+        for (int i = 1; i < d; ++i) {
             final long[] c = cardinalities[i];
             for (int j = 0; j < merged.length; ++j) {
                 merged[j] = Math.min(merged[j], c[j]);
             }
         }
+
+        final int index1 = Arrays.binarySearch(frequencies, 1L);
+        if (index1 >= 0) {
+            final double w = 1L << lgW;
+            final double[] uniqueValueCounts = new double[d];
+            for (int i = 0; i < d; ++i) {
+                final double zeros = w - cardinalities[i][index1];
+                uniqueValueCounts[i] = w * Math.log(w / zeros);
+            }
+            // Then we take the median
+            Arrays.sort(uniqueValueCounts);
+            if ((d & 1) == 1) {
+                merged[index1] = Math.round(uniqueValueCounts[d >>> 1]);
+            } else {
+                merged[index1] = Math.round((uniqueValueCounts[(d >>> 1) - 1] + uniqueValueCounts[d >>> 1]) / 2);
+            }
+        }
+
         return merged;
+    }
+
+    public void merge(long thisBucket, CountMinSketch other, long otherBucket) {
+        Preconditions.checkArgument(d == other.d);
+        Preconditions.checkArgument(lgW == other.lgW);
+        final long thisBaseAddress = baseAddress(thisBucket);
+        final long otherBaseAddress = other.baseAddress(otherBucket);
+        final long count = baseAddress(1);
+        for (long i = 0; i < count; ++i) {
+            final long newFreq = freqs.get(thisBaseAddress + i) + other.freqs.get(otherBaseAddress + i);
+            freqs.set(thisBaseAddress + i, Math.min(newFreq, maxFreq));
+        }
     }
 
     public long[] cardinalities(long bucket, long... frequencies) {
@@ -142,7 +231,7 @@ public final class CountMinSketch implements Releasable {
         for (int i = 0; i < d; ++i) {
             cardinalities[i] = cardinalities(bucket, i, frequencies);
         }
-        return merge(cardinalities);
+        return merge(cardinalities, frequencies);
     }
 
     @Override
@@ -153,7 +242,7 @@ public final class CountMinSketch implements Releasable {
     public void writeTo(long bucket, StreamOutput out) throws IOException {
         out.writeVInt(d);
         out.writeVInt(lgW);
-        out.writeVLong(maxFreq);
+        out.writeVInt(lgMaxFreq);
         // Runs of zeros or ones are very likely so we try to compress them
         int zeroOneCount = 0;
         long tmpBits = 0;
@@ -206,8 +295,8 @@ public final class CountMinSketch implements Releasable {
     public static CountMinSketch readFrom(StreamInput in, BigArrays bigArrays) throws IOException {
         final int d = in.readVInt();
         final int lgW = in.readVInt();
-        final long maxFreq = in.readVLong();
-        final CountMinSketch sketch = new CountMinSketch(d, lgW, maxFreq, bigArrays);
+        final int lgMaxFreq = in.readVInt();
+        final CountMinSketch sketch = new CountMinSketch(d, lgW, lgMaxFreq, bigArrays);
         sketch.grow(1);
         final PackedArray freqs = sketch.freqs;
         final long totalNumFreqs = sketch.baseAddress(1);
@@ -233,6 +322,31 @@ public final class CountMinSketch implements Releasable {
             }
         }
         return sketch;
+    }
+
+    // nocommit: for testing
+    public static void main(String[] args) {
+        long[] actualFreqs = new long[1024];
+        final CountMinSketch sketch = new CountMinSketch(3, 8, 25, BigArrays.NON_RECYCLING_INSTANCE);
+        Random r = new Random(0);
+        for (int i = 0; i < 10000; ++i) {
+            final int rint = r.nextInt(1 << r.nextInt(10));
+            actualFreqs[rint]++;
+            sketch.collect(0, MurmurHash3.hash((long) rint));
+        }
+        long[] frequencies = new long[] { 1, 2, 3, 5, 10, 20, 100, 1000, 10000 };
+        long[] actualFreqTable = new long[frequencies.length];
+        for (int i = 0; i < frequencies.length; ++i) {
+            long c = 0;
+            for (long freq : actualFreqs) {
+                if (freq >= frequencies[i]) {
+                    c += 1;
+                }
+            }
+            actualFreqTable[i] = c;
+        }
+        System.out.println(Arrays.toString(actualFreqTable));
+        System.out.println(Arrays.toString(sketch.cardinalities(0, frequencies)));
     }
 
 }
