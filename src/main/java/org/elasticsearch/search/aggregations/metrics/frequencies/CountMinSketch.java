@@ -81,6 +81,10 @@ public final class CountMinSketch implements Releasable {
         return lgMaxFreq;
     }
     
+    public long maxBucket() {
+        return (freqs.size() >>> lgW) / d;
+    }
+
     long baseAddress(long bucket) {
         return d * (bucket << lgW);
     }

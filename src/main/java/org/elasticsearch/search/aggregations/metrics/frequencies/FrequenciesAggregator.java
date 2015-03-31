@@ -20,22 +20,12 @@
 package org.elasticsearch.search.aggregations.metrics.frequencies;
 
 import com.carrotsearch.hppc.hash.MurmurHash3;
-import com.google.common.base.Preconditions;
 
 import org.apache.lucene.index.LeafReaderContext;
-import org.apache.lucene.index.RandomAccessOrds;
 import org.apache.lucene.index.SortedNumericDocValues;
-import org.apache.lucene.search.DocIdSetIterator;
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.FixedBitSet;
-import org.apache.lucene.util.RamUsageEstimator;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.lease.Releasable;
 import org.elasticsearch.common.lease.Releasables;
-import org.elasticsearch.common.util.BigArrays;
-import org.elasticsearch.common.util.LongArray;
-import org.elasticsearch.common.util.ObjectArray;
 import org.elasticsearch.index.fielddata.SortedBinaryDocValues;
 import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
@@ -116,13 +106,13 @@ public class FrequenciesAggregator extends NumericMetricsAggregator.MultiValue {
 
     @Override
     public InternalAggregation buildAggregation(long owningBucketOrdinal) {
-        if (counts == null || owningBucketOrdinal >= counts.maxBucket() || counts.cardinality(owningBucketOrdinal) == 0) {
+        if (frequencies == null || owningBucketOrdinal >= frequencies.maxBucket()) {
             return buildEmptyAggregation();
         }
         // We need to build a copy because the returned Aggregation needs remain usable after
         // this Aggregator (and its HLL++ counters) is released.
-        HyperLogLogPlusPlus copy = new HyperLogLogPlusPlus(precision, BigArrays.NON_RECYCLING_INSTANCE, 1);
-        copy.merge(0, counts, owningBucketOrdinal);
+        CountMinSketch copy = new CountMinSketch(d, lgW, lgMaxFreq, context.bigArrays());
+        copy.merge(0, frequencies, owningBucketOrdinal);
         return new InternalFrequencies(name, copy, formatter, metaData());
     }
 
@@ -133,7 +123,7 @@ public class FrequenciesAggregator extends NumericMetricsAggregator.MultiValue {
 
     @Override
     protected void doClose() {
-        Releasables.close(counts, collector);
+        Releasables.close(frequencies);
     }
 
     private static class DirectCollector extends LeafBucketCollector {
