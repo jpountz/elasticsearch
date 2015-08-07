@@ -25,6 +25,7 @@ import org.elasticsearch.common.inject.internal.Nullable;
 import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.rounding.Rounding;
 import org.elasticsearch.common.util.LongHash;
+import org.elasticsearch.index.fielddata.SortedNumericDoubleValues;
 import org.elasticsearch.search.aggregations.Aggregator;
 import org.elasticsearch.search.aggregations.AggregatorFactories;
 import org.elasticsearch.search.aggregations.InternalAggregation;
@@ -81,13 +82,43 @@ public class HistogramAggregator extends BucketsAggregator {
         return (valuesSource != null && valuesSource.needsScores()) || super.needsScores();
     }
 
+    private SortedNumericDocValues getValues(LeafReaderContext context) throws IOException {
+        if (valuesSource.isFloatingPoint() == false) {
+            return valuesSource.longValues(context);
+        } else {
+            // calling longValues() on a floating-point source will cast values
+            // which will round up instead of down for negative values. For instance
+            // -2.5 would become -2, while we need -3.
+            final SortedNumericDoubleValues doubles = valuesSource.doubleValues(context);
+            return new SortedNumericDocValues() {
+
+                @Override
+                public long valueAt(int index) {
+                    final double value = doubles.valueAt(index);
+                    final long floor = (long) Math.floor(value);
+                    return floor;
+                }
+
+                @Override
+                public void setDocument(int doc) {
+                    doubles.setDocument(doc);
+                }
+
+                @Override
+                public int count() {
+                    return doubles.count();
+                }
+            };
+        }
+    }
+
     @Override
     public LeafBucketCollector getLeafCollector(LeafReaderContext ctx,
             final LeafBucketCollector sub) throws IOException {
         if (valuesSource == null) {
             return LeafBucketCollector.NO_OP_COLLECTOR;
         }
-        final SortedNumericDocValues values = valuesSource.longValues(ctx);
+        final SortedNumericDocValues values = getValues(ctx);
         return new LeafBucketCollectorBase(sub, values) {
             @Override
             public void collect(int doc, long bucket) throws IOException {

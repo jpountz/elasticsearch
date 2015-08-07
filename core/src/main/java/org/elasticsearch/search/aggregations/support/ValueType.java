@@ -49,12 +49,6 @@ public enum ValueType {
             return true;
         }
     },
-    NUMBER("number", ValuesSource.Numeric.class, IndexNumericFieldData.class, ValueFormat.RAW) {
-        @Override
-        public boolean isNumeric() {
-            return true;
-        }
-    },
     DATE("date", ValuesSource.Numeric.class, IndexNumericFieldData.class, ValueFormat.DateTime.DEFAULT) {
         @Override
         public boolean isNumeric() {
@@ -71,6 +65,10 @@ public enum ValueType {
         @Override
         public boolean isNumeric() {
             return true;
+        }
+        @Override
+        public boolean isFloatingPoint() {
+            return true; // we have no idea, so assume floating-point
         }
     },
     GEOPOINT("geo_point", ValuesSource.GeoPoint.class, IndexGeoPointFieldData.class, ValueFormat.RAW) {

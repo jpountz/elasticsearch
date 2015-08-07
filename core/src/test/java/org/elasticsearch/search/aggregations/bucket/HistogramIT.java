@@ -39,6 +39,8 @@ import org.junit.Test;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 import static org.elasticsearch.index.query.QueryBuilders.matchAllQuery;
@@ -64,6 +66,7 @@ import static org.hamcrest.core.IsNull.notNullValue;
 public class HistogramIT extends ESIntegTestCase {
 
     private static final String SINGLE_VALUED_FIELD_NAME = "l_value";
+    private static final String SINGLE_VALUED_DOUBLE_FIELD_NAME = "d_value";
     private static final String MULTI_VALUED_FIELD_NAME = "l_values";
 
     static int numDocs;
@@ -103,6 +106,7 @@ public class HistogramIT extends ESIntegTestCase {
             builders.add(client().prepareIndex("idx", "type").setSource(jsonBuilder()
                     .startObject()
                     .field(SINGLE_VALUED_FIELD_NAME, i + 1)
+                    .field(SINGLE_VALUED_DOUBLE_FIELD_NAME, i - 2.5)
                     .startArray(MULTI_VALUED_FIELD_NAME).value(i + 1).value(i + 2).endArray()
                     .field("tag", "tag" + i)
                     .endObject()));
@@ -1017,5 +1021,53 @@ public class HistogramIT extends ESIntegTestCase {
         } catch (SearchPhaseExecutionException e) {
             assertThat(e.toString(), containsString("Missing required field [interval]"));
         }
+    }
+
+    public void testNegativeDoubles() {
+        Map<Long, Long> expectedCounts = new TreeMap<>();
+        for (int i = 0; i < numDocs; ++i) {
+            double value = i - 2.5;
+            System.out.println(value);
+            double rem = value % interval;
+            if (rem < 0) {
+                rem += interval;
+            }
+            long rounded = (long) Math.round(value - rem);
+            expectedCounts.put(rounded, expectedCounts.containsKey(rounded) ? expectedCounts.get(rounded) + 1 : 1);
+        }
+
+        // FIELD
+        SearchResponse response = client().prepareSearch("idx")
+                .addAggregation(histogram("histo").field(SINGLE_VALUED_DOUBLE_FIELD_NAME).interval(interval))
+                .execute().actionGet();
+        assertSearchResponse(response);
+
+        Histogram histo = response.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        assertThat(histo.getName(), equalTo("histo"));
+        List<? extends Bucket> buckets = histo.getBuckets();
+
+        Map<Long, Long> actualCounts = new TreeMap<>();
+        for (Bucket bucket : buckets) {
+            actualCounts.put(((Number) bucket.getKey()).longValue(), bucket.getDocCount());
+        }
+        assertEquals(expectedCounts, actualCounts);
+
+        // SCRIPT
+        response = client().prepareSearch("idx")
+                .addAggregation(histogram("histo").script(new Script("doc['" + SINGLE_VALUED_FIELD_NAME + "'].value - 3.5")).interval(interval))
+                .execute().actionGet();
+        assertSearchResponse(response);
+
+        histo = response.getAggregations().get("histo");
+        assertThat(histo, notNullValue());
+        assertThat(histo.getName(), equalTo("histo"));
+        buckets = histo.getBuckets();
+
+        actualCounts = new TreeMap<>();
+        for (Bucket bucket : buckets) {
+            actualCounts.put(((Number) bucket.getKey()).longValue(), bucket.getDocCount());
+        }
+        assertEquals(expectedCounts, actualCounts);
     }
 }
