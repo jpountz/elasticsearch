@@ -17,21 +17,29 @@
  * under the License.
  */
 
-package org.elasticsearch.messy.tests;
+package org.elasticsearch.routing;
 
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.plugins.Plugin;
+import org.elasticsearch.script.CompiledScript;
+import org.elasticsearch.script.ExecutableScript;
 import org.elasticsearch.script.Script;
+import org.elasticsearch.script.ScriptEngineService;
+import org.elasticsearch.script.ScriptModule;
 import org.elasticsearch.script.ScriptService;
-import org.elasticsearch.script.groovy.GroovyPlugin;
+import org.elasticsearch.script.SearchScript;
+import org.elasticsearch.search.lookup.SearchLookup;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.elasticsearch.cluster.metadata.AliasAction.newAddAliasAction;
 import static org.elasticsearch.test.hamcrest.ElasticsearchAssertions.assertAcked;
@@ -40,13 +48,111 @@ import static org.hamcrest.Matchers.equalTo;
 /**
  *
  */
-public class AliasRoutingTests extends ESIntegTestCase {
+public class AliasRoutingIT extends ESIntegTestCase {
+
+    public static class MockScriptPlugin extends Plugin {
+
+        public MockScriptPlugin() {
+        }
+
+        @Override
+        public String name() {
+            return MockScriptEngine.NAME;
+        }
+
+        @Override
+        public String description() {
+            return "Mock script engine for " + AliasRoutingIT.class;
+        }
+
+        public void onModule(ScriptModule module) {
+            module.addScriptEngine(MockScriptEngine.class);
+        }
+
+    }
+
+    public static class MockScriptEngine implements ScriptEngineService {
+
+        public static final String NAME = "mockscript";
+
+        @Override
+        public void close() throws IOException {
+        }
+
+        @Override
+        public String[] types() {
+            return new String[] { NAME };
+        }
+
+        @Override
+        public String[] extensions() {
+            return types();
+        }
+
+        @Override
+        public boolean sandboxed() {
+            return true;
+        }
+
+        @Override
+        public Object compile(String script) {
+            return new Object(); // unused
+        }
+
+        @Override
+        public ExecutableScript executable(CompiledScript compiledScript, Map<String, Object> params) {
+            return new ExecutableScript() {
+
+                Map<String, Object> vars = new HashMap<>();
+
+                @Override
+                public void setNextVar(String name, Object value) {
+                    vars.put(name, value);
+                }
+
+                @Override
+                public Object run() {
+                    Map<String, Object> ctx = (Map<String, Object>) vars.get("ctx");
+                    assertNotNull(ctx);
+                    Map<String, Object> source = (Map<String, Object>) ctx.get("_source");
+                    source.putAll(params);
+                    return ctx;
+                }
+
+                @Override
+                public Object unwrap(Object value) {
+                    return value;
+                }
+
+            };
+        }
+
+        @Override
+        public SearchScript search(CompiledScript compiledScript, SearchLookup lookup, Map<String, Object> vars) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Object execute(CompiledScript compiledScript, Map<String, Object> vars) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Object unwrap(Object value) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void scriptRemoved(CompiledScript script) {
+        }
+
+    }
 
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
-        return Collections.singleton(GroovyPlugin.class);
+        return Collections.singleton(MockScriptPlugin.class);
     }
-    
+
     @Override
     protected int minimumNumberOfShards() {
         return 2;
@@ -77,7 +183,7 @@ public class AliasRoutingTests extends ESIntegTestCase {
         logger.info("--> updating with id [1] and routing through alias");
         client().prepareUpdate("alias0", "type1", "1")
                 .setUpsert(XContentFactory.jsonBuilder().startObject().field("field", 1).endObject())
-                .setScript(new Script("ctx._source.field = 'value2'", ScriptService.ScriptType.INLINE, null, null))
+                .setScript(new Script("", ScriptService.ScriptType.INLINE, MockScriptEngine.NAME, Collections.singletonMap("field", "value2")))
                 .execute().actionGet();
         for (int i = 0; i < 5; i++) {
             assertThat(client().prepareGet("alias0", "type1", "1").execute().actionGet().isExists(), equalTo(true));

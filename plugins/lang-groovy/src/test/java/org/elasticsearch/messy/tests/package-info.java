@@ -35,7 +35,6 @@
  * </ul>
  */
 /* List of renames that took place:
-  renamed:    core/src/test/java/org/elasticsearch/routing/AliasRoutingIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/AliasRoutingTests.java
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/metrics/AvgIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/AvgTests.java
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/pipeline/BucketScriptIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/BucketScriptTests.java
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/pipeline/BucketSelectorIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/BucketSelectorTests.java
@@ -83,7 +82,6 @@
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/metrics/TDigestPercentilesIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/TDigestPercentilesTests.java
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/bucket/TopHitsIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/TopHitsTests.java
   renamed:    core/src/test/java/org/elasticsearch/index/mapper/TransformOnIndexMapperIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/TransformOnIndexMapperTests.java
-  renamed:    core/src/test/java/org/elasticsearch/update/UpdateIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/UpdateTests.java
   renamed:    core/src/test/java/org/elasticsearch/search/aggregations/metrics/ValueCountIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/messy/tests/ValueCountTests.java
   renamed:    core/src/main/java/org/elasticsearch/script/groovy/GroovyScriptCompilationException.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/script/groovy/GroovyRestIT.java
   renamed:    core/src/test/java/org/elasticsearch/script/GroovyScriptIT.java -> plugins/lang-groovy/src/test/java/org/elasticsearch/script/groovy/GroovyScriptTests.java
