@@ -349,21 +349,21 @@ public class DocumentMapper implements ToXContent {
         this.fieldMappers = this.fieldMappers.copyAndAllAll(fieldMappers);
 
         // finally update for the entire index
-        mapperService.addMappers(objectMappers, fieldMappers);
+        mapperService.addMappers(type, objectMappers, fieldMappers);
     }
 
     public void merge(Mapping mapping, boolean updateAllTypes) {
         try (ReleasableLock lock = mappingWriteLock.acquire()) {
-            // first simulate to only check for conflicts
+            // first check for conflicts, either with other types or with
+            // a previous version of the same mapping
+            mapperService.checkMappersCompatibility(type, mapping, updateAllTypes);
+            
+            // now simulate the merge
             MergeResult mergeResult = new MergeResult(true, updateAllTypes);
             this.mapping.merge(mapping, mergeResult);
             if (mergeResult.hasConflicts()) {
                 throw new MergeMappingException(mergeResult.buildConflicts());
             }
-
-            // then check conflicts with other types
-            // if there is a single type then we are implicitly updating all types
-            mapperService.checkMappersCompatibility(mapping, updateAllTypes || mapperService.types().size() == 1);
 
             // finally apply the mapping update for real
             mergeResult = new MergeResult(false, updateAllTypes);

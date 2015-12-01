@@ -157,6 +157,14 @@ public abstract class NumberFieldMapper extends FieldMapper implements AllFieldM
         public boolean isNumeric() {
             return true;
         }
+
+        @Override
+        public void checkCompatibility(MappedFieldType other, List<String> conflicts, boolean strict) {
+            super.checkCompatibility(other, conflicts, strict);
+            if (numericPrecisionStep() != other.numericPrecisionStep()) {
+                conflicts.add("mapper [" + names().fullName() + "] has different [precision_step] values, cannot change from [" + numericPrecisionStep() + "] to [" + other.numericPrecisionStep() + "]");
+            }
+        }
     }
 
     protected Boolean includeInAll;
@@ -251,11 +259,6 @@ public abstract class NumberFieldMapper extends FieldMapper implements AllFieldM
             return;
         }
         NumberFieldMapper nfmMergeWith = (NumberFieldMapper) mergeWith;
-        if (this.fieldTypeRef.getNumAssociatedMappers() > 1 && mergeResult.updateAllTypes() == false) {
-            if (fieldType().numericPrecisionStep() != nfmMergeWith.fieldType().numericPrecisionStep()) {
-                mergeResult.addConflict("mapper [" + fieldType().names().fullName() + "] is used by multiple types. Set update_all_types to true to update precision_step across all types.");
-            }
-        }
 
         if (mergeResult.simulate() == false) {
             assert mergeResult.hasConflicts() == false;

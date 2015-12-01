@@ -302,8 +302,8 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
                 fieldMappers.add(metadataMapper);
             }
             MapperUtils.collect(mapper.mapping().root, objectMappers, fieldMappers);
-            checkMappersCompatibility(objectMappers, fieldMappers, updateAllTypes);
-            addMappers(objectMappers, fieldMappers);
+            checkMappersCompatibility(mapper.type(), objectMappers, fieldMappers, updateAllTypes);
+            addMappers(mapper.type(), objectMappers, fieldMappers);
 
             for (DocumentTypeListener typeListener : typeListeners) {
                 typeListener.beforeCreate(mapper);
@@ -360,7 +360,7 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
         }
     }
 
-    protected void checkMappersCompatibility(Collection<ObjectMapper> objectMappers, Collection<FieldMapper> fieldMappers, boolean updateAllTypes) {
+    protected void checkMappersCompatibility(String type, Collection<ObjectMapper> objectMappers, Collection<FieldMapper> fieldMappers, boolean updateAllTypes) {
         assert mappingLock.isWriteLockedByCurrentThread();
 
         // check compatibility within the mapping update
@@ -378,10 +378,10 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
                 }
             }
         }
-        fieldTypes.checkCompatibility(fieldMappers, updateAllTypes);
+        fieldTypes.checkCompatibility(type, fieldMappers, updateAllTypes);
     }
 
-    protected void checkMappersCompatibility(Mapping mapping, boolean updateAllTypes) {
+    protected void checkMappersCompatibility(String type, Mapping mapping, boolean updateAllTypes) {
         // First check compatibility of the new mapping with other types
         List<ObjectMapper> objectMappers = new ArrayList<>();
         List<FieldMapper> fieldMappers = new ArrayList<>();
@@ -389,10 +389,10 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
             fieldMappers.add(metadataMapper);
         }
         MapperUtils.collect(mapping.root(), objectMappers, fieldMappers);
-        checkMappersCompatibility(objectMappers, fieldMappers, updateAllTypes);
+        checkMappersCompatibility(type, objectMappers, fieldMappers, updateAllTypes);
     }
 
-    protected void addMappers(Collection<ObjectMapper> objectMappers, Collection<FieldMapper> fieldMappers) {
+    protected void addMappers(String type, Collection<ObjectMapper> objectMappers, Collection<FieldMapper> fieldMappers) {
         assert mappingLock.isWriteLockedByCurrentThread();
         ImmutableOpenMap.Builder<String, ObjectMapper> fullPathObjectMappers = ImmutableOpenMap.builder(this.fullPathObjectMappers);
         for (ObjectMapper objectMapper : objectMappers) {
@@ -402,7 +402,7 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
             }
         }
         this.fullPathObjectMappers = fullPathObjectMappers.build();
-        this.fieldTypes = this.fieldTypes.copyAndAddAll(fieldMappers);
+        this.fieldTypes = this.fieldTypes.copyAndAddAll(type, fieldMappers);
     }
 
     public boolean hasMapping(String mappingType) {
