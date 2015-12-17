@@ -104,6 +104,9 @@ public class DocumentMapperParser {
         if (source != null) {
             Map<String, Object> root = XContentHelper.convertToMap(source.compressedReference(), true).v2();
             Tuple<String, Map<String, Object>> t = extractMapping(type, root);
+            if (type != null && type.equals(t.v1()) == false) {
+                throw new IllegalArgumentException("Expected type [" + type + "] but mapping defines type [" + t.v1() + "]");
+            }
             type = t.v1();
             mapping = t.v2();
         }
