@@ -92,14 +92,6 @@ public class GeoUtils {
     }
 
     /**
-     * Return an approximate value of the diameter of the earth (in meters) at the given latitude (in radians).
-     */
-    public static double earthDiameter(double latitude) {
-        // SloppyMath impl returns a result in kilometers
-        return SloppyMath.earthDiameter(latitude) * 1000;
-    }
-
-    /**
      * Calculate the width (in meters) of geohash cells at a specific level
      * @param level geohash level must be greater or equal to zero
      * @return the width of cells at level in meters
