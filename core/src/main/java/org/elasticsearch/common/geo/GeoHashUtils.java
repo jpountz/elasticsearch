@@ -53,7 +53,7 @@ public class GeoHashUtils {
     public static final long longEncode(final double lon, final double lat, final int level) {
         // shift to appropriate level
         final short msf = (short)(((12 - level) * 5) + MORTON_OFFSET);
-        return ((BitUtil.flipFlop(GeoEncodingUtils.mortonHash(lon, lat)) >>> msf) << 4) | level;
+        return ((BitUtil.flipFlop(GeoEncodingUtils.mortonHash(lat, lon)) >>> msf) << 4) | level;
     }
 
     /**
@@ -119,7 +119,7 @@ public class GeoHashUtils {
      */
     public static final String stringEncode(final double lon, final double lat, final int level) {
         // convert to geohashlong
-        final long ghLong = fromMorton(GeoEncodingUtils.mortonHash(lon, lat), level);
+        final long ghLong = fromMorton(GeoEncodingUtils.mortonHash(lat, lon), level);
         return stringEncode(ghLong);
 
     }

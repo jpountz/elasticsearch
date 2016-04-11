@@ -168,4 +168,28 @@ public final class GeoPoint {
     public static GeoPoint fromIndexLong(long indexLong) {
         return new GeoPoint().resetFromIndexHash(indexLong);
     }
+
+    /** Puts latitude in range of -90 to 90. */
+    public static double normalizeLatitude(double latitude) {
+        if (latitude >= -90 && latitude <= 90) {
+            return latitude; //common case, and avoids slight double precision shifting
+        }
+        double off = Math.abs((latitude + 90) % 360);
+        return (off <= 180 ? off : 360-off) - 90;
+    }
+
+    /** Puts longitude in range of -180 to +180. */
+    public static double normalizeLongitude(double longitude) {
+        if (longitude >= -180 && longitude <= 180) {
+            return longitude; //common case, and avoids slight double precision shifting
+        }
+        double off = (longitude + 180) % 360;
+        if (off < 0) {
+            return 180 + off;
+        } else if (off == 0 && longitude > 0) {
+            return 180;
+        } else {
+            return -180 + off;
+        }
+    }
 }

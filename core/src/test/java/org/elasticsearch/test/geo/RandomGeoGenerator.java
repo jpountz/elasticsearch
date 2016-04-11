@@ -42,8 +42,8 @@ public class RandomGeoGenerator {
         assert pt != null && pt.length == 2;
 
         // normalize min and max
-        double[] min = {GeoUtils.normalizeLon(minLon), GeoUtils.normalizeLat(minLat)};
-        double[] max = {GeoUtils.normalizeLon(maxLon), GeoUtils.normalizeLat(maxLat)};
+        double[] min = {GeoPoint.normalizeLongitude(minLon), GeoPoint.normalizeLatitude(minLat)};
+        double[] max = {GeoPoint.normalizeLongitude(maxLon), GeoPoint.normalizeLatitude(maxLat)};
         final double[] tMin = new double[2];
         final double[] tMax = new double[2];
         tMin[0] = Math.min(min[0], max[0]);
