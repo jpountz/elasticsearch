@@ -21,6 +21,7 @@ package org.elasticsearch.search;
 
 import org.apache.lucene.document.InetAddressPoint;
 import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.Version;
 import org.elasticsearch.common.geo.GeoHashUtils;
 import org.elasticsearch.common.io.stream.NamedWriteable;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -395,4 +396,60 @@ public interface DocValueFormat extends NamedWriteable {
             throw new UnsupportedOperationException();
         }
     }
+
+    public static class Uid implements DocValueFormat {
+
+        public static final String NAME = "uid";
+
+        private Version indexCreated;
+
+        public Uid(Version indexCreated) {
+            this.indexCreated = Objects.requireNonNull(indexCreated);
+        }
+
+        Uid(StreamInput in) throws IOException {
+            this(Version.readVersion(in));
+        }
+
+        @Override
+        public String getWriteableName() {
+            return NAME;
+        }
+
+        @Override
+        public void writeTo(StreamOutput out) throws IOException {
+            Version.writeVersion(indexCreated, out);
+        }
+
+        @Override
+        public String format(long value) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String format(double value) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public String format(BytesRef value) {
+            return org.elasticsearch.index.mapper.Uid.parseIndexTerm(indexCreated, value).toString();
+        }
+
+        @Override
+        public long parseLong(String value, boolean roundUp, Callable<Long> now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public double parseDouble(String value, boolean roundUp, Callable<Long> now) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public BytesRef parseBytesRef(String value) {
+            return org.elasticsearch.index.mapper.Uid.createUid(value).toIndexTerm(indexCreated);
+        }
+        
+    };
 }

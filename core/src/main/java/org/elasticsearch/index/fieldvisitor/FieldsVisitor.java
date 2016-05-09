@@ -62,6 +62,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     private final boolean loadSource;
     private final Set<String> requiredFields;
     protected BytesReference source;
+    private byte[] binaryUid;
     protected Uid uid;
     protected Map<String, List<Object>> fieldsValues;
 
@@ -84,6 +85,9 @@ public class FieldsVisitor extends StoredFieldVisitor {
     }
 
     public void postProcess(MapperService mapperService) {
+        if (binaryUid != null) {
+            uid = Uid.parseIndexTerm(mapperService.getIndexSettings().getIndexVersionCreated(), new BytesRef(binaryUid));
+        }
         if (uid != null) {
             DocumentMapper documentMapper = mapperService.documentMapper(uid.type());
             if (documentMapper != null) {
@@ -105,7 +109,11 @@ public class FieldsVisitor extends StoredFieldVisitor {
         }
     }
 
+    // TODO: can we get rid of one of these duplicate postProcess methods?
     public void postProcess(DocumentMapper documentMapper) {
+        if (binaryUid != null) {
+            uid = Uid.createUid((String) documentMapper.uidMapper().fieldType().valueForSearch(binaryUid));
+        }
         for (Map.Entry<String, List<Object>> entry : fields().entrySet()) {
             String indexName = entry.getKey();
             FieldMapper fieldMapper = documentMapper.mappers().getMapper(indexName);
@@ -133,6 +141,8 @@ public class FieldsVisitor extends StoredFieldVisitor {
     public void binaryField(FieldInfo fieldInfo, byte[] value) throws IOException {
         if (SourceFieldMapper.NAME.equals(fieldInfo.name)) {
             source = new BytesArray(value);
+        } else if (UidFieldMapper.NAME.equals(fieldInfo.name)) {
+            binaryUid = value;
         } else {
             addValue(fieldInfo.name, new BytesRef(value));
         }
@@ -142,7 +152,8 @@ public class FieldsVisitor extends StoredFieldVisitor {
     public void stringField(FieldInfo fieldInfo, byte[] bytes) throws IOException {
         final String value = new String(bytes, StandardCharsets.UTF_8);
         if (UidFieldMapper.NAME.equals(fieldInfo.name)) {
-            uid = Uid.createUid(value);
+            // only exists for bw compat: uid is now stored in a binary field
+            binaryUid = bytes;
         } else {
             addValue(fieldInfo.name, value);
         }
@@ -195,6 +206,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     public void reset() {
         if (fieldsValues != null) fieldsValues.clear();
         source = null;
+        binaryUid = null;
         uid = null;
 
         requiredFields.addAll(BASE_REQUIRED_FIELDS);

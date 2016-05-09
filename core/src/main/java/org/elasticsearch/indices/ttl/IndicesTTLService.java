@@ -24,6 +24,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.SimpleCollector;
+import org.elasticsearch.Version;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
@@ -201,7 +202,7 @@ public class IndicesTTLService extends AbstractLifecycleComponent<IndicesTTLServ
             Engine.Searcher searcher = shardToPurge.acquireSearcher("indices_ttl");
             try {
                 logger.debug("[{}][{}] purging shard", shardToPurge.routingEntry().index(), shardToPurge.routingEntry().id());
-                ExpiredDocsCollector expiredDocsCollector = new ExpiredDocsCollector();
+                ExpiredDocsCollector expiredDocsCollector = new ExpiredDocsCollector(shardToPurge.getService().indexSettings().getIndexVersionCreated());
                 searcher.searcher().search(query, expiredDocsCollector);
                 List<DocToPurge> docsToPurge = expiredDocsCollector.getDocsToPurge();
 
@@ -235,10 +236,12 @@ public class IndicesTTLService extends AbstractLifecycleComponent<IndicesTTLServ
     }
 
     private class ExpiredDocsCollector extends SimpleCollector {
+        private final Version indexCreated;
         private LeafReaderContext context;
         private List<DocToPurge> docsToPurge = new ArrayList<>();
 
-        public ExpiredDocsCollector() {
+        public ExpiredDocsCollector(Version indexCreated) {
+            this.indexCreated = indexCreated;
         }
 
         @Override
@@ -256,7 +259,7 @@ public class IndicesTTLService extends AbstractLifecycleComponent<IndicesTTLServ
                 FieldsVisitor fieldsVisitor = new FieldsVisitor(false);
                 context.reader().document(doc, fieldsVisitor);
                 Uid uid = fieldsVisitor.uid();
-                final long version = Versions.loadVersion(context.reader(), new Term(UidFieldMapper.NAME, uid.toBytesRef()));
+                final long version = Versions.loadVersion(context.reader(), new Term(UidFieldMapper.NAME, uid.toIndexTerm(indexCreated)));
                 docsToPurge.add(new DocToPurge(uid.type(), uid.id(), version, fieldsVisitor.routing()));
             } catch (Exception e) {
                 logger.trace("failed to collect doc", e);

@@ -51,8 +51,8 @@ public class IdMappingTests extends ESSingleNodeTestCase {
                 .endObject()
                 .bytes());
 
-        assertThat(doc.rootDoc().get(UidFieldMapper.NAME), notNullValue());
-        assertThat(doc.rootDoc().get(IdFieldMapper.NAME), nullValue());
+        assertThat(doc.rootDoc().getField(UidFieldMapper.NAME), notNullValue());
+        assertThat(doc.rootDoc().getField(IdFieldMapper.NAME), nullValue());
 
         try {
             docMapper.parse("test", "type", null, XContentFactory.jsonBuilder()

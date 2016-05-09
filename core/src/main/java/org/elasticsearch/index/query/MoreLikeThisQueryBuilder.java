@@ -28,6 +28,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchParseException;
 import org.elasticsearch.ExceptionsHelper;
+import org.elasticsearch.Version;
 import org.elasticsearch.action.termvectors.MultiTermVectorsItemResponse;
 import org.elasticsearch.action.termvectors.MultiTermVectorsRequest;
 import org.elasticsearch.action.termvectors.MultiTermVectorsResponse;
@@ -53,6 +54,7 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.MappedFieldType;
+import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.mapper.core.KeywordFieldMapper.KeywordFieldType;
 import org.elasticsearch.index.mapper.core.StringFieldMapper.StringFieldType;
 import org.elasticsearch.index.mapper.core.TextFieldMapper.TextFieldType;
@@ -71,7 +73,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.index.mapper.Uid.createUidAsBytes;
 
 /**
  * A more like this query that finds documents that are "like" the provided set of document(s).
@@ -1098,7 +1099,7 @@ public class MoreLikeThisQueryBuilder extends AbstractQueryBuilder<MoreLikeThisQ
 
         // exclude the items from the search
         if (!include) {
-            handleExclude(boolQuery, likeItems);
+            handleExclude(boolQuery, likeItems, context.indexVersionCreated());
         }
         return boolQuery.build();
     }
@@ -1151,14 +1152,15 @@ public class MoreLikeThisQueryBuilder extends AbstractQueryBuilder<MoreLikeThisQ
         return likeFields.toArray(Fields.EMPTY_ARRAY);
     }
 
-    private static void handleExclude(BooleanQuery.Builder boolQuery, Item[] likeItems) {
+    private static void handleExclude(BooleanQuery.Builder boolQuery, Item[] likeItems, Version indexCreated) {
         // artificial docs get assigned a random id and should be disregarded
         List<BytesRef> uids = new ArrayList<>();
         for (Item item : likeItems) {
             if (item.doc() != null) {
                 continue;
             }
-            uids.add(createUidAsBytes(item.type(), item.id()));
+            
+            uids.add(new Uid(item.type(), item.id()).toIndexTerm(indexCreated));
         }
         if (!uids.isEmpty()) {
             TermsQuery query = new TermsQuery(UidFieldMapper.NAME, uids.toArray(new BytesRef[uids.size()]));

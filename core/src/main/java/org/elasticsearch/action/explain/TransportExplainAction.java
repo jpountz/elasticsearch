@@ -21,6 +21,7 @@ package org.elasticsearch.action.explain;
 
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.Explanation;
+import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.RoutingMissingException;
@@ -109,7 +110,8 @@ public class TransportExplainAction extends TransportSingleShardAction<ExplainRe
     protected ExplainResponse shardOperation(ExplainRequest request, ShardId shardId) {
         IndexService indexService = indicesService.indexServiceSafe(shardId.getIndex());
         IndexShard indexShard = indexService.getShard(shardId.id());
-        Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id()));
+        BytesRef uidBytes = new Uid(request.type(), request.id()).toIndexTerm(indexService.getIndexSettings().getIndexVersionCreated());
+        Term uidTerm = new Term(UidFieldMapper.NAME, uidBytes);
         Engine.GetResult result = indexShard.get(new Engine.Get(false, uidTerm));
         if (!result.exists()) {
             return new ExplainResponse(shardId.getIndexName(), request.type(), request.id(), false);

@@ -19,6 +19,7 @@
 
 package org.elasticsearch.index.mapper.simple;
 
+import org.elasticsearch.Version;
 import org.elasticsearch.common.bytes.BytesArray;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.compress.CompressedXContent;
@@ -67,7 +68,7 @@ public class SimpleMapperTests extends ESSingleNodeTestCase {
         DocumentMapper builtDocMapper = parser.parse("person", new CompressedXContent(builtMapping));
         BytesReference json = new BytesArray(copyToBytesFromClasspath("/org/elasticsearch/index/mapper/simple/test1.json"));
         Document doc = builtDocMapper.parse("test", "person", "1", json).rootDoc();
-        assertThat(doc.get(docMapper.uidMapper().fieldType().name()), equalTo(Uid.createUid("person", "1")));
+        assertThat(doc.getField(docMapper.uidMapper().fieldType().name()).binaryValue(), equalTo(new Uid("person", "1").toIndexTerm(Version.CURRENT)));
         assertThat(doc.get(docMapper.mappers().getMapper("name.first").fieldType().name()), equalTo("shay"));
     }
 
@@ -79,7 +80,7 @@ public class SimpleMapperTests extends ESSingleNodeTestCase {
 
         BytesReference json = new BytesArray(copyToBytesFromClasspath("/org/elasticsearch/index/mapper/simple/test1.json"));
         Document doc = docMapper.parse("test", "person", "1", json).rootDoc();
-        assertThat(doc.get(docMapper.uidMapper().fieldType().name()), equalTo(Uid.createUid("person", "1")));
+        assertThat(doc.getField(docMapper.uidMapper().fieldType().name()).binaryValue(), equalTo(new Uid("person", "1").toIndexTerm(Version.CURRENT)));
         assertThat(doc.get(docMapper.mappers().getMapper("name.first").fieldType().name()), equalTo("shay"));
     }
 
@@ -88,7 +89,7 @@ public class SimpleMapperTests extends ESSingleNodeTestCase {
         DocumentMapper docMapper = createIndex("test").mapperService().documentMapperParser().parse("person", new CompressedXContent(mapping));
         BytesReference json = new BytesArray(copyToBytesFromClasspath("/org/elasticsearch/index/mapper/simple/test1-notype-noid.json"));
         Document doc = docMapper.parse("test", "person", "1", json).rootDoc();
-        assertThat(doc.get(docMapper.uidMapper().fieldType().name()), equalTo(Uid.createUid("person", "1")));
+        assertThat(doc.getField(docMapper.uidMapper().fieldType().name()).binaryValue(), equalTo(new Uid("person", "1").toIndexTerm(Version.CURRENT)));
         assertThat(doc.get(docMapper.mappers().getMapper("name.first").fieldType().name()), equalTo("shay"));
     }
 

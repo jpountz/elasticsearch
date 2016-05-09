@@ -20,6 +20,7 @@
 package org.elasticsearch.index.get;
 
 import org.apache.lucene.index.Term;
+import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.bytes.BytesReference;
@@ -160,7 +161,8 @@ public final class ShardGetService extends AbstractIndexShardComponent {
         Engine.GetResult get = null;
         if (type == null || type.equals("_all")) {
             for (String typeX : mapperService.types()) {
-                get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(typeX, id)))
+                BytesRef uidBytes = new Uid(typeX, id).toIndexTerm(mapperService.getIndexSettings().getIndexVersionCreated());
+                get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, uidBytes))
                         .version(version).versionType(versionType));
                 if (get.exists()) {
                     type = typeX;
@@ -177,7 +179,8 @@ public final class ShardGetService extends AbstractIndexShardComponent {
                 return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
             }
         } else {
-            get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(type, id)))
+            BytesRef uidBytes = new Uid(type, id).toIndexTerm(mapperService.getIndexSettings().getIndexVersionCreated());
+            get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, uidBytes))
                     .version(version).versionType(versionType));
             if (!get.exists()) {
                 get.release();

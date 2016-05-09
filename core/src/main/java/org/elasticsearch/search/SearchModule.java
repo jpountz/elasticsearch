@@ -622,6 +622,7 @@ public class SearchModule extends AbstractModule {
         registerValueFormat(DocValueFormat.GEOHASH.getWriteableName(), in -> DocValueFormat.GEOHASH);
         registerValueFormat(DocValueFormat.IP.getWriteableName(), in -> DocValueFormat.IP);
         registerValueFormat(DocValueFormat.RAW.getWriteableName(), in -> DocValueFormat.RAW);
+        registerValueFormat(DocValueFormat.Uid.NAME, DocValueFormat.Uid::new);
     }
 
     private void registerBuiltinSignificanceHeuristics() {

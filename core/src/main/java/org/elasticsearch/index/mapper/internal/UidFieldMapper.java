@@ -23,7 +23,14 @@ import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queries.TermsQuery;
+import org.apache.lucene.search.MultiTermQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.Version;
+import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
@@ -36,6 +43,9 @@ import org.elasticsearch.index.mapper.MetadataFieldMapper;
 import org.elasticsearch.index.mapper.ParseContext;
 import org.elasticsearch.index.mapper.ParseContext.Document;
 import org.elasticsearch.index.mapper.core.TextFieldMapper;
+import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.search.DocValueFormat;
+import org.joda.time.DateTimeZone;
 import org.elasticsearch.index.mapper.Uid;
 
 import java.io.IOException;
@@ -81,6 +91,13 @@ public class UidFieldMapper extends MetadataFieldMapper {
         }
 
         @Override
+        protected void setupFieldType(BuilderContext context) {
+            super.setupFieldType(context);
+            ((UidFieldType) fieldType).indexCreated = context.indexCreatedVersion();
+            ((UidFieldType) defaultFieldType).indexCreated = context.indexCreatedVersion();
+        }
+
+        @Override
         public UidFieldMapper build(BuilderContext context) {
             setupFieldType(context);
             return new UidFieldMapper(fieldType, defaultFieldType, context.indexSettings());
@@ -101,11 +118,14 @@ public class UidFieldMapper extends MetadataFieldMapper {
 
     static final class UidFieldType extends MappedFieldType {
 
+        private Version indexCreated;
+
         public UidFieldType() {
         }
 
         protected UidFieldType(UidFieldType ref) {
             super(ref);
+            indexCreated = ref.indexCreated;
         }
 
         @Override
@@ -126,10 +146,76 @@ public class UidFieldMapper extends MetadataFieldMapper {
                     TextFieldMapper.Defaults.FIELDDATA_MAX_FREQUENCY,
                     TextFieldMapper.Defaults.FIELDDATA_MIN_SEGMENT_SIZE);
         }
+
+        @Override
+        public DocValueFormat docValueFormat(String format, DateTimeZone timeZone) {
+            if (format != null) {
+                throw new IllegalArgumentException("Field [" + name() + "] does not support custom formats");
+            }
+            if (timeZone != null) {
+                throw new IllegalArgumentException("Field [" + name() + "] does not support custom time zones");
+            }
+            return new DocValueFormat.Uid(indexCreated);
+        }
+
+        @Override
+        public Query termQuery(Object value, QueryShardContext context) {
+            String uid;
+            if (value instanceof BytesRef) {
+                uid = ((BytesRef) value).utf8ToString();
+            } else {
+                uid = value.toString();
+            }
+            return new TermQuery(new Term(NAME, Uid.createUid(uid).toIndexTerm(indexCreated)));
+        }
+
+        @Override
+        public Query termsQuery(List values, QueryShardContext context) {
+            BytesRef[] uids = new BytesRef[values.size()];
+            int i = 0;
+            for (Object value : values) {
+                String uid;
+                if (value instanceof BytesRef) {
+                    uid = ((BytesRef) value).utf8ToString();
+                } else {
+                    uid = value.toString();
+                }
+                uids[i++] = Uid.createUid(uid).toIndexTerm(indexCreated);
+            }
+            return new TermsQuery(NAME, uids);
+        }
+
+        @Override
+        public Query prefixQuery(String value, @Nullable MultiTermQuery.RewriteMethod method, @Nullable QueryShardContext context) {
+            throw new IllegalArgumentException("Prefix queries on _uid are not supported");
+        }
+
+        @Override
+        public Query regexpQuery(String value, int flags, int maxDeterminizedStates, @Nullable MultiTermQuery.RewriteMethod method, @Nullable QueryShardContext context) {
+            throw new IllegalArgumentException("Regexp queries on _uid are not supported");
+        }
+
+        @Override
+        public Query rangeQuery(Object lowerTerm, Object upperTerm,
+                boolean includeLower, boolean includeUpper) {
+            throw new IllegalArgumentException("Range queries on _uid are not supported");
+        }
+
+        @Override
+        public Object valueForSearch(Object value) {
+            byte[] uid = (byte[]) value;
+            return Uid.parseIndexTerm(indexCreated, new BytesRef(uid)).toString();
+        }
+    }
+
+    private static MappedFieldType defaultFieldType(Settings indexSettings) {
+        UidFieldType ft = (UidFieldType) Defaults.FIELD_TYPE.clone();
+        ft.indexCreated = Version.indexCreated(indexSettings);
+        return ft;
     }
 
     private UidFieldMapper(Settings indexSettings, MappedFieldType existing) {
-        this(existing == null ? Defaults.FIELD_TYPE.clone() : existing, Defaults.FIELD_TYPE, indexSettings);
+        this(existing == null ? defaultFieldType(indexSettings) : existing, Defaults.FIELD_TYPE, indexSettings);
     }
 
     private UidFieldMapper(MappedFieldType fieldType, MappedFieldType defaultFieldType, Settings indexSettings) {
@@ -176,11 +262,13 @@ public class UidFieldMapper extends MetadataFieldMapper {
 
     @Override
     protected void parseCreateField(ParseContext context, List<Field> fields) throws IOException {
-        Field uid = new Field(NAME, Uid.createUid(context.type(), context.id()), Defaults.FIELD_TYPE);
+        UidFieldType fieldType = (UidFieldType) fieldType();
+        BytesRef uidTerm = new Uid(context.type(), context.id()).toIndexTerm(fieldType.indexCreated);
+        Field uid = new Field(NAME, uidTerm, Defaults.FIELD_TYPE);
         context.uid(uid);
         fields.add(uid);
         if (fieldType().hasDocValues()) {
-            fields.add(new BinaryDocValuesField(NAME, new BytesRef(uid.stringValue())));
+            fields.add(new BinaryDocValuesField(NAME, uidTerm));
         }
     }
 

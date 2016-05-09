@@ -66,7 +66,8 @@ public class VersionFetchSubPhase implements FetchSubPhase {
         // the case below...
         long version;
         try {
-            BytesRef uid = Uid.createUidAsBytes(hitContext.hit().type(), hitContext.hit().id());
+            BytesRef uid = new Uid(hitContext.hit().type(), hitContext.hit().id()).toIndexTerm(
+                    context.indexShard().getService().indexSettings().getIndexVersionCreated());
             version = Versions.loadVersion(
                     hitContext.readerContext().reader(),
                     new Term(UidFieldMapper.NAME, uid)

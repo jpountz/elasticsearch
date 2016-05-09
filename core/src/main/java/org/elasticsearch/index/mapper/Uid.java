@@ -21,12 +21,10 @@ package org.elasticsearch.index.mapper;
 
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
-import org.elasticsearch.action.DocumentRequest;
-import org.elasticsearch.common.lucene.BytesRefs;
+import org.elasticsearch.Version;
+import org.elasticsearch.common.Base64;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.io.IOException;
 
 /**
  *
@@ -34,8 +32,6 @@ import java.util.List;
 public final class Uid {
 
     public static final char DELIMITER = '#';
-    public static final byte DELIMITER_BYTE = 0x23;
-    public static final BytesRef DELIMITER_BYTES = new BytesRef(new byte[]{DELIMITER_BYTE});
 
     private final String type;
 
@@ -79,101 +75,98 @@ public final class Uid {
         return createUid(type, id);
     }
 
-    public BytesRef toBytesRef() {
-        return createUidAsBytes(type, id);
-    }
-
-    public static BytesRef typePrefixAsBytes(BytesRef type) {
-        BytesRefBuilder bytesRef = new BytesRefBuilder();
-        bytesRef.append(type);
-        bytesRef.append(DELIMITER_BYTES);
-        return bytesRef.toBytesRef();
-    }
-
     public static Uid createUid(String uid) {
         int delimiterIndex = uid.indexOf(DELIMITER); // type is not allowed to have # in it..., ids can
         return new Uid(uid.substring(0, delimiterIndex), uid.substring(delimiterIndex + 1));
-    }
-
-    public static BytesRef[] createUids(List<? extends DocumentRequest> requests) {
-        BytesRef[] uids = new BytesRef[requests.size()];
-        int idx = 0;
-        for (DocumentRequest item : requests) {
-            uids[idx++] = createUidAsBytes(item.type(), item.id());
-        }
-        return uids;
-    }
-
-    public static BytesRef createUidAsBytes(String type, String id) {
-        return createUidAsBytes(new BytesRef(type), new BytesRef(id));
-    }
-
-    public static BytesRef createUidAsBytes(String type, BytesRef id) {
-        return createUidAsBytes(new BytesRef(type), id);
-    }
-
-    public static BytesRef createUidAsBytes(BytesRef type, BytesRef id) {
-        final BytesRef ref = new BytesRef(type.length + 1 + id.length);
-        System.arraycopy(type.bytes, type.offset, ref.bytes, 0, type.length);
-        ref.offset = type.length;
-        ref.bytes[ref.offset++] = DELIMITER_BYTE;
-        System.arraycopy(id.bytes, id.offset, ref.bytes, ref.offset, id.length);
-        ref.offset = 0;
-        ref.length = ref.bytes.length;
-        return ref;
-    }
-
-    public static BytesRef[] createUidsForTypesAndId(Collection<String> types, Object id) {
-        return createUidsForTypesAndIds(types, Collections.singletonList(id));
-    }
-
-    public static BytesRef[] createUidsForTypesAndIds(Collection<String> types, Collection<?> ids) {
-        BytesRef[] uids = new BytesRef[types.size() * ids.size()];
-        BytesRefBuilder typeBytes = new BytesRefBuilder();
-        BytesRefBuilder idBytes = new BytesRefBuilder();
-        int index = 0;
-        for (String type : types) {
-            typeBytes.copyChars(type);
-            for (Object id : ids) {
-                uids[index++] = Uid.createUidAsBytes(typeBytes.get(), BytesRefs.toBytesRef(id, idBytes));
-            }
-        }
-        return uids;
     }
 
     public static String createUid(String type, String id) {
         return type + DELIMITER + id;
     }
 
-    public static boolean hasDelimiter(BytesRef uid) {
-        final int limit = uid.offset + uid.length;
-        for (int i = uid.offset; i < limit; i++) {
-            if (uid.bytes[i] == DELIMITER_BYTE) { // 0x23 is equal to '#'
-                return true;
+    static boolean isUrlSafeBase64(String s) {
+        if (s.length() % 4 != 0) {
+            // base64 strings must have a number of chars that is multiple of 4
+            return false;
+        }
+        int numberOfTrailingEqualSigns = 0;
+        for (int i = s.length() - 1; i >= 0; --i) {
+            if (s.charAt(i) == '=') {
+                numberOfTrailingEqualSigns++;
             }
         }
-        return false;
+        if (numberOfTrailingEqualSigns > 2) {
+            return false;
+        }
+        for (int i = 0; i < s.length() - numberOfTrailingEqualSigns; ++i) {
+            final char c = s.charAt(i);
+            if ((c >= 'A' && c <= 'Z')
+                    || (c >= 'a' && c <= 'z')
+                    || (c >= '0' && c <= '9')
+                    || c == '-'
+                    || c == '_') {
+                continue;
+            } else {
+                return false;
+            }
+        }
+        return true;
     }
 
-    public static BytesRef[] splitUidIntoTypeAndId(BytesRef uid) {
-        int loc = -1;
-        final int limit = uid.offset + uid.length;
-        for (int i = uid.offset; i < limit; i++) {
-            if (uid.bytes[i] == DELIMITER_BYTE) { // 0x23 is equal to '#'
-                loc = i;
+    /** Create a uid term for indexing in the terms dictionary. */
+    public BytesRef toIndexTerm(Version indexCreated) {
+        BytesRefBuilder builder = new BytesRefBuilder();
+        builder.copyChars(type);
+        if (indexCreated.before(Version.V_5_0_0)) {
+            builder.append((byte) '#');
+            builder.append(new BytesRef(id));
+        } else {
+            if (isUrlSafeBase64(id)) {
+                builder.append((byte) '\0');
+                byte[] decoded;
+                try {
+                    decoded = Base64.decode(id, Base64.URL_SAFE);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                builder.append(new BytesRef(decoded));
+            } else {
+                builder.append((byte) '#');
+                builder.append(new BytesRef(id));
+            }
+        }
+        return builder.toBytesRef();
+    }
+
+    /** Parse a {@link Uid} that has been retrieved from the terms dictionary. */
+    public static Uid parseIndexTerm(Version indexCreated, BytesRef term) {
+        int separatorIndex = -1;
+        boolean base64 = false;
+        for (int i = 0; i < term.length; ++i) {
+            byte b = term.bytes[term.offset + i];
+            if (b == '\0' && indexCreated.onOrAfter(Version.V_5_0_0)) {
+                separatorIndex = i;
+                base64 = true;
+                break;
+            } else if (b == '#') {
+                separatorIndex = i;
                 break;
             }
         }
-
-        if (loc == -1) {
-            return null;
+        if (separatorIndex < 0) {
+            throw new IllegalArgumentException("Missing separator in uid term: " + term);
         }
-
-        int idStart = loc + 1;
-        return new BytesRef[] {
-                new BytesRef(uid.bytes, uid.offset, loc - uid.offset),
-                new BytesRef(uid.bytes, idStart, limit - idStart)
-        };
+        String type = new BytesRef(term.bytes, term.offset, separatorIndex).utf8ToString();
+        String id;
+        if (base64) {
+            try {
+                id = Base64.encodeBytes(term.bytes, term.offset + separatorIndex + 1, term.length - separatorIndex - 1, Base64.URL_SAFE);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Cannot oncode to base 64", e);
+            }
+        } else {
+            id = new BytesRef(term.bytes, term.offset + separatorIndex + 1, term.length - separatorIndex - 1).utf8ToString();
+        }
+        return new Uid(type, id);
     }
-
 }

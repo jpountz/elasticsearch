@@ -21,6 +21,7 @@ package org.elasticsearch.index.query;
 
 import org.apache.lucene.queries.TermsQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.common.ParseField;
 import org.elasticsearch.common.ParsingException;
@@ -216,7 +217,16 @@ public class IdsQueryBuilder extends AbstractQueryBuilder<IdsQueryBuilder> {
                 Collections.addAll(typesForQuery, types);
             }
 
-            query = new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(typesForQuery, ids));
+            final BytesRef[] uids = new BytesRef[context.queryTypes().size() * ids.size()];
+            int i = 0;
+            for (String id : ids) {
+                for (String queryType : context.queryTypes()) {
+                    uids[i++] = new Uid(queryType, id).toIndexTerm(context.indexVersionCreated());
+                }
+            }
+            assert i == uids.length;
+
+            query = new TermsQuery(UidFieldMapper.NAME, uids);
         }
         return query;
     }

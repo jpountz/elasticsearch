@@ -27,15 +27,24 @@ import java.io.IOException;
  */
 public class JustUidFieldsVisitor extends FieldsVisitor {
 
+    private boolean hasUid;
+
     public JustUidFieldsVisitor() {
         super(false);
     }
 
     @Override
+    public void reset() {
+        super.reset();
+        hasUid = false;
+    }
+
+    @Override
     public Status needsField(FieldInfo fieldInfo) throws IOException {
         if (UidFieldMapper.NAME.equals(fieldInfo.name)) {
+            hasUid = true;
             return Status.YES;
         }
-        return uid != null ? Status.STOP : Status.NO;
+        return hasUid ? Status.STOP : Status.NO;
     }
 }

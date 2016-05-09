@@ -478,7 +478,7 @@ public class IndexShard extends AbstractIndexShardComponent {
             doc.addDynamicMappingsUpdate(docMapper.getMapping());
         }
         MappedFieldType uidFieldType = docMapper.getDocumentMapper().uidMapper().fieldType();
-        Query uidQuery = uidFieldType.termQuery(doc.uid().stringValue(), null);
+        Query uidQuery = uidFieldType.termQuery(new Uid(doc.type(), doc.id()).toString(), null);
         Term uid = MappedFieldType.extractTerm(uidQuery);
         return new Engine.Index(uid, doc, version, versionType, origin, startTime);
     }

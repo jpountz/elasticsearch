@@ -22,20 +22,14 @@ package org.elasticsearch.index.mapper.internal;
 import org.apache.lucene.document.BinaryDocValuesField;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexOptions;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.TermsQuery;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.MultiTermQuery;
-import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.Version;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.lucene.BytesRefs;
 import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.iterable.Iterables;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.mapper.MappedFieldType;
@@ -47,7 +41,6 @@ import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.query.QueryShardContext;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -91,6 +84,13 @@ public class IdFieldMapper extends MetadataFieldMapper {
         }
 
         @Override
+        protected void setupFieldType(BuilderContext context) {
+            super.setupFieldType(context);
+            ((IdFieldType) fieldType).indexCreated = context.indexCreatedVersion();
+            ((IdFieldType) defaultFieldType).indexCreated = context.indexCreatedVersion();
+        }
+
+        @Override
         public IdFieldMapper build(BuilderContext context) {
             setupFieldType(context);
             return new IdFieldMapper(fieldType, context.indexSettings());
@@ -111,11 +111,14 @@ public class IdFieldMapper extends MetadataFieldMapper {
 
     static final class IdFieldType extends MappedFieldType {
 
+        private Version indexCreated;
+
         public IdFieldType() {
         }
 
         protected IdFieldType(IdFieldType ref) {
             super(ref);
+            this.indexCreated = ref.indexCreated;
         }
 
         @Override
@@ -136,61 +139,54 @@ public class IdFieldMapper extends MetadataFieldMapper {
 
         @Override
         public Query termQuery(Object value, @Nullable QueryShardContext context) {
-            if (indexOptions() != IndexOptions.NONE || context == null) {
-                return super.termQuery(value, context);
+            String id;
+            if (value instanceof BytesRef) {
+                id = ((BytesRef) value).utf8ToString();
+            } else {
+                id = value.toString();
             }
-            final BytesRef[] uids = Uid.createUidsForTypesAndId(context.queryTypes(), value);
+            final BytesRef[] uids = new BytesRef[context.queryTypes().size()];
+            int i = 0;
+            for (String queryType : context.queryTypes()) {
+                uids[i++] = new Uid(queryType, id).toIndexTerm(indexCreated);
+            }
             return new TermsQuery(UidFieldMapper.NAME, uids);
         }
 
         @Override
         public Query termsQuery(List values, @Nullable QueryShardContext context) {
-            if (indexOptions() != IndexOptions.NONE || context == null) {
-                return super.termsQuery(values, context);
+            final BytesRef[] uids = new BytesRef[context.queryTypes().size() * values.size()];
+            int i = 0;
+            for (Object value : values) {
+                String id;
+                if (value instanceof BytesRef) {
+                    id = ((BytesRef) value).utf8ToString();
+                } else {
+                    id = value.toString();
+                }
+                for (String queryType : context.queryTypes()) {
+                    uids[i++] = new Uid(queryType, id).toIndexTerm(indexCreated);
+                }
             }
-            return new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(context.queryTypes(), values));
+            assert i == uids.length;
+
+            return new TermsQuery(UidFieldMapper.NAME, uids);
         }
 
         @Override
         public Query prefixQuery(String value, @Nullable MultiTermQuery.RewriteMethod method, @Nullable QueryShardContext context) {
-            if (indexOptions() != IndexOptions.NONE || context == null) {
-                return super.prefixQuery(value, method, context);
-            }
-            Collection<String> queryTypes = context.queryTypes();
-            BooleanQuery.Builder query = new BooleanQuery.Builder();
-            for (String queryType : queryTypes) {
-                PrefixQuery prefixQuery = new PrefixQuery(new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(queryType, BytesRefs.toBytesRef(value))));
-                if (method != null) {
-                    prefixQuery.setRewriteMethod(method);
-                }
-                query.add(prefixQuery, BooleanClause.Occur.SHOULD);
-            }
-            return query.build();
+            throw new IllegalArgumentException("Prefix queries on _id are not supported");
         }
 
         @Override
         public Query regexpQuery(String value, int flags, int maxDeterminizedStates, @Nullable MultiTermQuery.RewriteMethod method, @Nullable QueryShardContext context) {
-            if (indexOptions() != IndexOptions.NONE || context == null) {
-                return super.regexpQuery(value, flags, maxDeterminizedStates, method, context);
-            }
-            Collection<String> queryTypes = context.queryTypes();
-            if (queryTypes.size() == 1) {
-                RegexpQuery regexpQuery = new RegexpQuery(new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(Iterables.getFirst(queryTypes, null), BytesRefs.toBytesRef(value))),
-                    flags, maxDeterminizedStates);
-                if (method != null) {
-                    regexpQuery.setRewriteMethod(method);
-                }
-                return regexpQuery;
-            }
-            BooleanQuery.Builder query = new BooleanQuery.Builder();
-            for (String queryType : queryTypes) {
-                RegexpQuery regexpQuery = new RegexpQuery(new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(queryType, BytesRefs.toBytesRef(value))), flags, maxDeterminizedStates);
-                if (method != null) {
-                    regexpQuery.setRewriteMethod(method);
-                }
-                query.add(regexpQuery, BooleanClause.Occur.SHOULD);
-            }
-            return query.build();
+            throw new IllegalArgumentException("Regexp queries on _id are not supported");
+        }
+
+        @Override
+        public Query rangeQuery(Object lowerTerm, Object upperTerm,
+                boolean includeLower, boolean includeUpper) {
+            throw new IllegalArgumentException("Range queries on _id are not supported");
         }
     }
 
