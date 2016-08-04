@@ -37,14 +37,14 @@ public class CustomFieldsVisitor extends FieldsVisitor {
     private final Set<String> fields;
     private final List<String> patterns;
 
-    public CustomFieldsVisitor(Set<String> fields, List<String> patterns, boolean loadSource) {
-        super(loadSource);
+    public CustomFieldsVisitor(Set<String> fields, List<String> patterns, boolean loadSource, String singleType) {
+        super(loadSource, singleType);
         this.fields = fields;
         this.patterns = patterns;
     }
 
-    public CustomFieldsVisitor(Set<String> fields, boolean loadSource) {
-        this(fields, Collections.emptyList(), loadSource);
+    public CustomFieldsVisitor(Set<String> fields, boolean loadSource, String singleType) {
+        this(fields, Collections.emptyList(), loadSource, singleType);
     }
 
     @Override

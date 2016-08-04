@@ -166,6 +166,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     private final TranslogConfig translogConfig;
     private final IndexEventListener indexEventListener;
     private final QueryCachingPolicy cachingPolicy;
+    private final String singleType;
 
 
     /**
@@ -272,6 +273,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         searcherWrapper = indexSearcherWrapper;
         primaryTerm = indexSettings.getIndexMetaData().primaryTerm(shardId.id());
         refreshListeners = buildRefreshListeners();
+        this.singleType = MapperService.getSingleType(indexSettings);
         persistMetadata(shardRouting, null);
     }
 
@@ -489,7 +491,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     public Engine.Index prepareIndexOnPrimary(SourceToParse source, long version, VersionType versionType) {
         try {
             verifyPrimary();
-            return prepareIndex(docMapper(source.type()), source, version, versionType, Engine.Operation.Origin.PRIMARY);
+            return prepareIndex(docMapper(source.type()), source, version, versionType, Engine.Operation.Origin.PRIMARY, singleType);
         } catch (Exception e) {
             verifyNotClosed(e);
             throw e;
@@ -499,21 +501,24 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     public Engine.Index prepareIndexOnReplica(SourceToParse source, long version, VersionType versionType) {
         try {
             verifyReplicationTarget();
-            return prepareIndex(docMapper(source.type()), source, version, versionType, Engine.Operation.Origin.REPLICA);
+            return prepareIndex(docMapper(source.type()), source, version, versionType, Engine.Operation.Origin.REPLICA, singleType);
         } catch (Exception e) {
             verifyNotClosed(e);
             throw e;
         }
     }
 
-    static Engine.Index prepareIndex(DocumentMapperForType docMapper, SourceToParse source, long version, VersionType versionType, Engine.Operation.Origin origin) {
+    static Engine.Index prepareIndex(DocumentMapperForType docMapper, SourceToParse source, long version, VersionType versionType,
+            Engine.Operation.Origin origin, String singleType) {
         long startTime = System.nanoTime();
         ParsedDocument doc = docMapper.getDocumentMapper().parse(source);
         if (docMapper.getMapping() != null) {
             doc.addDynamicMappingsUpdate(docMapper.getMapping());
         }
+        assert singleType == null || singleType.equals(doc.type());
+        String uidValue = Uid.createUid(doc.type(), doc.id(), singleType != null);
         MappedFieldType uidFieldType = docMapper.getDocumentMapper().uidMapper().fieldType();
-        Query uidQuery = uidFieldType.termQuery(doc.uid(), null);
+        Query uidQuery = uidFieldType.termQuery(uidValue, null);
         Term uid = MappedFieldType.extractTerm(uidQuery);
         return new Engine.Index(uid, doc, version, versionType, origin, startTime);
     }
@@ -552,7 +557,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
         verifyPrimary();
         final DocumentMapper documentMapper = docMapper(type).getDocumentMapper();
         final MappedFieldType uidFieldType = documentMapper.uidMapper().fieldType();
-        final Query uidQuery = uidFieldType.termQuery(Uid.createUid(type, id), null);
+        assert singleType == null || singleType.equals(type);
+        final Query uidQuery = uidFieldType.termQuery(Uid.createUid(type, id, singleType != null), null);
         final Term uid = MappedFieldType.extractTerm(uidQuery);
         return prepareDelete(type, id, uid, version, versionType, Engine.Operation.Origin.PRIMARY);
     }
@@ -560,7 +566,8 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
     public Engine.Delete prepareDeleteOnReplica(String type, String id, long version, VersionType versionType) {
         final DocumentMapper documentMapper = docMapper(type).getDocumentMapper();
         final MappedFieldType uidFieldType = documentMapper.uidMapper().fieldType();
-        final Query uidQuery = uidFieldType.termQuery(Uid.createUid(type, id), null);
+        assert singleType == null || singleType.equals(type);
+        final Query uidQuery = uidFieldType.termQuery(Uid.createUid(type, id, singleType != null), null);
         final Term uid = MappedFieldType.extractTerm(uidQuery);
         return prepareDelete(type, id, uid, version, versionType, Engine.Operation.Origin.REPLICA);
     }

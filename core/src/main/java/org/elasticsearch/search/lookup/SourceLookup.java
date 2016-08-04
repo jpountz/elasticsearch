@@ -40,6 +40,8 @@ import static java.util.Collections.emptyMap;
  */
 public class SourceLookup implements Map {
 
+    private final String singleType;
+
     private LeafReader reader;
 
     private int docId = -1;
@@ -47,6 +49,10 @@ public class SourceLookup implements Map {
     private BytesReference sourceAsBytes;
     private Map<String, Object> source;
     private XContentType sourceContentType;
+
+    public SourceLookup(String singleType) {
+        this.singleType = singleType;
+    }
 
     public Map<String, Object> source() {
         return source;
@@ -67,7 +73,7 @@ public class SourceLookup implements Map {
             return source;
         }
         try {
-            FieldsVisitor sourceFieldVisitor = new FieldsVisitor(true);
+            FieldsVisitor sourceFieldVisitor = new FieldsVisitor(true, singleType);
             reader.document(docId, sourceFieldVisitor);
             BytesReference source = sourceFieldVisitor.source();
             if (source == null) {

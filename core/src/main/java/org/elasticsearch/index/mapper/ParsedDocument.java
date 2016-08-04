@@ -32,7 +32,7 @@ public class ParsedDocument {
 
     private final Field version;
 
-    private final String uid, id, type;
+    private final String id, type;
 
     private final String routing;
 
@@ -52,7 +52,6 @@ public class ParsedDocument {
         this.version = version;
         this.id = id;
         this.type = type;
-        this.uid = Uid.createUid(type, id);
         this.routing = routing;
         this.timestamp = timestamp;
         this.ttl = ttl;
@@ -62,10 +61,6 @@ public class ParsedDocument {
     }
     public Field version() {
         return version;
-    }
-
-    public String uid() {
-        return uid;
     }
 
     public String id() {
@@ -132,7 +127,7 @@ public class ParsedDocument {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Document ").append("uid[").append(uid).append("] doc [").append(documents).append("]");
+        sb.append("Document ").append("type[").append(type).append("] id [").append(id).append("] doc [").append(documents).append("]");
         return sb.toString();
     }
 }

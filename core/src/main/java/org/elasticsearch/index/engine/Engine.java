@@ -57,6 +57,7 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ReleasableLock;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.ParseContext.Document;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.ParsedDocument;
 import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.merge.MergeStats;
@@ -98,6 +99,7 @@ public abstract class Engine implements Closeable {
     protected final AtomicBoolean isClosed = new AtomicBoolean(false);
     protected final EventListener eventListener;
     protected final SnapshotDeletionPolicy deletionPolicy;
+    protected final String singleType;
     protected final ReentrantLock failEngineLock = new ReentrantLock();
     protected final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock();
     protected final ReleasableLock readLock = new ReleasableLock(rwl.readLock());
@@ -127,6 +129,7 @@ public abstract class Engine implements Closeable {
                 engineConfig.getIndexSettings().getSettings(), engineConfig.getShardId());
         this.eventListener = engineConfig.getEventListener();
         this.deletionPolicy = engineConfig.getDeletionPolicy();
+        this.singleType = MapperService.getSingleType(engineConfig.getIndexSettings());
     }
 
     /** Returns 0 in the case where accountable is null, otherwise returns {@code ramBytesUsed()} */
@@ -311,7 +314,7 @@ public abstract class Engine implements Closeable {
         if (docIdAndVersion != null) {
             if (get.versionType().isVersionConflictForReads(docIdAndVersion.version, get.version())) {
                 Releasables.close(searcher);
-                Uid uid = Uid.createUid(get.uid().text());
+                Uid uid = Uid.createUid(get.uid().text(), singleType);
                 throw new VersionConflictEngineException(shardId, uid.type(), uid.id(),
                         get.versionType().explainConflictForReads(docIdAndVersion.version, get.version()));
             }

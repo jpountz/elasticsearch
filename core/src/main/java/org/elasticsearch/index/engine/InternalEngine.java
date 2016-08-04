@@ -324,7 +324,7 @@ public class InternalEngine extends Engine {
                         return GetResult.NOT_EXISTS;
                     }
                     if (get.versionType().isVersionConflictForReads(versionValue.version(), get.version())) {
-                        Uid uid = Uid.createUid(get.uid().text());
+                        Uid uid = Uid.createUid(get.uid().text(), singleType);
                         throw new VersionConflictEngineException(shardId, uid.type(), uid.id(),
                                 get.versionType().explainConflictForReads(versionValue.version(), get.version()));
                     }

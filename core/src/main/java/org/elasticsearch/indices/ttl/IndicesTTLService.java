@@ -253,7 +253,8 @@ public class IndicesTTLService extends AbstractLifecycleComponent {
         @Override
         public void collect(int doc) {
             try {
-                FieldsVisitor fieldsVisitor = new FieldsVisitor(false);
+                // _ttl is only for 2.x indices so there cannot be a single type
+                FieldsVisitor fieldsVisitor = new FieldsVisitor(false, null);
                 context.reader().document(doc, fieldsVisitor);
                 Uid uid = fieldsVisitor.uid();
                 final long version = Versions.loadVersion(context.reader(), new Term(UidFieldMapper.NAME, uid.toBytesRef()));

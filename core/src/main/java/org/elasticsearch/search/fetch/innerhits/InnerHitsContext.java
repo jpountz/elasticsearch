@@ -298,7 +298,8 @@ public final class InnerHitsContext {
                 if (parentField == null) {
                     throw new IllegalStateException("All children must have a _parent");
                 }
-                hitQuery = new TermQuery(new Term(UidFieldMapper.NAME, Uid.createUid(parentType, parentField.getValue())));
+                // use of parent/child means that there are multiple types
+                hitQuery = new TermQuery(new Term(UidFieldMapper.NAME, Uid.createUid(parentType, parentField.getValue(), false)));
             } else {
                 return Lucene.EMPTY_TOP_DOCS;
             }

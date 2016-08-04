@@ -58,13 +58,15 @@ public class FieldsVisitor extends StoredFieldVisitor {
             ParentFieldMapper.NAME));
 
     private final boolean loadSource;
+    private final String singleType;
     private final Set<String> requiredFields;
     protected BytesReference source;
     protected Uid uid;
     protected Map<String, List<Object>> fieldsValues;
 
-    public FieldsVisitor(boolean loadSource) {
+    public FieldsVisitor(boolean loadSource, String singleType) {
         this.loadSource = loadSource;
+        this.singleType = singleType;
         requiredFields = new HashSet<>();
         reset();
     }
@@ -108,7 +110,7 @@ public class FieldsVisitor extends StoredFieldVisitor {
     public void stringField(FieldInfo fieldInfo, byte[] bytes) throws IOException {
         final String value = new String(bytes, StandardCharsets.UTF_8);
         if (UidFieldMapper.NAME.equals(fieldInfo.name)) {
-            uid = Uid.createUid(value);
+            uid = Uid.createUid(value, singleType);
         } else {
             addValue(fieldInfo.name, value);
         }

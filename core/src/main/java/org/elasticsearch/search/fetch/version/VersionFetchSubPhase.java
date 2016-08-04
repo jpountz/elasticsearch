@@ -22,6 +22,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.common.lucene.uid.Versions;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.mapper.internal.UidFieldMapper;
 import org.elasticsearch.search.fetch.FetchSubPhase;
@@ -41,7 +42,8 @@ public final class VersionFetchSubPhase implements FetchSubPhase {
         // the case below...
         final long version;
         try {
-            BytesRef uid = Uid.createUidAsBytes(hitContext.hit().type(), hitContext.hit().id());
+            final String singleType = MapperService.getSingleType(context.mapperService().getIndexSettings());
+            BytesRef uid = Uid.createUidAsBytes(hitContext.hit().type(), hitContext.hit().id(), singleType != null);
             version = Versions.loadVersion(
                     hitContext.readerContext().reader(),
                     new Term(UidFieldMapper.NAME, uid)

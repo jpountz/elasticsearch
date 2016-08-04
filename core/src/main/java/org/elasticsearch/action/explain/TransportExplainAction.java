@@ -36,6 +36,7 @@ import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.index.IndexService;
 import org.elasticsearch.index.engine.Engine;
 import org.elasticsearch.index.get.GetResult;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.mapper.internal.UidFieldMapper;
 import org.elasticsearch.index.shard.IndexShard;
@@ -106,7 +107,11 @@ public class TransportExplainAction extends TransportSingleShardAction<ExplainRe
     protected ExplainResponse shardOperation(ExplainRequest request, ShardId shardId) {
         IndexService indexService = indicesService.indexServiceSafe(shardId.getIndex());
         IndexShard indexShard = indexService.getShard(shardId.id());
-        Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id()));
+        final String singleType = MapperService.getSingleType(indexService.getIndexSettings());
+        if (singleType != null && singleType.equals(request.type()) == false) {
+            return new ExplainResponse(shardId.getIndexName(), request.type(), request.id(), false);
+        }
+        Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id(), singleType != null));
         Engine.GetResult result = indexShard.get(new Engine.Get(false, uidTerm));
         if (!result.exists()) {
             return new ExplainResponse(shardId.getIndexName(), request.type(), request.id(), false);

@@ -27,8 +27,8 @@ import java.io.IOException;
  */
 public class JustUidFieldsVisitor extends FieldsVisitor {
 
-    public JustUidFieldsVisitor() {
-        super(false);
+    public JustUidFieldsVisitor(String singleType) {
+        super(false, singleType);
     }
 
     @Override

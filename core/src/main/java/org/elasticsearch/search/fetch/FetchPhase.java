@@ -39,6 +39,7 @@ import org.elasticsearch.index.fieldvisitor.CustomFieldsVisitor;
 import org.elasticsearch.index.fieldvisitor.FieldsVisitor;
 import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.MappedFieldType;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.internal.SourceFieldMapper;
 import org.elasticsearch.index.mapper.object.ObjectMapper;
 import org.elasticsearch.search.SearchHit;
@@ -92,6 +93,7 @@ public class FetchPhase implements SearchPhase {
 
     @Override
     public void execute(SearchContext context) {
+        final String singleType = MapperService.getSingleType(context.mapperService().getIndexSettings());
         FieldsVisitor fieldsVisitor;
         Set<String> fieldNames = null;
         List<String> fieldNamePatterns = null;
@@ -100,9 +102,9 @@ public class FetchPhase implements SearchPhase {
             if (!context.hasScriptFields() && !context.hasFetchSourceContext()) {
                 context.fetchSourceContext(new FetchSourceContext(true));
             }
-            fieldsVisitor = new FieldsVisitor(context.sourceRequested());
+            fieldsVisitor = new FieldsVisitor(context.sourceRequested(), singleType);
         } else if (context.fieldNames().isEmpty()) {
-            fieldsVisitor = new FieldsVisitor(context.sourceRequested());
+            fieldsVisitor = new FieldsVisitor(context.sourceRequested(), singleType);
         } else {
             for (String fieldName : context.fieldNames()) {
                 if (fieldName.equals(SourceFieldMapper.NAME)) {
@@ -134,7 +136,7 @@ public class FetchPhase implements SearchPhase {
             }
             boolean loadSource = context.sourceRequested();
             fieldsVisitor = new CustomFieldsVisitor(fieldNames == null ? Collections.emptySet() : fieldNames,
-                        fieldNamePatterns == null ? Collections.emptyList() : fieldNamePatterns, loadSource);
+                        fieldNamePatterns == null ? Collections.<String>emptyList() : fieldNamePatterns, loadSource, singleType);
         }
 
         InternalSearchHit[] hits = new InternalSearchHit[context.docIdsToLoadSize()];
@@ -211,10 +213,11 @@ public class FetchPhase implements SearchPhase {
     }
 
     private InternalSearchHit createNestedSearchHit(SearchContext context, int nestedTopDocId, int nestedSubDocId, int rootSubDocId, Set<String> fieldNames, List<String> fieldNamePatterns, LeafReaderContext subReaderContext) throws IOException {
+        final String singleType = MapperService.getSingleType(context.mapperService().getIndexSettings());
         // Also if highlighting is requested on nested documents we need to fetch the _source from the root document,
         // otherwise highlighting will attempt to fetch the _source from the nested doc, which will fail,
         // because the entire _source is only stored with the root document.
-        final FieldsVisitor rootFieldsVisitor = new FieldsVisitor(context.sourceRequested() || context.highlight() != null);
+        final FieldsVisitor rootFieldsVisitor = new FieldsVisitor(context.sourceRequested() || context.highlight() != null, singleType);
         loadStoredFields(context, subReaderContext, rootFieldsVisitor, rootSubDocId);
         rootFieldsVisitor.postProcess(context.mapperService());
 
@@ -272,10 +275,11 @@ public class FetchPhase implements SearchPhase {
     }
 
     private Map<String, SearchHitField> getSearchFields(SearchContext context, int nestedSubDocId, Set<String> fieldNames, List<String> fieldNamePatterns, LeafReaderContext subReaderContext) {
+        final String singleType = MapperService.getSingleType(context.mapperService().getIndexSettings());
         Map<String, SearchHitField> searchFields = null;
         if (context.hasFieldNames() && !context.fieldNames().isEmpty()) {
             FieldsVisitor nestedFieldsVisitor = new CustomFieldsVisitor(fieldNames == null ? Collections.emptySet() : fieldNames,
-                    fieldNamePatterns == null ? Collections.emptyList() : fieldNamePatterns, false);
+                    fieldNamePatterns == null ? Collections.emptyList() : fieldNamePatterns, false, singleType);
             if (nestedFieldsVisitor != null) {
                 loadStoredFields(context, subReaderContext, nestedFieldsVisitor, nestedSubDocId);
                 nestedFieldsVisitor.postProcess(context.mapperService());

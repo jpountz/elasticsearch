@@ -56,7 +56,8 @@ public class LeafFieldsLookup implements Map {
         this.mapperService = mapperService;
         this.types = types;
         this.reader = reader;
-        this.fieldVisitor = new SingleFieldsVisitor(null);
+        final String singleType = MapperService.getSingleType(mapperService.getIndexSettings());
+        this.fieldVisitor = new SingleFieldsVisitor(null, singleType);
     }
 
     public void setDocument(int docId) {

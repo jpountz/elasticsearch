@@ -40,13 +40,6 @@ class TimeBasedUUIDGenerator implements UUIDGenerator {
         assert SECURE_MUNGED_ADDRESS.length == 6;
     }
 
-    /** Puts the lower numberOfLongBytes from l into the array, starting index pos. */
-    private static void putLong(byte[] array, long l, int pos, int numberOfLongBytes) {
-        for (int i=0; i<numberOfLongBytes; ++i) {
-            array[pos+numberOfLongBytes-i-1] = (byte) (l >>> (i*8));
-        }
-    }
-
     @Override
     public String getBase64UUID()  {
         final int sequenceId = sequenceNumber.incrementAndGet() & 0xffffff;
@@ -67,17 +60,28 @@ class TimeBasedUUIDGenerator implements UUIDGenerator {
         }
 
         final byte[] uuidBytes = new byte[15];
+        int i = 0;
 
-        // Only use lower 6 bytes of the timestamp (this will suffice beyond the year 10000):
-        putLong(uuidBytes, timestamp, 0, 6);
+        // We use the lower 6 bytes of the timestamp in the uid and try to put
+        // the most discriminant ones closer to the beginning
+        uuidBytes[i++] = (byte) (timestamp >>> 8);
+        uuidBytes[i++] = (byte) (timestamp >>> 16);
+        uuidBytes[i++] = (byte) (timestamp >>> 24);
+        uuidBytes[i++] = (byte) (timestamp >>> 32);
+        uuidBytes[i++] = (byte) (timestamp >>> 40);
 
         // MAC address adds 6 bytes:
-        System.arraycopy(SECURE_MUNGED_ADDRESS, 0, uuidBytes, 6, SECURE_MUNGED_ADDRESS.length);
+        System.arraycopy(SECURE_MUNGED_ADDRESS, 0, uuidBytes, 5, SECURE_MUNGED_ADDRESS.length);
+        i += SECURE_MUNGED_ADDRESS.length;
 
-        // Sequence number adds 3 bytes:
-        putLong(uuidBytes, sequenceId, 12, 3);
+        // Now add the lowest byte of the timestamp and the counter, they are less discriminant
+        // (they could appear in any segment) so we put them last
+        uuidBytes[i++] = (byte) (sequenceId >>> 16);
+        uuidBytes[i++] = (byte) (sequenceId >>> 8);
+        uuidBytes[i++] = (byte) sequenceId;
+        uuidBytes[i++] = (byte) timestamp;
 
-        assert 9 + SECURE_MUNGED_ADDRESS.length == uuidBytes.length;
+        assert i == uuidBytes.length;
 
         return Base64.getUrlEncoder().withoutPadding().encodeToString(uuidBytes);
     }

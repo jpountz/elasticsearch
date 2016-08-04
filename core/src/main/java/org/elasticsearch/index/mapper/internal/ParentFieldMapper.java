@@ -261,8 +261,8 @@ public class ParentFieldMapper extends MetadataFieldMapper {
                     }
                     // we did not add it in the parsing phase, add it now
                     fields.add(new SortedDocValuesField(fieldType.name(), new BytesRef(parentId)));
-                } else if (parentId != null && !parsedParentId.equals(Uid.createUid(parentType, parentId))) {
-                    throw new MapperParsingException("Parent id mismatch, document value is [" + Uid.createUid(parsedParentId).id() + "], while external value is [" + parentId + "]");
+                } else if (parentId != null && !parsedParentId.equals(Uid.createUid(parentType, parentId, false))) {
+                    throw new MapperParsingException("Parent id mismatch, document value is [" + Uid.createUid(parsedParentId, null).id() + "], while external value is [" + parentId + "]");
                 }
             }
         }

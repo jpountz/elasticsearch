@@ -31,6 +31,7 @@ import org.elasticsearch.index.fielddata.plain.PagedBytesIndexFieldData;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.Mapper;
 import org.elasticsearch.index.mapper.MapperParsingException;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.MetadataFieldMapper;
 import org.elasticsearch.index.mapper.ParseContext;
 import org.elasticsearch.index.mapper.TermBasedFieldType;
@@ -137,7 +138,9 @@ public class UidFieldMapper extends MetadataFieldMapper {
 
     @Override
     protected void parseCreateField(ParseContext context, List<Field> fields) throws IOException {
-        Field uid = new Field(NAME, Uid.createUid(context.sourceToParse().type(), context.sourceToParse().id()), Defaults.FIELD_TYPE);
+        boolean hasSingleType = MapperService.getSingleType(context.indexSettings()) != null;
+        String uidValue = Uid.createUid(context.sourceToParse().type(), context.sourceToParse().id(), hasSingleType);
+        Field uid = new Field(NAME, uidValue, Defaults.FIELD_TYPE);
         fields.add(uid);
         if (fieldType().hasDocValues()) {
             fields.add(new BinaryDocValuesField(NAME, new BytesRef(uid.stringValue())));

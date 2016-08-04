@@ -281,7 +281,8 @@ public class UpdateHelper extends AbstractComponent {
         boolean sourceRequested = false;
         Map<String, GetField> fields = null;
         if (request.fields() != null && request.fields().length > 0) {
-            SourceLookup sourceLookup = new SourceLookup();
+            // in this context, we do not care about whether there is a single type
+            SourceLookup sourceLookup = new SourceLookup(null);
             sourceLookup.setSource(source);
             for (String field : request.fields()) {
                 if (field.equals("_source")) {

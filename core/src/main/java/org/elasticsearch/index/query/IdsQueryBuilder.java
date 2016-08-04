@@ -29,6 +29,7 @@ import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.lucene.search.Queries;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.mapper.internal.UidFieldMapper;
 
@@ -207,15 +208,18 @@ public class IdsQueryBuilder extends AbstractQueryBuilder<IdsQueryBuilder> {
         } else {
             Collection<String> typesForQuery;
             if (types.length == 0) {
-                typesForQuery = context.queryTypes();
+                typesForQuery = new HashSet<>(context.queryTypes());
+                typesForQuery.retainAll(context.getMapperService().types());
             } else if (types.length == 1 && MetaData.ALL.equals(types[0])) {
                 typesForQuery = context.getMapperService().types();
             } else {
                 typesForQuery = new HashSet<>();
                 Collections.addAll(typesForQuery, types);
+                typesForQuery.retainAll(context.getMapperService().types());
             }
 
-            query = new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(typesForQuery, ids));
+            boolean hasSingleType = MapperService.getSingleType(context.getIndexSettings()) != null;
+            query = new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(typesForQuery, ids, hasSingleType));
         }
         return query;
     }

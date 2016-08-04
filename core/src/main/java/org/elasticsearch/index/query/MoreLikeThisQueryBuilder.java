@@ -53,6 +53,7 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.MappedFieldType;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.core.KeywordFieldMapper.KeywordFieldType;
 import org.elasticsearch.index.mapper.core.StringFieldMapper.StringFieldType;
 import org.elasticsearch.index.mapper.core.TextFieldMapper.TextFieldType;
@@ -1097,7 +1098,8 @@ public class MoreLikeThisQueryBuilder extends AbstractQueryBuilder<MoreLikeThisQ
 
         // exclude the items from the search
         if (!include) {
-            handleExclude(boolQuery, likeItems);
+            String singleType = MapperService.getSingleType(context.getIndexSettings());
+            handleExclude(boolQuery, likeItems, singleType);
         }
         return boolQuery.build();
     }
@@ -1150,14 +1152,17 @@ public class MoreLikeThisQueryBuilder extends AbstractQueryBuilder<MoreLikeThisQ
         return likeFields.toArray(Fields.EMPTY_ARRAY);
     }
 
-    private static void handleExclude(BooleanQuery.Builder boolQuery, Item[] likeItems) {
+    private static void handleExclude(BooleanQuery.Builder boolQuery, Item[] likeItems, String singleType) {
         // artificial docs get assigned a random id and should be disregarded
         List<BytesRef> uids = new ArrayList<>();
         for (Item item : likeItems) {
             if (item.doc() != null) {
                 continue;
             }
-            uids.add(createUidAsBytes(item.type(), item.id()));
+            if (singleType != null && item.type().equals(singleType) == false) {
+                continue;
+            }
+            uids.add(createUidAsBytes(item.type(), item.id(), singleType != null));
         }
         if (!uids.isEmpty()) {
             TermsQuery query = new TermsQuery(UidFieldMapper.NAME, uids.toArray(new BytesRef[uids.size()]));

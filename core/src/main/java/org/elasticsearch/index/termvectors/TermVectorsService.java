@@ -77,7 +77,12 @@ public class TermVectorsService  {
     static TermVectorsResponse getTermVectors(IndexShard indexShard, TermVectorsRequest request, LongSupplier nanoTimeSupplier) {
         final long startTime = nanoTimeSupplier.getAsLong();
         final TermVectorsResponse termVectorsResponse = new TermVectorsResponse(indexShard.shardId().getIndex().getName(), request.type(), request.id());
-        final Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id()));
+        final String singleType = MapperService.getSingleType(indexShard.indexSettings());
+        if (singleType != null && singleType.equals(request.type()) == false) {
+            termVectorsResponse.setExists(false);
+            return termVectorsResponse;
+        }
+        final Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id(), singleType != null));
 
         Engine.GetResult get = indexShard.get(new Engine.Get(request.realtime(), uidTerm).version(request.version()).versionType(request.versionType()));
 

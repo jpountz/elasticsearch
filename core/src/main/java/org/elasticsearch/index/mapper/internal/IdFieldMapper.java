@@ -21,24 +21,17 @@ package org.elasticsearch.index.mapper.internal;
 
 import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexOptions;
-import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.TermsQuery;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.MultiTermQuery;
-import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
-import org.apache.lucene.search.RegexpQuery;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.Nullable;
-import org.elasticsearch.common.lucene.BytesRefs;
 import org.elasticsearch.common.lucene.Lucene;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.util.iterable.Iterables;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.Mapper;
 import org.elasticsearch.index.mapper.MapperParsingException;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.MetadataFieldMapper;
 import org.elasticsearch.index.mapper.ParseContext;
 import org.elasticsearch.index.mapper.TermBasedFieldType;
@@ -46,9 +39,10 @@ import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.query.QueryShardContext;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A mapper for the _id field. It does nothing since _id is neither indexed nor
@@ -117,13 +111,19 @@ public class IdFieldMapper extends MetadataFieldMapper {
 
         @Override
         public Query termQuery(Object value, @Nullable QueryShardContext context) {
-            final BytesRef[] uids = Uid.createUidsForTypesAndId(context.queryTypes(), value);
+            Set<String> types = new HashSet<>(context.queryTypes());
+            types.retainAll(context.getMapperService().types());
+            boolean hasSingleType = MapperService.getSingleType(context.getIndexSettings()) != null;
+            final BytesRef[] uids = Uid.createUidsForTypesAndId(types, value, hasSingleType);
             return new TermsQuery(UidFieldMapper.NAME, uids);
         }
 
         @Override
         public Query termsQuery(List values, @Nullable QueryShardContext context) {
-            return new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(context.queryTypes(), values));
+            Set<String> types = new HashSet<>(context.queryTypes());
+            types.retainAll(context.getMapperService().types());
+            boolean hasSingleType = MapperService.getSingleType(context.getIndexSettings()) != null;
+            return new TermsQuery(UidFieldMapper.NAME, Uid.createUidsForTypesAndIds(types, values, hasSingleType));
         }
     }
 

@@ -57,6 +57,7 @@ import org.elasticsearch.search.lookup.SearchLookup;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,12 +74,14 @@ public final class ShardGetService extends AbstractIndexShardComponent {
     private final MeanMetric missingMetric = new MeanMetric();
     private final CounterMetric currentMetric = new CounterMetric();
     private final IndexShard indexShard;
+    private final String singleType;
 
     public ShardGetService(IndexSettings indexSettings, IndexShard indexShard,
                            MapperService mapperService) {
         super(indexShard.shardId(), indexSettings);
         this.mapperService = mapperService;
         this.indexShard = indexShard;
+        this.singleType = MapperService.getSingleType(indexSettings);
     }
 
     public GetStats stats() {
@@ -153,31 +156,34 @@ public final class ShardGetService extends AbstractIndexShardComponent {
         fetchSourceContext = normalizeFetchSourceContent(fetchSourceContext, gFields);
 
         Engine.GetResult get = null;
+
+        Collection<String> types;
         if (type == null || type.equals("_all")) {
-            for (String typeX : mapperService.types()) {
-                get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(typeX, id)))
-                        .version(version).versionType(versionType));
-                if (get.exists()) {
-                    type = typeX;
-                    break;
-                } else {
-                    get.release();
-                }
-            }
-            if (get == null) {
-                return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
-            }
-            if (!get.exists()) {
-                // no need to release here as well..., we release in the for loop for non exists
-                return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
-            }
+            types = mapperService.types();
         } else {
-            get = indexShard.get(new Engine.Get(realtime, new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(type, id)))
-                    .version(version).versionType(versionType));
-            if (!get.exists()) {
-                get.release();
-                return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
+            types = Collections.singleton(type);
+        }
+
+        for (String typeX : mapperService.types()) {
+            if (singleType != null && singleType.equals(typeX) == false) {
+                continue;
             }
+            get = indexShard.get(new Engine.Get(realtime,
+                    new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(typeX, id, singleType != null)))
+                    .version(version).versionType(versionType));
+            if (get.exists()) {
+                type = typeX;
+                break;
+            } else {
+                get.release();
+            }
+        }
+        if (get == null) {
+            return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
+        }
+        if (!get.exists()) {
+            // no need to release here as well..., we release in the for loop for non exists
+            return new GetResult(shardId.getIndexName(), type, id, -1, false, null, null);
         }
 
         try {
@@ -409,11 +415,11 @@ public final class ShardGetService extends AbstractIndexShardComponent {
         return new GetResult(shardId.getIndexName(), type, id, get.version(), get.exists(), source, fields);
     }
 
-    private static FieldsVisitor buildFieldsVisitors(String[] fields, FetchSourceContext fetchSourceContext) {
+    private FieldsVisitor buildFieldsVisitors(String[] fields, FetchSourceContext fetchSourceContext) {
         if (fields == null || fields.length == 0) {
-            return fetchSourceContext.fetchSource() ? new FieldsVisitor(true) : null;
+            return fetchSourceContext.fetchSource() ? new FieldsVisitor(true, singleType) : null;
         }
 
-        return new CustomFieldsVisitor(Sets.newHashSet(fields), fetchSourceContext.fetchSource());
+        return new CustomFieldsVisitor(Sets.newHashSet(fields), fetchSourceContext.fetchSource(), singleType);
     }
 }

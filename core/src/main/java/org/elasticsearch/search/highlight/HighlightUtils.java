@@ -23,6 +23,7 @@ import org.apache.lucene.search.highlight.Encoder;
 import org.apache.lucene.search.highlight.SimpleHTMLEncoder;
 import org.elasticsearch.index.fieldvisitor.CustomFieldsVisitor;
 import org.elasticsearch.index.mapper.FieldMapper;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.search.fetch.FetchSubPhase;
 import org.elasticsearch.search.internal.SearchContext;
 import org.elasticsearch.search.lookup.SourceLookup;
@@ -44,11 +45,12 @@ public final class HighlightUtils {
     }
 
     static List<Object> loadFieldValues(SearchContextHighlight.Field field, FieldMapper mapper, SearchContext searchContext, FetchSubPhase.HitContext hitContext) throws IOException {
+        final String singleType = MapperService.getSingleType(searchContext.mapperService().getIndexSettings());
         //percolator needs to always load from source, thus it sets the global force source to true
         boolean forceSource = searchContext.highlight().forceSource(field);
         List<Object> textsToHighlight;
         if (!forceSource && mapper.fieldType().stored()) {
-            CustomFieldsVisitor fieldVisitor = new CustomFieldsVisitor(singleton(mapper.fieldType().name()), false);
+            CustomFieldsVisitor fieldVisitor = new CustomFieldsVisitor(singleton(mapper.fieldType().name()), false, singleType);
             hitContext.reader().document(hitContext.docId(), fieldVisitor);
             textsToHighlight = fieldVisitor.fields().get(mapper.fieldType().name());
             if (textsToHighlight == null) {

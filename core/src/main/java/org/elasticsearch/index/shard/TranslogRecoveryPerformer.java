@@ -47,11 +47,13 @@ public class TranslogRecoveryPerformer {
     private final ESLogger logger;
     private final Map<String, Mapping> recoveredTypes = new HashMap<>();
     private final ShardId shardId;
+    private final String singleType;
 
     protected TranslogRecoveryPerformer(ShardId shardId, MapperService mapperService, ESLogger logger) {
         this.shardId = shardId;
         this.mapperService = mapperService;
         this.logger = logger;
+        this.singleType = MapperService.getSingleType(mapperService.getIndexSettings());
     }
 
     protected DocumentMapperForType docMapper(String type) {
@@ -153,7 +155,7 @@ public class TranslogRecoveryPerformer {
                     Translog.Index index = (Translog.Index) operation;
                     Engine.Index engineIndex = IndexShard.prepareIndex(docMapper(index.type()), source(shardId.getIndexName(), index.type(), index.id(), index.source())
                             .routing(index.routing()).parent(index.parent()).timestamp(index.timestamp()).ttl(index.ttl()),
-                        index.version(), index.versionType().versionTypeForReplicationAndRecovery(), origin);
+                        index.version(), index.versionType().versionTypeForReplicationAndRecovery(), origin, singleType);
                     maybeAddMappingUpdate(engineIndex.type(), engineIndex.parsedDoc().dynamicMappingsUpdate(), engineIndex.id(), allowMappingUpdates);
                     if (logger.isTraceEnabled()) {
                         logger.trace("[translog] recover [index] op of [{}][{}]", index.type(), index.id());
@@ -162,7 +164,7 @@ public class TranslogRecoveryPerformer {
                     break;
                 case DELETE:
                     Translog.Delete delete = (Translog.Delete) operation;
-                    Uid uid = Uid.createUid(delete.uid().text());
+                    Uid uid = Uid.createUid(delete.uid().text(), singleType);
                     if (logger.isTraceEnabled()) {
                         logger.trace("[translog] recover [delete] op of [{}][{}]", uid.type(), uid.id());
                     }

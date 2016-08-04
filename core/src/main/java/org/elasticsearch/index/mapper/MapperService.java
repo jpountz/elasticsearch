@@ -31,6 +31,7 @@ import org.elasticsearch.common.compress.CompressedXContent;
 import org.elasticsearch.common.regex.Regex;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Setting.Property;
+import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.AbstractIndexComponent;
@@ -93,6 +94,8 @@ public class MapperService extends AbstractIndexComponent {
     public static final boolean INDEX_MAPPER_DYNAMIC_DEFAULT = true;
     public static final Setting<Boolean> INDEX_MAPPER_DYNAMIC_SETTING =
         Setting.boolSetting("index.mapper.dynamic", INDEX_MAPPER_DYNAMIC_DEFAULT, Property.Dynamic, Property.IndexScope);
+    public static final Setting<String> INDEX_MAPPING_SINGLE_TYPE =
+            Setting.simpleString("index.mapping.single_type", Property.IndexScope);
     private static ObjectHashSet<String> META_FIELDS = ObjectHashSet.from(
             "_uid", "_id", "_type", "_all", "_parent", "_routing", "_index",
             "_size", "_timestamp", "_ttl"
@@ -100,12 +103,27 @@ public class MapperService extends AbstractIndexComponent {
     @Deprecated
     public static final String PERCOLATOR_LEGACY_TYPE_NAME = ".percolator";
 
+    // work around the fact settings do not like nulls
+    public static String getSingleType(IndexSettings indexSettings) {
+        String singleType = indexSettings.getValue(INDEX_MAPPING_SINGLE_TYPE);
+        if (singleType.equals("")) {
+            singleType = null;
+        }
+        return singleType;
+    }
+
+    public static String getSingleType(Settings indexSettings) {
+        return indexSettings.get(INDEX_MAPPING_SINGLE_TYPE.getKey());
+    }
+
     private final AnalysisService analysisService;
 
     /**
      * Will create types automatically if they do not exists in the mapping definition yet
      */
     private final boolean dynamic;
+
+    private final String singleType;
 
     private volatile String defaultMappingSource;
 
@@ -140,6 +158,7 @@ public class MapperService extends AbstractIndexComponent {
         this.mapperRegistry = mapperRegistry;
 
         this.dynamic = this.indexSettings.getValue(INDEX_MAPPER_DYNAMIC_SETTING);
+        this.singleType = getSingleType(this.indexSettings);
         defaultMappingSource = "{\"_default_\":{}}";
 
         if (logger.isTraceEnabled()) {
@@ -297,6 +316,10 @@ public class MapperService extends AbstractIndexComponent {
         }
         if (typeNameStartsWithIllegalDot(mapper)) {
             throw new IllegalArgumentException("mapping type name [" + mapper.type() + "] must not start with a '.'");
+        }
+        if (singleType != null && singleType.equals(mapper.type()) == false) {
+            throw new IllegalArgumentException("Cannot add type [" + mapper.type()
+                + "], this mapping may only contain type [" + singleType + "].");
         }
 
         // 1. compute the merged DocumentMapper
