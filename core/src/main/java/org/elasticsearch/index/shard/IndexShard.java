@@ -34,6 +34,7 @@ import org.apache.lucene.search.QueryCachingPolicy;
 import org.apache.lucene.search.UsageTrackingQueryCachingPolicy;
 import org.apache.lucene.store.AlreadyClosedException;
 import org.apache.lucene.store.Lock;
+import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.IOUtils;
 import org.apache.lucene.util.ThreadInterruptedException;
 import org.elasticsearch.ElasticsearchException;
@@ -516,7 +517,7 @@ public class IndexShard extends AbstractIndexShardComponent implements IndicesCl
             doc.addDynamicMappingsUpdate(docMapper.getMapping());
         }
         assert singleType == null || singleType.equals(doc.type());
-        String uidValue = Uid.createUid(doc.type(), doc.id(), singleType != null);
+        BytesRef uidValue = Uid.createUid(doc.type(), doc.id(), singleType != null);
         MappedFieldType uidFieldType = docMapper.getDocumentMapper().uidMapper().fieldType();
         Query uidQuery = uidFieldType.termQuery(uidValue, null);
         Term uid = MappedFieldType.extractTerm(uidQuery);

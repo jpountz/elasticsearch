@@ -111,7 +111,7 @@ public class TransportExplainAction extends TransportSingleShardAction<ExplainRe
         if (singleType != null && singleType.equals(request.type()) == false) {
             return new ExplainResponse(shardId.getIndexName(), request.type(), request.id(), false);
         }
-        Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id(), singleType != null));
+        Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUid(request.type(), request.id(), singleType != null));
         Engine.GetResult result = indexShard.get(new Engine.Get(false, uidTerm));
         if (!result.exists()) {
             return new ExplainResponse(shardId.getIndexName(), request.type(), request.id(), false);

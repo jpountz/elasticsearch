@@ -43,7 +43,7 @@ public final class VersionFetchSubPhase implements FetchSubPhase {
         final long version;
         try {
             final String singleType = MapperService.getSingleType(context.mapperService().getIndexSettings());
-            BytesRef uid = Uid.createUidAsBytes(hitContext.hit().type(), hitContext.hit().id(), singleType != null);
+            BytesRef uid = Uid.createUid(hitContext.hit().type(), hitContext.hit().id(), singleType != null);
             version = Versions.loadVersion(
                     hitContext.readerContext().reader(),
                     new Term(UidFieldMapper.NAME, uid)

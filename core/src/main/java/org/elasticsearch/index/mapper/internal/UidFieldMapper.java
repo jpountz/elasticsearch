@@ -139,11 +139,10 @@ public class UidFieldMapper extends MetadataFieldMapper {
     @Override
     protected void parseCreateField(ParseContext context, List<Field> fields) throws IOException {
         boolean hasSingleType = MapperService.getSingleType(context.indexSettings()) != null;
-        String uidValue = Uid.createUid(context.sourceToParse().type(), context.sourceToParse().id(), hasSingleType);
-        Field uid = new Field(NAME, uidValue, Defaults.FIELD_TYPE);
-        fields.add(uid);
+        BytesRef uid = Uid.createUid(context.sourceToParse().type(), context.sourceToParse().id(), hasSingleType);
+        fields.add(new Field(NAME, uid, Defaults.FIELD_TYPE));
         if (fieldType().hasDocValues()) {
-            fields.add(new BinaryDocValuesField(NAME, new BytesRef(uid.stringValue())));
+            fields.add(new BinaryDocValuesField(NAME, uid));
         }
     }
 

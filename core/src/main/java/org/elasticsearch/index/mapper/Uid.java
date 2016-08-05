@@ -21,8 +21,8 @@ package org.elasticsearch.index.mapper;
 
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
-import org.elasticsearch.common.lucene.BytesRefs;
 
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -74,11 +74,11 @@ public final class Uid {
 
     @Override
     public String toString() {
-        return createUid(type, id, singleType);
+        return "Uid(" + type + "," + id + ")";
     }
 
     public BytesRef toBytesRef() {
-        return createUidAsBytes(type, id, singleType);
+        return createUid(type, id, singleType);
     }
 
     /**
@@ -94,37 +94,6 @@ public final class Uid {
         }
     }
 
-    public static BytesRef createUidAsBytes(String type, String id, boolean singleType) {
-        if (singleType) {
-            return new BytesRef(id);
-        } else {
-            return createUidAsBytes(new BytesRef(type), new BytesRef(id), singleType);
-        }
-    }
-
-    public static BytesRef createUidAsBytes(String type, BytesRef id, boolean singleType) {
-        if (singleType) {
-            return id;
-        } else {
-            return createUidAsBytes(new BytesRef(type), id, singleType);
-        }
-    }
-
-    public static BytesRef createUidAsBytes(BytesRef type, BytesRef id, boolean singleType) {
-        if (singleType) {
-            return id;
-        } else {
-            final BytesRef ref = new BytesRef(type.length + 1 + id.length);
-            System.arraycopy(type.bytes, type.offset, ref.bytes, 0, type.length);
-            ref.offset = type.length;
-            ref.bytes[ref.offset++] = DELIMITER_BYTE;
-            System.arraycopy(id.bytes, id.offset, ref.bytes, ref.offset, id.length);
-            ref.offset = 0;
-            ref.length = ref.bytes.length;
-            return ref;
-        }
-    }
-
     public static BytesRef[] createUidsForTypesAndId(Collection<String> types, Object id, boolean singleType) {
         return createUidsForTypesAndIds(types, Collections.singletonList(id), singleType);
     }
@@ -134,23 +103,33 @@ public final class Uid {
             throw new IllegalStateException("Multiple types: " + types);
         }
         BytesRef[] uids = new BytesRef[types.size() * ids.size()];
-        BytesRefBuilder typeBytes = new BytesRefBuilder();
-        BytesRefBuilder idBytes = new BytesRefBuilder();
         int index = 0;
+        BytesRefBuilder uidBuilder = new BytesRefBuilder();
+        BytesRefBuilder scratch = new BytesRefBuilder();
         for (String type : types) {
-            typeBytes.copyChars(type);
+            uidBuilder.copyChars(type);
+            uidBuilder.append(DELIMITER_BYTE);
             for (Object id : ids) {
-                uids[index++] = Uid.createUidAsBytes(typeBytes.get(), BytesRefs.toBytesRef(id, idBytes), singleType);
+                String idString = id.toString();
+                final int len = uidBuilder.length();
+                scratch.copyChars(idString);
+                uidBuilder.append(scratch);
+                uids[index++] = uidBuilder.toBytesRef();
+                uidBuilder.setLength(len); // restore to the length before the id was appended
             }
         }
         return uids;
     }
 
-    public static String createUid(String type, String id, boolean singleType) {
+    public static BytesRef createUid(String type, String id, boolean singleType) {
         if (singleType) {
-            return id;
+            try {
+                return new BytesRef(Base64.getUrlDecoder().decode(id));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Ids must be base64-encoded, but got [" + id + "], which is not", e);
+            }
         } else {
-            return type + DELIMITER + id;
+            return new BytesRef(type + DELIMITER + id);
         }
     }
 

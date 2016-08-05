@@ -54,6 +54,7 @@ import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.index.VersionType;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.mapper.MapperService;
+import org.elasticsearch.index.mapper.Uid;
 import org.elasticsearch.index.mapper.core.KeywordFieldMapper.KeywordFieldType;
 import org.elasticsearch.index.mapper.core.StringFieldMapper.StringFieldType;
 import org.elasticsearch.index.mapper.core.TextFieldMapper.TextFieldType;
@@ -72,7 +73,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
-import static org.elasticsearch.index.mapper.Uid.createUidAsBytes;
 
 /**
  * A more like this query that finds documents that are "like" the provided set of document(s).
@@ -1162,7 +1162,7 @@ public class MoreLikeThisQueryBuilder extends AbstractQueryBuilder<MoreLikeThisQ
             if (singleType != null && item.type().equals(singleType) == false) {
                 continue;
             }
-            uids.add(createUidAsBytes(item.type(), item.id(), singleType != null));
+            uids.add(Uid.createUid(item.type(), item.id(), singleType != null));
         }
         if (!uids.isEmpty()) {
             TermsQuery query = new TermsQuery(UidFieldMapper.NAME, uids.toArray(new BytesRef[uids.size()]));

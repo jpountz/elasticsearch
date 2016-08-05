@@ -160,16 +160,15 @@ public final class ShardGetService extends AbstractIndexShardComponent {
         Collection<String> types;
         if (type == null || type.equals("_all")) {
             types = mapperService.types();
-        } else {
+        } else if (mapperService.types().contains(type)) {
             types = Collections.singleton(type);
+        } else {
+            types = Collections.emptySet();
         }
 
-        for (String typeX : mapperService.types()) {
-            if (singleType != null && singleType.equals(typeX) == false) {
-                continue;
-            }
+        for (String typeX : types) {
             get = indexShard.get(new Engine.Get(realtime,
-                    new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(typeX, id, singleType != null)))
+                    new Term(UidFieldMapper.NAME, Uid.createUid(typeX, id, singleType != null)))
                     .version(version).versionType(versionType));
             if (get.exists()) {
                 type = typeX;

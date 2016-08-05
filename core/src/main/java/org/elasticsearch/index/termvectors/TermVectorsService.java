@@ -82,7 +82,7 @@ public class TermVectorsService  {
             termVectorsResponse.setExists(false);
             return termVectorsResponse;
         }
-        final Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUidAsBytes(request.type(), request.id(), singleType != null));
+        final Term uidTerm = new Term(UidFieldMapper.NAME, Uid.createUid(request.type(), request.id(), singleType != null));
 
         Engine.GetResult get = indexShard.get(new Engine.Get(request.realtime(), uidTerm).version(request.version()).versionType(request.versionType()));
 
