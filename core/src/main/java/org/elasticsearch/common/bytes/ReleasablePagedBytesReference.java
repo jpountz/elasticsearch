@@ -21,7 +21,6 @@ package org.elasticsearch.common.bytes;
 
 import org.elasticsearch.common.lease.Releasable;
 import org.elasticsearch.common.lease.Releasables;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.ByteArray;
 
 /**
@@ -30,8 +29,8 @@ import org.elasticsearch.common.util.ByteArray;
  */
 public final class ReleasablePagedBytesReference extends PagedBytesReference implements Releasable {
 
-    public ReleasablePagedBytesReference(BigArrays bigarrays, ByteArray byteArray, int length) {
-        super(bigarrays, byteArray, length);
+    public ReleasablePagedBytesReference(ByteArray byteArray, int length) {
+        super(byteArray, length);
     }
 
     @Override

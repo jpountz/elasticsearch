@@ -42,7 +42,7 @@ public class ReleasableBytesStreamOutput extends BytesStreamOutput implements Re
 
     @Override
     public ReleasablePagedBytesReference bytes() {
-        return new ReleasablePagedBytesReference(bigArrays, bytes, count);
+        return new ReleasablePagedBytesReference(bytes, count);
     }
 
 }

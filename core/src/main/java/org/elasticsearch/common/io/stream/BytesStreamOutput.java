@@ -140,7 +140,7 @@ public class BytesStreamOutput extends StreamOutput implements BytesStream {
 
     @Override
     public BytesReference bytes() {
-        return new PagedBytesReference(bigArrays, bytes, count);
+        return new PagedBytesReference(bytes, count);
     }
 
     /**
