@@ -57,8 +57,8 @@
 "PUT mapping with _doc on an index that has types":
 
  - skip:
-      version: " - 5.99.99"
-      reason: 5.x indices can have types that start with an `_`
+      version: " - 6.1.99"
+      reason: 5.x, 6.0 and 6.1 indices can't have types that start with an `_`
 
  - do:
       indices.create:
