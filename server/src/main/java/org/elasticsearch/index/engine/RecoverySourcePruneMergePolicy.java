@@ -61,10 +61,27 @@ final class RecoverySourcePruneMergePolicy extends OneMergeWrappingMergePolicy {
         Scorer scorer = weight.scorer(reader.getContext());
         if (scorer != null) {
             BitSet recoverySourceToKeep = BitSet.of(scorer.iterator(), reader.maxDoc());
-            // calculating the cardinality is significantly cheaper than skipping all bulk-merging we might do
-            // if retentions are high we keep most of it
-            if (recoverySourceToKeep.cardinality() == reader.maxDoc()) {
-                return reader; // keep all source
+            // Returning a SourcePruningFilterCodecReader helps reclaim storage that is used by the _recovery_source field, but it comes
+            // with the major downside that it disables bulk merging optimizations for stored fields, ie. merging stored fields will need
+            // to decompress all data from the input segment and recompress it into the new segment, while it can otherwise copy compressed
+            // data directly into the merged segment. So we only want to use this SourcePruningFilterCodecReader when we're reclaiming a
+            // significant share of the recovery sources of this segment.
+            final long numRecoverySourcesToKeep = recoverySourceToKeep.cardinality();
+            if (numRecoverySourcesToKeep == reader.maxDoc()) {
+                return reader;
+            }
+            long totalNumRecoverySources = 1;
+            for (int doc = recoverySource.docID(); doc != DocIdSetIterator.NO_MORE_DOCS; doc = recoverySource.nextDoc()) {
+                totalNumRecoverySources++;
+            }
+            assert totalNumRecoverySources >= numRecoverySourcesToKeep;
+            final long numRecoverySourcesToDrop = totalNumRecoverySources - numRecoverySourcesToKeep;
+            if (numRecoverySourcesToKeep != 0
+                && (numRecoverySourcesToDrop < totalNumRecoverySources / 2 || numRecoverySourcesToDrop < reader.maxDoc() / 5)) {
+                // If we're not dropping at least 50% of the remaining recovery sources and 20% of the total number of docs of the segment
+                // then it's not worth disabling bulk merging optimizations. We'll reclaim these recovery sources on the next merge, when a
+                // higher number of recovery sources can be reclaimed.
+                return reader;
             }
             return new SourcePruningFilterCodecReader(recoverySourceField, reader, recoverySourceToKeep);
         } else {

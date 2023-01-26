@@ -19,6 +19,7 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LogDocMergePolicy;
 import org.apache.lucene.index.MergePolicy;
 import org.apache.lucene.index.NumericDocValues;
 import org.apache.lucene.index.SegmentCommitInfo;
@@ -112,16 +113,16 @@ public class RecoverySourcePruneMergePolicyTests extends ESTestCase {
     public void testPruneSome() throws IOException {
         try (Directory dir = newDirectory()) {
             IndexWriterConfig iwc = newIndexWriterConfig();
-            iwc.setMergePolicy(
-                new RecoverySourcePruneMergePolicy("extra_source", () -> new TermQuery(new Term("even", "true")), iwc.getMergePolicy())
-            );
+            LogDocMergePolicy mp = new LogDocMergePolicy();
+            mp.setMinMergeDocs(1);
+            iwc.setMergePolicy(new RecoverySourcePruneMergePolicy("extra_source", () -> new TermQuery(new Term("i%3", "0")), mp));
             try (IndexWriter writer = new IndexWriter(dir, iwc)) {
                 for (int i = 0; i < 20; i++) {
                     if (i > 0 && randomBoolean()) {
                         writer.flush();
                     }
                     Document doc = new Document();
-                    doc.add(new StringField("even", Boolean.toString(i % 2 == 0), Field.Store.YES));
+                    doc.add(new StringField("i%3", Integer.toString(i % 3), Field.Store.YES));
                     doc.add(new StoredField("source", "hello world"));
                     doc.add(new StoredField("extra_source", "hello world"));
                     doc.add(new NumericDocValuesField("extra_source", 1));
@@ -137,10 +138,10 @@ public class RecoverySourcePruneMergePolicyTests extends ESTestCase {
                         Document document = reader.document(i);
                         Set<String> collect = document.getFields().stream().map(IndexableField::name).collect(Collectors.toSet());
                         assertTrue(collect.contains("source"));
-                        assertTrue(collect.contains("even"));
+                        assertTrue(collect.contains("i%3"));
                         if (collect.size() == 3) {
                             assertTrue(collect.contains("extra_source"));
-                            assertEquals("true", document.getField("even").stringValue());
+                            assertEquals("0", document.getField("i%3").stringValue());
                             assertEquals(i, extra_source.nextDoc());
                         } else {
                             assertEquals(2, document.getFields().size());
