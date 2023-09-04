@@ -21,6 +21,8 @@ import org.apache.lucene.search.MatchNoDocsQuery;
 import org.apache.lucene.search.PointRangeQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreMode;
+import org.apache.lucene.search.Scorer;
+import org.apache.lucene.search.ScorerSupplier;
 import org.apache.lucene.search.Weight;
 import org.apache.lucene.util.Bits;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -181,6 +183,15 @@ public class QueryToFilterAdapter {
     @SuppressWarnings("resource")  // Closing the reader is someone else's problem
     IntPredicate matchingDocIds(LeafReaderContext ctx) throws IOException {
         return Lucene.asSequentialAccessBits(ctx.reader().maxDoc(), weight().scorerSupplier(ctx))::get;
+    }
+
+    Scorer randomAccessScorer(LeafReaderContext ctx) throws IOException {
+        ScorerSupplier scorerSupplier = weight().scorerSupplier(ctx);
+        if (scorerSupplier == null) {
+            return null;
+        }
+        // A leading cost of 0 instructs the scorer to optimize for random access as opposed to sequential access
+        return scorerSupplier.get(0L);
     }
 
     /**
