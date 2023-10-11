@@ -15,11 +15,14 @@ import org.elasticsearch.compute.data.ElementType;
 import org.elasticsearch.compute.lucene.LuceneOperator;
 import org.elasticsearch.compute.lucene.LuceneSourceOperator;
 import org.elasticsearch.compute.lucene.LuceneTopNSourceOperator;
+import org.elasticsearch.compute.lucene.ValueSourceInfo;
 import org.elasticsearch.compute.lucene.ValueSources;
 import org.elasticsearch.compute.lucene.ValuesSourceReaderOperator;
 import org.elasticsearch.compute.operator.Operator;
 import org.elasticsearch.compute.operator.OrdinalsGroupingOperator;
 import org.elasticsearch.index.mapper.NestedLookup;
+import org.elasticsearch.index.query.QueryBuilder;
+import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.index.search.NestedHelper;
 import org.elasticsearch.logging.LogManager;
@@ -37,10 +40,12 @@ import org.elasticsearch.xpack.esql.planner.LocalExecutionPlanner.PhysicalOperat
 import org.elasticsearch.xpack.esql.type.EsqlDataTypes;
 import org.elasticsearch.xpack.ql.expression.Attribute;
 import org.elasticsearch.xpack.ql.expression.FieldAttribute;
+import org.elasticsearch.xpack.ql.type.DataType;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static org.elasticsearch.common.lucene.search.Queries.newNonNestedFilter;
 import static org.elasticsearch.compute.lucene.LuceneSourceOperator.NO_LIMIT;
@@ -52,6 +57,10 @@ public class EsPhysicalOperationProviders extends AbstractPhysicalOperationProvi
 
     public EsPhysicalOperationProviders(List<SearchContext> searchContexts) {
         this.searchContexts = searchContexts;
+    }
+
+    public List<SearchContext> searchContexts() {
+        return searchContexts;
     }
 
     @Override
@@ -68,29 +77,28 @@ public class EsPhysicalOperationProviders extends AbstractPhysicalOperationProvi
             layout.append(attr);
             Layout previousLayout = op.layout;
 
-            var sources = ValueSources.sources(
+            DataType dataType = attr.dataType();
+            String fieldName = attr.name();
+            Supplier<List<ValueSourceInfo>> sources = () -> ValueSources.sources(
                 searchContexts,
-                attr.name(),
-                EsqlDataTypes.isUnsupported(attr.dataType()),
-                LocalExecutionPlanner.toElementType(attr.dataType())
+                fieldName,
+                EsqlDataTypes.isUnsupported(dataType),
+                LocalExecutionPlanner.toElementType(dataType)
             );
 
             int docChannel = previousLayout.get(sourceAttr.id()).channel();
 
-            op = op.with(
-                new ValuesSourceReaderOperator.ValuesSourceReaderOperatorFactory(sources, docChannel, attr.name()),
-                layout.build()
-            );
+            op = op.with(new ValuesSourceReaderOperator.ValuesSourceReaderOperatorFactory(sources, docChannel, fieldName), layout.build());
         }
         return op;
     }
 
-    @Override
-    public final PhysicalOperation sourcePhysicalOperation(EsQueryExec esQueryExec, LocalExecutionPlannerContext context) {
-        final LuceneOperator.Factory luceneFactory;
-        Function<SearchContext, Query> querySupplier = searchContext -> {
+    public static Function<SearchContext, Query> querySupplier(QueryBuilder queryBuilder) {
+        final QueryBuilder qb = queryBuilder == null ? QueryBuilders.matchAllQuery() : queryBuilder;
+
+        return searchContext -> {
             SearchExecutionContext ctx = searchContext.getSearchExecutionContext();
-            Query query = ctx.toQuery(esQueryExec.query()).query();
+            Query query = ctx.toQuery(qb).query();
             NestedLookup nestedLookup = ctx.nestedLookup();
             if (nestedLookup != NestedLookup.EMPTY) {
                 NestedHelper nestedHelper = new NestedHelper(nestedLookup, ctx::isFieldMapped);
@@ -110,6 +118,12 @@ public class EsPhysicalOperationProviders extends AbstractPhysicalOperationProvi
             }
             return query;
         };
+    }
+
+    @Override
+    public final PhysicalOperation sourcePhysicalOperation(EsQueryExec esQueryExec, LocalExecutionPlannerContext context) {
+        Function<SearchContext, Query> querySupplier = querySupplier(esQueryExec.query());
+        final LuceneOperator.Factory luceneFactory;
 
         List<FieldSort> sorts = esQueryExec.sorts();
         List<SortBuilder<?>> fieldSorts = null;
@@ -161,7 +175,7 @@ public class EsPhysicalOperationProviders extends AbstractPhysicalOperationProvi
         // The grouping-by values are ready, let's group on them directly.
         // Costin: why are they ready and not already exposed in the layout?
         return new OrdinalsGroupingOperator.OrdinalsGroupingOperatorFactory(
-            ValueSources.sources(
+            () -> ValueSources.sources(
                 searchContexts,
                 attrSource.name(),
                 EsqlDataTypes.isUnsupported(attrSource.dataType()),

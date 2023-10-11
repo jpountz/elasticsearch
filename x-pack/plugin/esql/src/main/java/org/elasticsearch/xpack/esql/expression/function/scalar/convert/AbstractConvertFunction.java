@@ -82,10 +82,12 @@ public abstract class AbstractConvertFunction extends UnaryScalarFunction implem
 
         private static final Log logger = LogFactory.getLog(AbstractEvaluator.class);
 
+        protected final DriverContext driverContext;
         private final EvalOperator.ExpressionEvaluator fieldEvaluator;
         private final Warnings warnings;
 
-        protected AbstractEvaluator(EvalOperator.ExpressionEvaluator field, Source source) {
+        protected AbstractEvaluator(DriverContext driverContext, EvalOperator.ExpressionEvaluator field, Source source) {
+            this.driverContext = driverContext;
             this.fieldEvaluator = field;
             this.warnings = new Warnings(source);
         }
@@ -102,13 +104,14 @@ public abstract class AbstractConvertFunction extends UnaryScalarFunction implem
          */
         protected abstract Block evalVector(Vector v);
 
-        public Block eval(Page page) {
-            Block block = fieldEvaluator.eval(page);
-            if (block.areAllValuesNull()) {
-                return Block.constantNullBlock(page.getPositionCount());
+        public Block.Ref eval(Page page) {
+            try (Block.Ref ref = fieldEvaluator.eval(page)) {
+                if (ref.block().areAllValuesNull()) {
+                    return Block.Ref.floating(Block.constantNullBlock(page.getPositionCount(), driverContext.blockFactory()));
+                }
+                Vector vector = ref.block().asVector();
+                return Block.Ref.floating(vector == null ? evalBlock(ref.block()) : evalVector(vector));
             }
-            Vector vector = block.asVector();
-            return vector == null ? evalBlock(block) : evalVector(vector);
         }
 
         protected final void registerException(Exception exception) {
