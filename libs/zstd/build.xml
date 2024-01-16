@@ -1,0 +1,53 @@
+<project name="lz4" default="compile-jni" basedir="."
+    xmlns:ivy="antlib:org.apache.ivy.ant"
+    xmlns:cpptasks="antlib:net.sf.antcontrib.cpptasks">
+
+  <property name="ivy.jar.version" value="2.5.0"/>
+  <property name="ivy.jar.name" value="ivy-${ivy.jar.version}.jar"/>
+
+  <condition property="platform" value="linux">
+   <os name="Linux"/>
+  </condition>
+  <condition property="platform" value="win32">
+   <os family="windows"/>
+  </condition>
+  <condition property="platform" value="solaris">
+   <os name="SunOS"/>
+  </condition>
+  <condition property="platform" value="darwin">
+   <os family="mac"/>
+  </condition>
+
+  <target name="ivy-bootstrap" description="install ivy" unless="ivy.available">
+    <condition property="ivy.available">
+      <typefound uri="antlib:org.apache.ivy.ant" name="configure" />
+    </condition>
+    <antcall target="-ivy-install" />
+  </target>
+
+  <target name="install-cpptasks" unless="cpptasks.available">
+    <ivy:cachepath organisation="ant-contrib" module="cpptasks" revision="1.0b5"
+      inline="true" conf="default" transitive="true" pathid="cpptasks.classpath"/>
+    <taskdef uri="antlib:net.sf.antcontrib.cpptasks" resource="net/sf/antcontrib/cpptasks/antlib.xml" classpathref="cpptasks.classpath"/>
+    <property name="cpptasks.available" value="true"/>
+  </target>
+
+  <target name="compile-jni" depends="install-cpptasks">
+    <mkdir dir="build/objects" />
+    <mkdir dir="build/jni/org/elasticsearch/zstd/${platform}/${os.arch}" />
+    <cpptasks:cc
+      debug="true"
+      optimize="extreme"
+      objdir="build/objects"
+      outfile="build/jni/org/elasticsearch/zstd/${platform}/${os.arch}/zstd-jni"
+      outtype="shared">
+      <includepath path="${java.home}/include" />
+      <includepath path="${java.home}/include/${platform}/" />
+      <includepath path="${build}/jni-headers" />
+      <fileset dir="src/main/jni" includes="*.c" />
+      <linker />
+      <syslibset libs="zstd"/>
+    </cpptasks:cc>
+  </target>
+
+</project>
