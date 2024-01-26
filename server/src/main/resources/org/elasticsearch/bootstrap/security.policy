@@ -31,9 +31,6 @@ grant codeBase "${codebase.elasticsearch}" {
 
   // for plugin api dynamic settings instances
   permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.reflect";
-
-  // zstd - should isolate this permission in a separate module
-  permission java.lang.RuntimePermission "loadLibrary.*";
 };
 
 //// Very special jar permissions:
@@ -89,6 +86,9 @@ grant codeBase "${codebase.elasticsearch-preallocate}" {
 //// Everything else:
 
 grant {
+  // zstd - should isolate this permission in a separate module
+  permission java.lang.RuntimePermission "loadLibrary.*";
+
   // needed by vendored Guice
   permission java.lang.RuntimePermission "accessClassInPackage.jdk.internal.vm.annotation";
 
