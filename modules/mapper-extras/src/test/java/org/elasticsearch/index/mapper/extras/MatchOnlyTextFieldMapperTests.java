@@ -14,6 +14,9 @@ import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.IndexableFieldType;
+import org.apache.lucene.search.ConstantScoreQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.TotalHits;
 import org.apache.lucene.store.Directory;
@@ -22,7 +25,9 @@ import org.apache.lucene.tests.analysis.Token;
 import org.apache.lucene.tests.index.RandomIndexWriter;
 import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.Strings;
+import org.elasticsearch.core.CheckedConsumer;
 import org.elasticsearch.core.Tuple;
+import org.elasticsearch.index.mapper.AllFieldMapper;
 import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.KeywordFieldMapper;
 import org.elasticsearch.index.mapper.LuceneDocument;
@@ -257,6 +262,34 @@ public class MatchOnlyTextFieldMapperTests extends MapperTestCase {
     public void testDocValuesLoadedFromSynthetic() throws IOException {
         MapperService mapper = createMapperService(syntheticSourceFieldMapping(b -> b.field("type", "match_only_text")));
         assertScriptDocValues(mapper, "foo", equalTo(List.of("foo")));
+    }
+
+    public void testAllField() throws Exception {
+        DocumentMapper docMapper = createDocumentMapper(allFieldMapping(true, b -> {
+            b.startObject("field1");
+            b.field("type", "match_only_text");
+            b.endObject();
+        }));
+
+        ParsedDocument doc = docMapper.parse(source(b -> b.field("field1", "value1")));
+        assertThat(doc.rootDoc().getFields(AllFieldMapper.NAME).size(), equalTo(1));
+        assertThat(doc.rootDoc().getFields(AllFieldMapper.NAME).get(0).binaryValue(), equalTo(new BytesRef("value1\0field1")));
+
+        Query query = docMapper.mappers().getFieldType("field1").termQuery("value1", null);
+        assertThat(query, instanceOf(ConstantScoreQuery.class));
+        TermQuery termQuery = (TermQuery) ((ConstantScoreQuery) query).getQuery();
+        assertThat(termQuery.getTerm().field(), equalTo(AllFieldMapper.NAME));
+        assertThat(termQuery.getTerm().bytes(), equalTo(new BytesRef("value1\0field1")));
+    }
+
+    private static XContentBuilder allFieldMapping(boolean enabled, CheckedConsumer<XContentBuilder, IOException> propertiesBuilder)
+        throws IOException {
+        return topMapping(b -> {
+            b.startObject(AllFieldMapper.NAME).field("enabled", enabled).endObject();
+            b.startObject("properties");
+            propertiesBuilder.accept(b);
+            b.endObject();
+        });
     }
 
     @Override

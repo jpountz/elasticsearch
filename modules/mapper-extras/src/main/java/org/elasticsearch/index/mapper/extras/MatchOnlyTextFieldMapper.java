@@ -24,6 +24,7 @@ import org.apache.lucene.search.MatchAllDocsQuery;
 import org.apache.lucene.search.MultiTermQuery;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermInSetQuery;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.IOFunction;
@@ -39,6 +40,7 @@ import org.elasticsearch.index.fielddata.SourceValueFetcherSortedBinaryIndexFiel
 import org.elasticsearch.index.fielddata.StoredFieldSortedBinaryIndexFieldData;
 import org.elasticsearch.index.fieldvisitor.LeafStoredFieldLoader;
 import org.elasticsearch.index.fieldvisitor.StoredFieldLoader;
+import org.elasticsearch.index.mapper.AllFieldMapper;
 import org.elasticsearch.index.mapper.BlockLoader;
 import org.elasticsearch.index.mapper.BlockSourceReader;
 import org.elasticsearch.index.mapper.BlockStoredFieldsReader;
@@ -63,11 +65,14 @@ import org.elasticsearch.xcontent.XContentBuilder;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import static org.elasticsearch.index.mapper.AllFieldMapper.toAllFieldTerm;
 
 /**
  * A {@link FieldMapper} for full-text fields that only indexes
@@ -131,7 +136,8 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
                 tsi,
                 indexAnalyzer,
                 context.isSourceSynthetic(),
-                meta.getValue()
+                meta.getValue(),
+                context.isIndexIntoAllField()
             );
             return ft;
         }
@@ -140,7 +146,16 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
         public MatchOnlyTextFieldMapper build(MapperBuilderContext context) {
             MatchOnlyTextFieldType tft = buildFieldType(context);
             MultiFields multiFields = multiFieldsBuilder.build(this, context);
-            return new MatchOnlyTextFieldMapper(name, Defaults.FIELD_TYPE, tft, multiFields, copyTo, context.isSourceSynthetic(), this);
+            return new MatchOnlyTextFieldMapper(
+                name,
+                Defaults.FIELD_TYPE,
+                tft,
+                multiFields,
+                copyTo,
+                context.isSourceSynthetic(),
+                context.isIndexIntoAllField(),
+                this
+            );
         }
     }
 
@@ -150,17 +165,20 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
 
         private final Analyzer indexAnalyzer;
         private final TextFieldType textFieldType;
+        private final boolean indexIntoAllField;
 
         public MatchOnlyTextFieldType(
             String name,
             TextSearchInfo tsi,
             Analyzer indexAnalyzer,
             boolean isSyntheticSource,
-            Map<String, String> meta
+            Map<String, String> meta,
+            boolean indexIntoAllField
         ) {
             super(name, true, false, false, tsi, meta);
             this.indexAnalyzer = Objects.requireNonNull(indexAnalyzer);
             this.textFieldType = new TextFieldType(name, isSyntheticSource);
+            this.indexIntoAllField = indexIntoAllField;
         }
 
         public MatchOnlyTextFieldType(String name) {
@@ -169,7 +187,8 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
                 new TextSearchInfo(Defaults.FIELD_TYPE, null, Lucene.STANDARD_ANALYZER, Lucene.STANDARD_ANALYZER),
                 Lucene.STANDARD_ANALYZER,
                 false,
-                Collections.emptyMap()
+                Collections.emptyMap(),
+                false
             );
         }
 
@@ -235,10 +254,30 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
             return new SourceIntervalsSource(source, approximation, getValueFetcherProvider(searchExecutionContext), indexAnalyzer);
         }
 
+        // TODO: fix other query types to work with _all
         @Override
         public Query termQuery(Object value, SearchExecutionContext context) {
-            // Disable scoring
-            return new ConstantScoreQuery(super.termQuery(value, context));
+            if (indexIntoAllField) {
+                return new ConstantScoreQuery(
+                    new TermQuery(new Term(AllFieldMapper.NAME, toAllFieldTerm(indexedValueForSearch(value), new BytesRef(name()))))
+                );
+            } else {
+                // Disable scoring
+                return new ConstantScoreQuery(super.termQuery(value, context));
+            }
+        }
+
+        @Override
+        public Query termsQuery(Collection<?> values, SearchExecutionContext context) {
+            if (indexIntoAllField) {
+                BytesRef[] bytesRefs = values.stream()
+                    .map(value -> toAllFieldTerm(indexedValueForSearch(value), new BytesRef(name())))
+                    .toArray(BytesRef[]::new);
+                return new ConstantScoreQuery(new TermInSetQuery(AllFieldMapper.NAME, bytesRefs));
+            } else {
+                // Disable scoring
+                return new ConstantScoreQuery(super.termsQuery(values, context));
+            }
         }
 
         @Override
@@ -368,6 +407,7 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
     private final NamedAnalyzer indexAnalyzer;
     private final int positionIncrementGap;
     private final boolean storeSource;
+    private final boolean indexIntoAllField;
     private final FieldType fieldType;
 
     private MatchOnlyTextFieldMapper(
@@ -377,6 +417,7 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
         MultiFields multiFields,
         CopyTo copyTo,
         boolean storeSource,
+        boolean indexIntoAllField,
         Builder builder
     ) {
         super(simpleName, mappedFieldType, multiFields, copyTo, false, null);
@@ -388,6 +429,7 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
         this.indexAnalyzer = builder.analyzers.getIndexAnalyzer();
         this.positionIncrementGap = builder.analyzers.positionIncrementGap.getValue();
         this.storeSource = storeSource;
+        this.indexIntoAllField = indexIntoAllField;
     }
 
     @Override
@@ -408,8 +450,14 @@ public class MatchOnlyTextFieldMapper extends FieldMapper {
             return;
         }
 
-        Field field = new Field(fieldType().name(), value, fieldType);
-        context.doc().add(field);
+        if (indexIntoAllField) {
+            Field field = new Field(fieldType().name(), value, fieldType);
+            AllFieldMapper allFieldMapper = (AllFieldMapper) context.getMetadataMapper(AllFieldMapper.NAME);
+            allFieldMapper.addToAll(context, field);
+        } else {
+            Field field = new Field(fieldType().name(), value, fieldType);
+            context.doc().add(field);
+        }
         context.addToFieldNames(fieldType().name());
 
         if (storeSource) {

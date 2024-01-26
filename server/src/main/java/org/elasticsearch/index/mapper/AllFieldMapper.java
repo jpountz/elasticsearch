@@ -8,6 +8,8 @@
 
 package org.elasticsearch.index.mapper;
 
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.document.FieldType;
 import org.apache.lucene.index.DocValuesType;
 import org.apache.lucene.index.IndexOptions;
@@ -136,6 +138,7 @@ public class AllFieldMapper extends MetadataFieldMapper {
         for (int i = 0; i < fields.size(); i++) {
             IndexableField indexableField = fields.get(i);
             var mappedFieldType = context.mappingLookup().getFieldType(indexableField.name());
+            // TODO: make keyword push like match_onlu_text:
             if (mappedFieldType != null && "keyword".equals(mappedFieldType.typeName())) {
                 BytesRef value = toAllFieldTerm(indexableField.binaryValue(), new BytesRef(indexableField.name()));
                 if (value.length > MAX_TERM_LENGTH) {
@@ -145,6 +148,26 @@ public class AllFieldMapper extends MetadataFieldMapper {
             }
         }
 
+    }
+
+    public void addToAll(DocumentParserContext context, IndexableField indexableField) throws IOException {
+        if (enabled == false) {
+            return;
+        }
+
+        // TODO: do we need to use index analyzer from MatchOnlyTextFieldMapper here?
+        try (TokenStream tokenStream = indexableField.tokenStream(Lucene.STANDARD_ANALYZER, null)) {
+            CharTermAttribute termAtt = tokenStream.addAttribute(CharTermAttribute.class);
+            tokenStream.reset();
+            while (tokenStream.incrementToken()) {
+                BytesRef value = toAllFieldTerm(new BytesRef(termAtt.toString()), new BytesRef(indexableField.name()));
+                if (value.length > MAX_TERM_LENGTH) {
+                    // TODO
+                }
+                context.doc().add(new KeywordFieldMapper.KeywordField(NAME, value, Defaults.FIELD_TYPE));
+            }
+            tokenStream.end();
+        }
     }
 
     public static BytesRef toAllFieldTerm(BytesRef fieldValueBytes, BytesRef fieldNameBytes) {
