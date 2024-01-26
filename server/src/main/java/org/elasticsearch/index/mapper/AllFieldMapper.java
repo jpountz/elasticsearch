@@ -22,9 +22,9 @@ import org.elasticsearch.index.query.SearchExecutionContext;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 
 import static org.apache.lucene.index.IndexWriter.MAX_TERM_LENGTH;
+import static org.elasticsearch.index.mapper.KeywordFieldMapper.failIfExceedsMaxLength;
 
 public class AllFieldMapper extends MetadataFieldMapper {
 
@@ -127,47 +127,33 @@ public class AllFieldMapper extends MetadataFieldMapper {
         return new Builder().init(this);
     }
 
-    @Override
-    public void postParse(DocumentParserContext context) throws IOException {
-        if (enabled == false) {
-            // not configured, so skip the validation
-            return;
-        }
-
-        final List<IndexableField> fields = context.rootDoc().getFields();
-        for (int i = 0; i < fields.size(); i++) {
-            IndexableField indexableField = fields.get(i);
-            var mappedFieldType = context.mappingLookup().getFieldType(indexableField.name());
-            // TODO: make keyword push like match_onlu_text:
-            if (mappedFieldType != null && "keyword".equals(mappedFieldType.typeName())) {
-                BytesRef value = toAllFieldTerm(indexableField.binaryValue(), new BytesRef(indexableField.name()));
-                if (value.length > MAX_TERM_LENGTH) {
-                    // TODO
-                }
-                context.doc().add(new KeywordFieldMapper.KeywordField(NAME, value, Defaults.FIELD_TYPE));
-            }
-        }
-
-    }
-
     public void addToAll(DocumentParserContext context, IndexableField indexableField) throws IOException {
         if (enabled == false) {
             return;
         }
 
-        // TODO: do we need to use index analyzer from MatchOnlyTextFieldMapper here?
         try (TokenStream tokenStream = indexableField.tokenStream(Lucene.STANDARD_ANALYZER, null)) {
             CharTermAttribute termAtt = tokenStream.addAttribute(CharTermAttribute.class);
             tokenStream.reset();
             while (tokenStream.incrementToken()) {
-                BytesRef value = toAllFieldTerm(new BytesRef(termAtt.toString()), new BytesRef(indexableField.name()));
-                if (value.length > MAX_TERM_LENGTH) {
-                    // TODO
-                }
-                context.doc().add(new KeywordFieldMapper.KeywordField(NAME, value, Defaults.FIELD_TYPE));
+                addToAll(context, new BytesRef(termAtt.toString()), indexableField.name());
             }
             tokenStream.end();
         }
+    }
+
+    public void addToAll(DocumentParserContext context, BytesRef value, String field) {
+        if (enabled == false) {
+            return;
+        }
+
+        BytesRef term = toAllFieldTerm(value, new BytesRef(field));
+        if (term.length > MAX_TERM_LENGTH) {
+            failIfExceedsMaxLength(field, term);
+            assert false;
+            return;
+        }
+        context.doc().add(new KeywordFieldMapper.KeywordField(NAME, term, Defaults.FIELD_TYPE));
     }
 
     public static BytesRef toAllFieldTerm(BytesRef fieldValueBytes, BytesRef fieldNameBytes) {

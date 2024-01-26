@@ -323,12 +323,6 @@ public final class KeywordFieldMapper extends FieldMapper {
             fieldtype.setIndexOptions(TextParams.toIndexOptions(this.indexed.getValue(), this.indexOptions.getValue()));
             fieldtype.setStored(this.stored.getValue());
             fieldtype.setDocValuesType(this.hasDocValues.getValue() ? DocValuesType.SORTED_SET : DocValuesType.NONE);
-
-            if (context.isIndexIntoAllField()) {
-                fieldtype.setIndexOptions(IndexOptions.NONE);
-                fieldtype.setOmitNorms(true);
-            }
-
             if (fieldtype.equals(Defaults.FIELD_TYPE)) {
                 // deduplicate in the common default case to save some memory
                 fieldtype = Defaults.FIELD_TYPE;
@@ -340,6 +334,7 @@ public final class KeywordFieldMapper extends FieldMapper {
                 multiFieldsBuilder.build(this, context),
                 copyTo,
                 context.isSourceSynthetic(),
+                context.isIndexIntoAllField(),
                 this
             );
         }
@@ -375,10 +370,9 @@ public final class KeywordFieldMapper extends FieldMapper {
         ) {
             super(
                 name,
-                isIndexed(fieldType, indexIntoAllField, builder),
+                fieldType.indexOptions() != IndexOptions.NONE && builder.indexCreatedVersion.isLegacyIndexVersion() == false,
                 fieldType.stored(),
                 builder.hasDocValues.getValue(),
-                // TODO: fix text info
                 textSearchInfo(fieldType, builder.similarity.getValue(), searchAnalyzer, quoteAnalyzer),
                 builder.meta.getValue()
             );
@@ -390,11 +384,6 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.isDimension = builder.dimension.getValue();
             this.isSyntheticSource = isSyntheticSource;
             this.indexIntoAllField = indexIntoAllField;
-        }
-
-        static boolean isIndexed(FieldType fieldType, boolean indexIntoAllField, Builder builder) {
-            boolean isFieldIndexed = fieldType.indexOptions() != IndexOptions.NONE || indexIntoAllField;
-            return isFieldIndexed && builder.indexCreatedVersion.isLegacyIndexVersion() == false;
         }
 
         public KeywordFieldType(String name, boolean isIndexed, boolean hasDocValues, Map<String, String> meta) {
@@ -894,8 +883,8 @@ public final class KeywordFieldMapper extends FieldMapper {
     private final ScriptCompiler scriptCompiler;
     private final IndexVersion indexCreatedVersion;
     private final boolean storeIgnored;
-
     private final IndexAnalyzers indexAnalyzers;
+    private final boolean indexIntoAllField;
 
     private KeywordFieldMapper(
         String simpleName,
@@ -904,6 +893,7 @@ public final class KeywordFieldMapper extends FieldMapper {
         MultiFields multiFields,
         CopyTo copyTo,
         boolean storeIgnored,
+        boolean indexIntoAllField,
         Builder builder
     ) {
         super(simpleName, mappedFieldType, multiFields, copyTo, builder.script.get() != null, builder.onScriptError.getValue());
@@ -919,6 +909,7 @@ public final class KeywordFieldMapper extends FieldMapper {
         this.scriptCompiler = builder.scriptCompiler;
         this.indexCreatedVersion = builder.indexCreatedVersion;
         this.storeIgnored = storeIgnored;
+        this.indexIntoAllField = indexIntoAllField;
     }
 
     @Override
@@ -969,15 +960,39 @@ public final class KeywordFieldMapper extends FieldMapper {
             context.getDimensions().addString(fieldType().name(), binaryValue);
         }
 
-        // If the UTF8 encoding of the field value is bigger than the max length 32766, Lucene fill fail the indexing request and, to
-        // roll back the changes, will mark the (possibly partially indexed) document as deleted. This results in deletes, even in an
-        // append-only workload, which in turn leads to slower merges, as these will potentially have to fall back to MergeStrategy.DOC
-        // instead of MergeStrategy.BULK. To avoid this, we do a preflight check here before indexing the document into Lucene.
+        if (indexIntoAllField) {
+            AllFieldMapper allFieldMapper = (AllFieldMapper) context.getMetadataMapper(AllFieldMapper.NAME);
+            allFieldMapper.addToAll(context, binaryValue, fieldType().name());
+            if (fieldType.stored()) {
+                context.doc().add(new StoredField(fieldType().name(), binaryValue));
+            }
+            if (fieldType.docValuesType() != DocValuesType.NONE) {
+                context.doc().add(new SortedSetDocValuesField(fieldType().name(), binaryValue));
+            }
+        } else {
+            failIfExceedsMaxLength(fieldType().name(), binaryValue);
+            Field field = new KeywordField(fieldType().name(), binaryValue, fieldType);
+            context.doc().add(field);
+        }
+
+        if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
+            context.addToFieldNames(fieldType().name());
+        }
+    }
+
+    /**
+     * If the UTF8 encoding of the field value is bigger than the max length 32766, Lucene fill fail the indexing request and, to
+     * roll back the changes, will mark the (possibly partially indexed) document as deleted. This results in deletes, even in an
+     * append-only workload, which in turn leads to slower merges, as these will potentially have to fall back to MergeStrategy.DOC
+     * instead of MergeStrategy.BULK. To avoid this, we do a preflight check here before indexing the document into Lucene.
+     */
+    static void failIfExceedsMaxLength(String fieldName, BytesRef binaryValue) {
+        //
         if (binaryValue.length > MAX_TERM_LENGTH) {
             byte[] prefix = new byte[30];
             System.arraycopy(binaryValue.bytes, binaryValue.offset, prefix, 0, 30);
             String msg = "Document contains at least one immense term in field=\""
-                + fieldType().name()
+                + fieldName
                 + "\" (whose "
                 + "UTF8 encoding is longer than the max length "
                 + MAX_TERM_LENGTH
@@ -987,13 +1002,6 @@ public final class KeywordFieldMapper extends FieldMapper {
                 + Arrays.toString(prefix)
                 + "...'";
             throw new IllegalArgumentException(msg);
-        }
-
-        Field field = new KeywordField(fieldType().name(), binaryValue, fieldType);
-        context.doc().add(field);
-
-        if (fieldType().hasDocValues() == false && fieldType.omitNorms()) {
-            context.addToFieldNames(fieldType().name());
         }
     }
 
