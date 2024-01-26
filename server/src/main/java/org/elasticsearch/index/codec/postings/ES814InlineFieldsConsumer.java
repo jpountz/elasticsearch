@@ -138,9 +138,9 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                 writer.write(pe, postingsOut);
                 termsOut.writeVInt(term.length);
                 termsOut.writeBytes(term.bytes, term.offset, term.length);
-                termsOut.writeInt(writer.docFreq);
+                termsOut.writeVInt(writer.docFreq);
                 if (hasFreqs) {
-                    termsOut.writeLong(writer.totalTermFreq);
+                    termsOut.writeVLong(writer.totalTermFreq);
                 }
                 if (hasPositions) {
                     termsOut.writeLong(proxOffset);

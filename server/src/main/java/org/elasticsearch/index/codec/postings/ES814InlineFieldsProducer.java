@@ -485,10 +485,10 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             assert loadedFrameIndex == state.blockIndex : loadedFrameIndex + " != " + state.blockIndex;
             term.setLength(termsReader.readVInt());
             termsReader.readBytes(term.bytes(), 0, term.length());
-            state.docFreq = termsReader.readInt();
+            state.docFreq = termsReader.readVInt();
 
             if (meta.options.compareTo(IndexOptions.DOCS_AND_FREQS) >= 0) {
-                state.totalTermFreq = termsReader.readLong();
+                state.totalTermFreq = termsReader.readVLong();
             } else {
                 state.totalTermFreq = state.docFreq;
             }
