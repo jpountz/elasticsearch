@@ -120,6 +120,7 @@ public final class MappingParser {
 
         boolean isSourceSynthetic = mappingParserContext.getIndexSettings().getMode().isSyntheticSourceEnabled();
         boolean isDataStream = false;
+        boolean nonTextFieldsSharedInvertedIndex = false;
 
         Iterator<Map.Entry<String, Object>> iterator = mappingSource.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -150,6 +151,9 @@ public final class MappingParser {
                 if (metadataFieldMapper instanceof DataStreamTimestampFieldMapper dsfm) {
                     isDataStream = dsfm.isEnabled();
                 }
+                if (metadataFieldMapper instanceof AllFieldMapper allFieldMapper) {
+                    nonTextFieldsSharedInvertedIndex = allFieldMapper.isEnabled();
+                }
             }
         }
 
@@ -177,7 +181,6 @@ public final class MappingParser {
             checkNoRemainingFields(mappingSource, "Root mapping definition has unsupported parameters: ");
         }
 
-        boolean nonTextFieldsSharedInvertedIndex = mappingParserContext.getIndexSettings().isMappingNonTextFieldsSharedInvertedIndex();
         return new Mapping(
             rootObjectMapper.build(MapperBuilderContext.root(isSourceSynthetic, isDataStream, nonTextFieldsSharedInvertedIndex)),
             metadataMappers.values().toArray(new MetadataFieldMapper[0]),

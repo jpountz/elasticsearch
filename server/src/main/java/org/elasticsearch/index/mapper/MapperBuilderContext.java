@@ -18,20 +18,20 @@ public class MapperBuilderContext {
     /**
      * The root context, to be used when building a tree of mappers
      */
-    public static MapperBuilderContext root(boolean isSourceSynthetic, boolean isDataStream, boolean nonTextFieldsSharedInvertedIndex) {
-        return new MapperBuilderContext(null, isSourceSynthetic, isDataStream, nonTextFieldsSharedInvertedIndex);
+    public static MapperBuilderContext root(boolean isSourceSynthetic, boolean isDataStream, boolean indexIntoAllField) {
+        return new MapperBuilderContext(null, isSourceSynthetic, isDataStream, indexIntoAllField);
     }
 
     private final String path;
     private final boolean isSourceSynthetic;
     private final boolean isDataStream;
-    private final boolean mappingNonTextFieldsSharedInvertedIndex;
+    private final boolean indexIntoAllField;
 
-    MapperBuilderContext(String path, boolean isSourceSynthetic, boolean isDataStream, boolean mappingNonTextFieldsSharedInvertedIndex) {
+    MapperBuilderContext(String path, boolean isSourceSynthetic, boolean isDataStream, boolean indexIntoAllField) {
         this.path = path;
         this.isSourceSynthetic = isSourceSynthetic;
         this.isDataStream = isDataStream;
-        this.mappingNonTextFieldsSharedInvertedIndex = mappingNonTextFieldsSharedInvertedIndex;
+        this.indexIntoAllField = indexIntoAllField;
     }
 
     /**
@@ -40,7 +40,7 @@ public class MapperBuilderContext {
      * @return a new MapperBuilderContext with this context as its parent
      */
     public MapperBuilderContext createChildContext(String name) {
-        return new MapperBuilderContext(buildFullName(name), isSourceSynthetic, isDataStream, mappingNonTextFieldsSharedInvertedIndex);
+        return new MapperBuilderContext(buildFullName(name), isSourceSynthetic, isDataStream, indexIntoAllField);
     }
 
     /**
@@ -67,7 +67,7 @@ public class MapperBuilderContext {
         return isDataStream;
     }
 
-    public boolean isMappingNonTextFieldsSharedInvertedIndex() {
-        return mappingNonTextFieldsSharedInvertedIndex;
+    public boolean isIndexIntoAllField() {
+        return indexIntoAllField;
     }
 }

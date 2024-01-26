@@ -20,8 +20,8 @@ public final class MapperMergeContext {
     /**
      * The root context, to be used when merging a tree of mappers
      */
-    public static MapperMergeContext root(boolean isSourceSynthetic, boolean isDataStream) {
-        return new MapperMergeContext(MapperBuilderContext.root(isSourceSynthetic, isDataStream, false));
+    public static MapperMergeContext root(boolean isSourceSynthetic, boolean isDataStream, boolean isAllFieldEnabled) {
+        return new MapperMergeContext(MapperBuilderContext.root(isSourceSynthetic, isDataStream, isAllFieldEnabled));
     }
 
     /**

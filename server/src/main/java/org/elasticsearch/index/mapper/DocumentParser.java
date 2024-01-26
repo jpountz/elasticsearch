@@ -256,9 +256,8 @@ public final class DocumentParser {
         for (RuntimeField runtimeField : context.getDynamicRuntimeFields()) {
             rootBuilder.addRuntimeField(runtimeField);
         }
-        boolean nonTextFieldsSharedInvertedIndex = context.indexSettings().isMappingNonTextFieldsSharedInvertedIndex();
         RootObjectMapper root = rootBuilder.build(
-            MapperBuilderContext.root(context.mappingLookup().isSourceSynthetic(), false, nonTextFieldsSharedInvertedIndex)
+            MapperBuilderContext.root(context.mappingLookup().isSourceSynthetic(), false, context.mappingLookup().isALlFieldEnabled())
         );
         return context.mappingLookup().getMapping().mappingUpdate(root);
     }

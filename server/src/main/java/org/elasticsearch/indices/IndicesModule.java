@@ -22,6 +22,7 @@ import org.elasticsearch.action.admin.indices.rollover.MinSizeCondition;
 import org.elasticsearch.action.resync.TransportResyncReplicationAction;
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.common.io.stream.NamedWriteableRegistry;
+import org.elasticsearch.index.mapper.AllFieldMapper;
 import org.elasticsearch.index.mapper.BinaryFieldMapper;
 import org.elasticsearch.index.mapper.BooleanFieldMapper;
 import org.elasticsearch.index.mapper.BooleanScriptFieldType;
@@ -252,6 +253,7 @@ public class IndicesModule extends AbstractModule {
         builtInMetadataMappers.put(SeqNoFieldMapper.NAME, SeqNoFieldMapper.PARSER);
         builtInMetadataMappers.put(DocCountFieldMapper.NAME, DocCountFieldMapper.PARSER);
         builtInMetadataMappers.put(DataStreamTimestampFieldMapper.NAME, DataStreamTimestampFieldMapper.PARSER);
+        builtInMetadataMappers.put(AllFieldMapper.NAME, AllFieldMapper.PARSER);
         // _field_names must be added last so that it has a chance to see all the other mappers
         builtInMetadataMappers.put(FieldNamesFieldMapper.NAME, FieldNamesFieldMapper.PARSER);
         return Collections.unmodifiableMap(builtInMetadataMappers);

@@ -22,10 +22,14 @@ import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.MultiTerms;
+import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.MultiTermQuery;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermInSetQuery;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TermRangeQuery;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.automaton.Automata;
 import org.apache.lucene.util.automaton.Automaton;
@@ -76,6 +80,7 @@ import java.util.Set;
 
 import static org.apache.lucene.index.IndexWriter.MAX_TERM_LENGTH;
 import static org.elasticsearch.core.Strings.format;
+import static org.elasticsearch.index.mapper.AllFieldMapper.toAllFieldTerm;
 
 /**
  * A field mapper for keywords. This mapper accepts strings and indexes them as-is.
@@ -307,7 +312,7 @@ public final class KeywordFieldMapper extends FieldMapper {
                 quoteAnalyzer,
                 this,
                 context.isSourceSynthetic(),
-                context.isSourceSynthetic()
+                context.isIndexIntoAllField()
             );
         }
 
@@ -318,6 +323,12 @@ public final class KeywordFieldMapper extends FieldMapper {
             fieldtype.setIndexOptions(TextParams.toIndexOptions(this.indexed.getValue(), this.indexOptions.getValue()));
             fieldtype.setStored(this.stored.getValue());
             fieldtype.setDocValuesType(this.hasDocValues.getValue() ? DocValuesType.SORTED_SET : DocValuesType.NONE);
+
+            if (context.isIndexIntoAllField()) {
+                fieldtype.setIndexOptions(IndexOptions.NONE);
+                fieldtype.setOmitNorms(true);
+            }
+
             if (fieldtype.equals(Defaults.FIELD_TYPE)) {
                 // deduplicate in the common default case to save some memory
                 fieldtype = Defaults.FIELD_TYPE;
@@ -329,8 +340,7 @@ public final class KeywordFieldMapper extends FieldMapper {
                 multiFieldsBuilder.build(this, context),
                 copyTo,
                 context.isSourceSynthetic(),
-                this,
-                context.isMappingNonTextFieldsSharedInvertedIndex()
+                this
             );
         }
     }
@@ -351,7 +361,7 @@ public final class KeywordFieldMapper extends FieldMapper {
         private final FieldValues<String> scriptValues;
         private final boolean isDimension;
         private final boolean isSyntheticSource;
-        private final boolean mappingNonTextFieldsSharedInvertedIndex;
+        private final boolean indexIntoAllField;
 
         public KeywordFieldType(
             String name,
@@ -361,13 +371,14 @@ public final class KeywordFieldMapper extends FieldMapper {
             NamedAnalyzer quoteAnalyzer,
             Builder builder,
             boolean isSyntheticSource,
-            boolean mappingNonTextFieldsSharedInvertedIndex
+            boolean indexIntoAllField
         ) {
             super(
                 name,
-                fieldType.indexOptions() != IndexOptions.NONE && builder.indexCreatedVersion.isLegacyIndexVersion() == false,
+                isIndexed(fieldType, indexIntoAllField, builder),
                 fieldType.stored(),
                 builder.hasDocValues.getValue(),
+                // TODO: fix text info
                 textSearchInfo(fieldType, builder.similarity.getValue(), searchAnalyzer, quoteAnalyzer),
                 builder.meta.getValue()
             );
@@ -378,7 +389,12 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.scriptValues = builder.scriptValues();
             this.isDimension = builder.dimension.getValue();
             this.isSyntheticSource = isSyntheticSource;
-            this.mappingNonTextFieldsSharedInvertedIndex = mappingNonTextFieldsSharedInvertedIndex;
+            this.indexIntoAllField = indexIntoAllField;
+        }
+
+        static boolean isIndexed(FieldType fieldType, boolean indexIntoAllField, Builder builder) {
+            boolean isFieldIndexed = fieldType.indexOptions() != IndexOptions.NONE || indexIntoAllField;
+            return isFieldIndexed && builder.indexCreatedVersion.isLegacyIndexVersion() == false;
         }
 
         public KeywordFieldType(String name, boolean isIndexed, boolean hasDocValues, Map<String, String> meta) {
@@ -390,7 +406,7 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.scriptValues = null;
             this.isDimension = false;
             this.isSyntheticSource = false;
-            this.mappingNonTextFieldsSharedInvertedIndex = false;
+            this.indexIntoAllField = false;
         }
 
         public KeywordFieldType(String name) {
@@ -413,7 +429,7 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.scriptValues = null;
             this.isDimension = false;
             this.isSyntheticSource = false;
-            this.mappingNonTextFieldsSharedInvertedIndex = false;
+            this.indexIntoAllField = false;
         }
 
         public KeywordFieldType(String name, NamedAnalyzer analyzer) {
@@ -425,7 +441,7 @@ public final class KeywordFieldMapper extends FieldMapper {
             this.scriptValues = null;
             this.isDimension = false;
             this.isSyntheticSource = false;
-            this.mappingNonTextFieldsSharedInvertedIndex = false;
+            this.indexIntoAllField = false;
         }
 
         @Override
@@ -437,7 +453,11 @@ public final class KeywordFieldMapper extends FieldMapper {
         public Query termQuery(Object value, SearchExecutionContext context) {
             failIfNotIndexedNorDocValuesFallback(context);
             if (isIndexed()) {
-                return super.termQuery(value, context);
+                if (indexIntoAllField) {
+                    return new TermQuery(new Term(AllFieldMapper.NAME, toAllFieldTerm(indexedValueForSearch(value), new BytesRef(name()))));
+                } else {
+                    return super.termQuery(value, context);
+                }
             } else {
                 return SortedSetDocValuesField.newSlowExactQuery(name(), indexedValueForSearch(value));
             }
@@ -447,7 +467,14 @@ public final class KeywordFieldMapper extends FieldMapper {
         public Query termsQuery(Collection<?> values, SearchExecutionContext context) {
             failIfNotIndexedNorDocValuesFallback(context);
             if (isIndexed()) {
-                return super.termsQuery(values, context);
+                if (indexIntoAllField) {
+                    BytesRef[] bytesRefs = values.stream()
+                        .map(value -> toAllFieldTerm(indexedValueForSearch(value), new BytesRef(name())))
+                        .toArray(BytesRef[]::new);
+                    return new TermInSetQuery(AllFieldMapper.NAME, bytesRefs);
+                } else {
+                    return super.termsQuery(values, context);
+                }
             } else {
                 BytesRef[] bytesRefs = values.stream().map(this::indexedValueForSearch).toArray(BytesRef[]::new);
                 return SortedSetDocValuesField.newSlowSetQuery(name(), bytesRefs);
@@ -464,7 +491,17 @@ public final class KeywordFieldMapper extends FieldMapper {
         ) {
             failIfNotIndexedNorDocValuesFallback(context);
             if (isIndexed()) {
-                return super.rangeQuery(lowerTerm, upperTerm, includeLower, includeUpper, context);
+                if (indexIntoAllField) {
+                    return new TermRangeQuery(
+                        AllFieldMapper.NAME,
+                        lowerTerm == null ? null : toAllFieldTerm(indexedValueForSearch(lowerTerm), new BytesRef(name())),
+                        upperTerm == null ? null : toAllFieldTerm(indexedValueForSearch(upperTerm), new BytesRef(name())),
+                        includeLower,
+                        includeUpper
+                    );
+                } else {
+                    return super.rangeQuery(lowerTerm, upperTerm, includeLower, includeUpper, context);
+                }
             } else {
                 return SortedSetDocValuesField.newSlowRangeQuery(
                     name(),
@@ -859,7 +896,6 @@ public final class KeywordFieldMapper extends FieldMapper {
     private final boolean storeIgnored;
 
     private final IndexAnalyzers indexAnalyzers;
-    private final boolean mappingNonTextFieldsSharedInvertedIndex;
 
     private KeywordFieldMapper(
         String simpleName,
@@ -868,8 +904,7 @@ public final class KeywordFieldMapper extends FieldMapper {
         MultiFields multiFields,
         CopyTo copyTo,
         boolean storeIgnored,
-        Builder builder,
-        boolean mappingNonTextFieldsSharedInvertedIndex
+        Builder builder
     ) {
         super(simpleName, mappedFieldType, multiFields, copyTo, builder.script.get() != null, builder.onScriptError.getValue());
         assert fieldType.indexOptions().compareTo(IndexOptions.DOCS_AND_FREQS) <= 0;
@@ -884,7 +919,6 @@ public final class KeywordFieldMapper extends FieldMapper {
         this.scriptCompiler = builder.scriptCompiler;
         this.indexCreatedVersion = builder.indexCreatedVersion;
         this.storeIgnored = storeIgnored;
-        this.mappingNonTextFieldsSharedInvertedIndex = mappingNonTextFieldsSharedInvertedIndex;
     }
 
     @Override

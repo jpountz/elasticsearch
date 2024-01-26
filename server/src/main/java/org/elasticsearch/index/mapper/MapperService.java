@@ -121,11 +121,6 @@ public class MapperService extends AbstractIndexComponent implements Closeable {
         Property.Dynamic,
         Property.IndexScope
     );
-    public static final Setting<Boolean> INDEX_MAPPING_NON_TEXT_FIELDS_SHARED_INVERTED_INDEX = Setting.boolSetting(
-        "index.mapping.non_text_fields.shared.inverted_index",
-        false,
-        Property.IndexScope
-    );
 
     private final IndexAnalyzers indexAnalyzers;
     private final MappingParser mappingParser;

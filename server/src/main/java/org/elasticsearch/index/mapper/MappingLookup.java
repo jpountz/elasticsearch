@@ -436,6 +436,11 @@ public final class MappingLookup {
         return sfm != null && sfm.isSynthetic();
     }
 
+    public boolean isALlFieldEnabled() {
+        AllFieldMapper allFieldMapper = mapping.getMetadataMapperByClass(AllFieldMapper.class);
+        return allFieldMapper != null && allFieldMapper.isEnabled();
+    }
+
     /**
      * Build something to load source {@code _source}.
      */
