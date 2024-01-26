@@ -24,6 +24,7 @@ import org.apache.lucene.store.IndexOutput;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.FixedBitSet;
+import org.apache.lucene.util.StringHelper;
 import org.apache.lucene.util.packed.MonotonicBlockPackedWriter;
 import org.apache.lucene.util.packed.PackedInts;
 import org.elasticsearch.core.IOUtils;
@@ -128,6 +129,7 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
             long numTerms = 0;
             int maxTermLength = 0;
             int numPending = 0;
+            BytesRefBuilder prevTerm = new BytesRefBuilder();
             for (BytesRef term = te.next(); term != null; term = te.next()) {
                 pe = te.postings(pe, flags);
                 if (pe.nextDoc() == DocIdSetIterator.NO_MORE_DOCS) {
@@ -136,8 +138,16 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                 long proxOffset = hasPositions ? prox.getFilePointer() : -1L;
                 long postingsStartPointer = postingsOut.size();
                 writer.write(pe, postingsOut);
-                termsOut.writeVInt(term.length);
-                termsOut.writeBytes(term.bytes, term.offset, term.length);
+                int prefix;
+                if (term.length == 0) {
+                    assert prevTerm.length() == 0;
+                    prefix = 0;
+                } else {
+                    prefix = StringHelper.bytesDifference(prevTerm.get(), term);
+                }
+                termsOut.writeVInt(prefix);
+                termsOut.writeVInt(term.length - prefix);
+                termsOut.writeBytes(term.bytes, term.offset + prefix, term.length - prefix);
                 termsOut.writeVInt(writer.docFreq);
                 if (hasFreqs) {
                     termsOut.writeVLong(writer.totalTermFreq);
@@ -154,6 +164,9 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                     flushBlock(numPending, termsOut, postingsOut);
                     numPending = 0;
                     ++numBlocks;
+                    prevTerm.setLength(0);
+                } else {
+                    prevTerm.copyBytes(term);
                 }
             }
             termIndexWriter.finish(index.getFilePointer());

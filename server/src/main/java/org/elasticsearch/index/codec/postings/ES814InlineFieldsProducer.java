@@ -487,8 +487,10 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
 
         private void scanNextTermInCurrentFrame() throws IOException {
             assert loadedFrameIndex == state.blockIndex : loadedFrameIndex + " != " + state.blockIndex;
-            term.setLength(termsReader.readVInt());
-            termsReader.readBytes(term.bytes(), 0, term.length());
+            final int prefix = termsReader.readVInt();
+            final int suffix = termsReader.readVInt();
+            term.setLength(prefix + suffix);
+            termsReader.readBytes(term.bytes(), prefix, suffix);
             state.docFreq = termsReader.readVInt();
 
             if (meta.options.compareTo(IndexOptions.DOCS_AND_FREQS) >= 0) {
