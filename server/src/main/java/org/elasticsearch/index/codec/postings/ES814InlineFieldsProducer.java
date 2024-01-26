@@ -496,7 +496,7 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             state.docFreq = termsReader.readVInt();
 
             if (meta.options.compareTo(IndexOptions.DOCS_AND_FREQS) >= 0) {
-                state.totalTermFreq = termsReader.readVLong();
+                state.totalTermFreq = state.docFreq + termsReader.readVLong();
             } else {
                 state.totalTermFreq = state.docFreq;
             }
