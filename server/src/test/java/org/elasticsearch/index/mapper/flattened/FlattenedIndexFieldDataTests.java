@@ -46,9 +46,7 @@ public class FlattenedIndexFieldDataTests extends ESSingleNodeTestCase {
             indicesService.getCircuitBreakerService()
         );
 
-        FlattenedFieldMapper fieldMapper = new FlattenedFieldMapper.Builder("flattened").build(
-            MapperBuilderContext.root(false, false)
-        );
+        FlattenedFieldMapper fieldMapper = new FlattenedFieldMapper.Builder("flattened").build(MapperBuilderContext.root(false, false));
         MappedFieldType fieldType1 = fieldMapper.fieldType().getChildFieldType("key");
 
         AtomicInteger onCacheCalled = new AtomicInteger();

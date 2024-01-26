@@ -24,6 +24,10 @@ public final class MapperMergeContext {
         return new MapperMergeContext(MapperBuilderContext.root(isSourceSynthetic, isDataStream, isAllFieldEnabled));
     }
 
+    public static MapperMergeContext root(boolean isSourceSynthetic, boolean isDataStream) {
+        return new MapperMergeContext(MapperBuilderContext.root(isSourceSynthetic, isDataStream, false));
+    }
+
     /**
      * Creates a new {@link MapperMergeContext} from a {@link MapperBuilderContext}
      * @param mapperBuilderContext the {@link MapperBuilderContext} for this {@link MapperMergeContext}
