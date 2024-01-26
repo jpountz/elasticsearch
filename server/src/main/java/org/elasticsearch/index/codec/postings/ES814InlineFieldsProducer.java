@@ -471,6 +471,7 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             long termsFP = index.getFilePointer();
             state.blockPostingsFP = termsFP + termBytes;
             state.docOffset = state.blockPostingsFP;
+            state.proxOffset = 0;
             state.termPostingsBytes = 0L;
             decompressTerms((int) termBytes, (int) originalTermsBytes);
             loadedFrameIndex = state.blockIndex;
@@ -481,6 +482,7 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             state.termIndexInBlock = 0;
             termsReader.setPosition(0);
             state.docOffset = state.blockPostingsFP;
+            state.proxOffset = 0;
             state.termPostingsBytes = 0L;
             index.seek(state.blockPostingsFP);
         }
@@ -499,7 +501,7 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
                 state.totalTermFreq = state.docFreq;
             }
             if (meta.options.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0) {
-                state.proxOffset = termsReader.readLong();
+                state.proxOffset += termsReader.readVLong();
             }
             state.docOffset += state.termPostingsBytes;
             state.termPostingsBytes = termsReader.readVLong();

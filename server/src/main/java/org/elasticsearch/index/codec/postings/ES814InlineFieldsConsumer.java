@@ -130,6 +130,7 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
             int maxTermLength = 0;
             int numPending = 0;
             BytesRefBuilder prevTerm = new BytesRefBuilder();
+            long prevProxOffset = 0;
             for (BytesRef term = te.next(); term != null; term = te.next()) {
                 pe = te.postings(pe, flags);
                 if (pe.nextDoc() == DocIdSetIterator.NO_MORE_DOCS) {
@@ -153,7 +154,8 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                     termsOut.writeVLong(writer.totalTermFreq);
                 }
                 if (hasPositions) {
-                    termsOut.writeLong(proxOffset);
+                    termsOut.writeVLong(proxOffset - prevProxOffset);
+                    prevProxOffset = proxOffset;
                 }
                 termsOut.writeVLong(postingsOut.size() - postingsStartPointer);
                 ++numPending;
@@ -165,6 +167,7 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                     numPending = 0;
                     ++numBlocks;
                     prevTerm.setLength(0);
+                    prevProxOffset = 0;
                 } else {
                     prevTerm.copyBytes(term);
                 }
