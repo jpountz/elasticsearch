@@ -134,7 +134,7 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                     continue;
                 }
                 long proxOffset = hasPositions ? prox.getFilePointer() : -1L;
-                long postingsPointer = postingsOut.size();
+                long postingsStartPointer = postingsOut.size();
                 writer.write(pe, postingsOut);
                 termsOut.writeVInt(term.length);
                 termsOut.writeBytes(term.bytes, term.offset, term.length);
@@ -145,7 +145,7 @@ final class ES814InlineFieldsConsumer extends FieldsConsumer {
                 if (hasPositions) {
                     termsOut.writeLong(proxOffset);
                 }
-                termsOut.writeLong(postingsPointer);
+                termsOut.writeVLong(postingsOut.size() - postingsStartPointer);
                 ++numPending;
                 maxTermLength = Math.max(maxTermLength, term.length);
                 ++numTerms;

@@ -332,8 +332,8 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             state.blockIndex = -1;
             state.termIndexInBlock = 0;
             state.numTermsInBlock = -1;
-            state.postingsFP = 0;
-            state.postingsBytes = 0;
+            state.blockPostingsFP = 0;
+            state.blockPostingsBytes = 0;
         }
 
         private long findBlockIndex(BytesRef target) throws IOException {
@@ -439,7 +439,7 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
                     return null; // exhausted
                 }
                 if (state.blockIndex > 0) {
-                    index.seek(state.postingsFP + state.postingsBytes);
+                    index.seek(state.blockPostingsFP + state.blockPostingsBytes);
                 }
                 loadFrame();
             } else if (state.blockIndex != loadedFrameIndex) {
@@ -467,9 +467,11 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             state.numTermsInBlock = index.readVInt();
             final long originalTermsBytes = index.readVLong();
             final long termBytes = index.readVLong();
-            state.postingsBytes = index.readVLong();
+            state.blockPostingsBytes = index.readVLong();
             long termsFP = index.getFilePointer();
-            state.postingsFP = termsFP + termBytes;
+            state.blockPostingsFP = termsFP + termBytes;
+            state.docOffset = state.blockPostingsFP;
+            state.termPostingsBytes = 0L;
             decompressTerms((int) termBytes, (int) originalTermsBytes);
             loadedFrameIndex = state.blockIndex;
         }
@@ -478,7 +480,9 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             assert loadedFrameIndex == state.blockIndex : loadedFrameIndex + " != " + state.blockIndex;
             state.termIndexInBlock = 0;
             termsReader.setPosition(0);
-            index.seek(state.postingsFP);
+            state.docOffset = state.blockPostingsFP;
+            state.termPostingsBytes = 0L;
+            index.seek(state.blockPostingsFP);
         }
 
         private void scanNextTermInCurrentFrame() throws IOException {
@@ -495,7 +499,8 @@ final class ES814InlineFieldsProducer extends FieldsProducer {
             if (meta.options.compareTo(IndexOptions.DOCS_AND_FREQS_AND_POSITIONS) >= 0) {
                 state.proxOffset = termsReader.readLong();
             }
-            state.docOffset = state.postingsFP + termsReader.readLong();
+            state.docOffset += state.termPostingsBytes;
+            state.termPostingsBytes = termsReader.readVLong();
             state.termIndexInBlock++;
         }
 

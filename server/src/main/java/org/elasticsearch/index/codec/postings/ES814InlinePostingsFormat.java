@@ -64,9 +64,10 @@ public final class ES814InlinePostingsFormat extends PostingsFormat {
         public long termIndexInBlock;
         public long numTermsInBlock;
 
-        public long postingsFP;
-        public long postingsBytes;
+        public long blockPostingsFP;
+        public long blockPostingsBytes;
 
+        public long termPostingsBytes;
         public long docOffset;
         public long proxOffset;
 
@@ -77,9 +78,10 @@ public final class ES814InlinePostingsFormat extends PostingsFormat {
             this.blockIndex = state.blockIndex;
             this.termIndexInBlock = state.termIndexInBlock;
             this.numTermsInBlock = state.numTermsInBlock;
-            this.postingsFP = state.postingsFP;
-            this.postingsBytes = state.postingsBytes;
+            this.blockPostingsFP = state.blockPostingsFP;
+            this.blockPostingsBytes = state.blockPostingsBytes;
             this.docOffset = state.docOffset;
+            this.termPostingsBytes = state.termPostingsBytes;
             this.proxOffset = state.proxOffset;
         }
 
