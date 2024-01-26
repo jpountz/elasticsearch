@@ -22,6 +22,10 @@ public class MapperBuilderContext {
         return new MapperBuilderContext(null, isSourceSynthetic, isDataStream, indexIntoAllField);
     }
 
+    public static MapperBuilderContext root(boolean isSourceSynthetic, boolean isDataStream) {
+        return new MapperBuilderContext(null, isSourceSynthetic, isDataStream, false);
+    }
+
     private final String path;
     private final boolean isSourceSynthetic;
     private final boolean isDataStream;

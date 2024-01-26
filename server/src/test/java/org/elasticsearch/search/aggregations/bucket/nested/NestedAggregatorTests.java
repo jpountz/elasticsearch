@@ -912,6 +912,6 @@ public class NestedAggregatorTests extends AggregatorTestCase {
     );
 
     public static NestedObjectMapper nestedObject(String path) {
-        return new NestedObjectMapper.Builder(path, IndexVersion.current()).build(MapperBuilderContext.root(false, false, false));
+        return new NestedObjectMapper.Builder(path, IndexVersion.current()).build(MapperBuilderContext.root(false, false));
     }
 }

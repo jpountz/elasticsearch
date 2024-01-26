@@ -283,7 +283,7 @@ public class ParametrizedMapperTests extends MapperServiceTestCase {
             pc = pc.createDynamicTemplateContext(null);
         }
         return (TestMapper) new TypeParser().parse("field", XContentHelper.convertToMap(JsonXContent.jsonXContent, mapping, true), pc)
-            .build(MapperBuilderContext.root(false, false, false));
+            .build(MapperBuilderContext.root(false, false));
     }
 
     private static TestMapper fromMapping(String mapping, IndexVersion version, TransportVersion transportVersion) {

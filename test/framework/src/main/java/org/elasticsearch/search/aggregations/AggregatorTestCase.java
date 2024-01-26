@@ -1079,7 +1079,7 @@ public abstract class AggregatorTestCase extends ESTestCase {
 
             IndexSettings indexSettings = createIndexSettings();
             Mapper.Builder builder = mappedType.getValue().parse(fieldName, source, new MockParserContext(indexSettings));
-            FieldMapper mapper = (FieldMapper) builder.build(MapperBuilderContext.root(false, false, false));
+            FieldMapper mapper = (FieldMapper) builder.build(MapperBuilderContext.root(false, false));
 
             MappedFieldType fieldType = mapper.fieldType();
 

@@ -1501,10 +1501,10 @@ public class NestedObjectMapperTests extends MapperServiceTestCase {
     public void testMergeNested() {
         NestedObjectMapper firstMapper = new NestedObjectMapper.Builder("nested1", IndexVersion.current()).includeInParent(true)
             .includeInRoot(true)
-            .build(MapperBuilderContext.root(false, false, false));
+            .build(MapperBuilderContext.root(false, false));
         NestedObjectMapper secondMapper = new NestedObjectMapper.Builder("nested1", IndexVersion.current()).includeInParent(false)
             .includeInRoot(true)
-            .build(MapperBuilderContext.root(false, false, false));
+            .build(MapperBuilderContext.root(false, false));
 
         MapperException e = expectThrows(
             MapperException.class,

@@ -16,7 +16,7 @@ public class IpRangeFieldTypeTests extends FieldTypeTestCase {
 
     public void testFetchSourceValue() throws IOException {
         RangeFieldMapper mapper = new RangeFieldMapper.Builder("field", RangeType.IP, true).build(
-            MapperBuilderContext.root(false, false, false)
+            MapperBuilderContext.root(false, false)
         );
         Map<String, Object> range = Map.of("gte", "2001:db8:0:0:0:0:2:1");
         assertEquals(List.of(Map.of("gte", "2001:db8::2:1")), fetchSourceValue(mapper.fieldType(), range));

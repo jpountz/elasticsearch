@@ -337,7 +337,7 @@ public class RootObjectMapper extends ObjectMapper {
                         template,
                         dynamicType,
                         (name, mapping) -> typeParser.parse(name, mapping, parserContext)
-                            .build(MapperBuilderContext.root(false, false, false))
+                            .build(MapperBuilderContext.root(false, false))
                     );
                 }
                 lastError = null; // ok, the template is valid for at least one type

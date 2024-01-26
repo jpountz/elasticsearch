@@ -180,7 +180,7 @@ public class DataStreamIndexSettingsProvider implements IndexSettingProvider {
                 for (Iterator<String> iterator = template.pathMatch().iterator(); iterator.hasNext();) {
                     var mapper = parserContext.typeParser(mappingSnippetType)
                         .parse(iterator.next(), mappingSnippet, parserContext)
-                        .build(MapperBuilderContext.root(false, false, false));
+                        .build(MapperBuilderContext.root(false, false));
                     extractPath(routingPaths, mapper);
                     if (iterator.hasNext()) {
                         // Since FieldMapper.parse modifies the Map passed in (removing entries for "type"), that means

@@ -222,7 +222,7 @@ public class KeywordFieldTypeTests extends FieldTypeTestCase {
 
     public void testFetchSourceValue() throws IOException {
         MappedFieldType mapper = new KeywordFieldMapper.Builder("field", IndexVersion.current()).build(
-            MapperBuilderContext.root(false, false, false)
+            MapperBuilderContext.root(false, false)
         ).fieldType();
         assertEquals(List.of("value"), fetchSourceValue(mapper, "value"));
         assertEquals(List.of("42"), fetchSourceValue(mapper, 42L));
@@ -232,7 +232,7 @@ public class KeywordFieldTypeTests extends FieldTypeTestCase {
         assertEquals("Field [field] of type [keyword] doesn't support formats.", e.getMessage());
 
         MappedFieldType ignoreAboveMapper = new KeywordFieldMapper.Builder("field", IndexVersion.current()).ignoreAbove(4)
-            .build(MapperBuilderContext.root(false, false, false))
+            .build(MapperBuilderContext.root(false, false))
             .fieldType();
         assertEquals(List.of(), fetchSourceValue(ignoreAboveMapper, "value"));
         assertEquals(List.of("42"), fetchSourceValue(ignoreAboveMapper, 42L));
@@ -243,13 +243,13 @@ public class KeywordFieldTypeTests extends FieldTypeTestCase {
             createIndexAnalyzers(),
             ScriptCompiler.NONE,
             IndexVersion.current()
-        ).normalizer("lowercase").build(MapperBuilderContext.root(false, false, false)).fieldType();
+        ).normalizer("lowercase").build(MapperBuilderContext.root(false, false)).fieldType();
         assertEquals(List.of("value"), fetchSourceValue(normalizerMapper, "VALUE"));
         assertEquals(List.of("42"), fetchSourceValue(normalizerMapper, 42L));
         assertEquals(List.of("value"), fetchSourceValue(normalizerMapper, "value"));
 
         MappedFieldType nullValueMapper = new KeywordFieldMapper.Builder("field", IndexVersion.current()).nullValue("NULL")
-            .build(MapperBuilderContext.root(false, false, false))
+            .build(MapperBuilderContext.root(false, false))
             .fieldType();
         assertEquals(List.of("NULL"), fetchSourceValue(nullValueMapper, null));
     }

@@ -47,7 +47,7 @@ public class FlattenedIndexFieldDataTests extends ESSingleNodeTestCase {
         );
 
         FlattenedFieldMapper fieldMapper = new FlattenedFieldMapper.Builder("flattened").build(
-            MapperBuilderContext.root(false, false, false)
+            MapperBuilderContext.root(false, false)
         );
         MappedFieldType fieldType1 = fieldMapper.fieldType().getChildFieldType("key");
 
