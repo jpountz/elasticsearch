@@ -3,3 +3,9 @@ summary: Upgrade to Lucene 9.10.0
 area: Search
 type: enhancement
 issues: []
+highlight:
+  title: "New Lucene 9.10.0 release"
+  body: |-
+    Tail postings are now encoded with group-varint. This may speed up multi-term queries that visit lots of terms that have short postings, e.g. prefix queries.
+    Range queries on numeric fields now exit early on segments whose range of values doesn't intersect with the query range. This should help a bit with queries that filter on narrow ranges of time, e.g. the last 5 minutes.
+    Boolean queries that mix FILTER and SHOULD clauses now propagate minimum competitive scores through the SHOULD clauses. This should help when sorting by descending score.
